@@ -9,6 +9,8 @@ import RecorderScreen from '@screens/RecorderScreen';
 import EpisodeDetailScreen from '@screens/EpisodeDetailScreen';
 import CommentsScreen from '@screens/CommentsScreen';
 import ProfileScreen from '@screens/ProfileScreen';
+import TopicsScreen from '@screens/TopicsScreen';
+import TopicDetailScreen from '@screens/TopicDetailScreen';
 import LiveHostScreen from '@screens/LiveHostScreen';
 import LiveListenerScreen from '@screens/LiveListenerScreen';
 import PaywallScreen from '@screens/PaywallScreen';
@@ -25,9 +27,11 @@ export type RootStackParamList = {
   Recorder: undefined;
   Episode: { id: string };
   Comments: { episodeId: string; episodeTitle?: string };
+  Profile: undefined;
+  Topics: undefined;
+  TopicDetail: { topicId: string };
   LiveHost: undefined;
   LiveListener: undefined;
-  Profile: undefined;
   Paywall: undefined;
   Settings: undefined;
 };
@@ -52,6 +56,8 @@ const RootNavigator: React.FC = () => {
           <Stack.Screen name="Episode" component={EpisodeDetailScreen} />
           <Stack.Screen name="Comments" component={CommentsScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Topics" component={TopicsScreen} />
+          <Stack.Screen name="TopicDetail" component={TopicDetailScreen} />
           <Stack.Screen name="LiveHost" component={LiveHostScreen} />
           <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
           <Stack.Screen name="Paywall" component={PaywallScreen} />

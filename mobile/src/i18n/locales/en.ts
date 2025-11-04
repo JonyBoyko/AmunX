@@ -156,6 +156,26 @@ export default {
       },
     },
 
+    // Topics
+    topics: {
+      title: 'Topics',
+      episodes: 'episodes',
+      followers: 'followers',
+      follow: 'Follow',
+      following: 'Following',
+      unfollow: 'Unfollow',
+      latestEpisodes: 'Latest Episodes',
+      notFound: 'Topic not found',
+      empty: {
+        title: 'No topics available',
+        message: 'Topics will appear here once created',
+      },
+      noEpisodes: {
+        title: 'No episodes yet',
+        message: 'Be the first to post an episode in this topic!',
+      },
+    },
+
     // Profile Screen
     profile: {
       title: 'Profile',

@@ -156,6 +156,26 @@ export default {
       },
     },
 
+    // Topics
+    topics: {
+      title: 'Теми',
+      episodes: 'епізодів',
+      followers: 'підписників',
+      follow: 'Підписатися',
+      following: 'Підписано',
+      unfollow: 'Відписатися',
+      latestEpisodes: 'Останні епізоди',
+      notFound: 'Тему не знайдено',
+      empty: {
+        title: 'Немає доступних тем',
+        message: 'Теми з'являться тут після створення',
+      },
+      noEpisodes: {
+        title: 'Ще немає епізодів',
+        message: 'Будьте першим, хто опублікує епізод у цій темі!',
+      },
+    },
+
     // Profile Screen
     profile: {
       title: 'Профіль',

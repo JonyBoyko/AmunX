@@ -125,6 +125,12 @@ const FeedScreen: React.FC<FeedScreenProps> = ({ navigation }) => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}
+            onPress={() => navigation.navigate('Topics')}
+          >
+            <Ionicons name="folder-outline" size={20} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={() => navigation.navigate('Recorder')}
           >
             <Text style={styles.headerButtonIcon}>🎙️</Text>
