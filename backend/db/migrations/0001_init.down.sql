@@ -7,8 +7,10 @@ DROP TABLE IF EXISTS summaries;
 DROP INDEX IF EXISTS episodes_author_published_idx;
 DROP INDEX IF EXISTS episodes_topic_published_idx;
 DROP TABLE IF EXISTS episodes;
+DROP TYPE IF EXISTS episode_quality;
+DROP TYPE IF EXISTS episode_mask;
+DROP TYPE IF EXISTS episode_status;
 DROP TYPE IF EXISTS visibility;
 DROP TABLE IF EXISTS follows;
 DROP TABLE IF EXISTS topics;
 DROP TABLE IF EXISTS users;
-

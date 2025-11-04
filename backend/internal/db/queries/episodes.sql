@@ -1,14 +1,16 @@
 -- name: CreateEpisode :one
-INSERT INTO episodes (author_id, topic_id, visibility, status, title, duration_sec, quality, mask, is_live)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING *;
+INSERT INTO episodes (id, author_id, topic_id, visibility, mask, quality, duration_sec, storage_key)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, status, storage_key, created_at;
 
 -- name: UpdateEpisodeStatus :one
 UPDATE episodes
 SET status = $2,
+    status_changed_at = now(),
+    updated_at = now(),
     published_at = CASE WHEN $2 = 'public' THEN now() ELSE published_at END
 WHERE id = $1
-RETURNING *;
+RETURNING id, status, status_changed_at, published_at;
 
 -- name: ListPublicEpisodes :many
 SELECT *

@@ -172,6 +172,7 @@ func uuidFromParam(value string) (uuid.UUID, error) {
 
 type createEpisodeParams struct {
 	ID          uuid.UUID
+	AuthorID    *uuid.UUID
 	Visibility  string
 	TopicID     *string
 	Mask        string
@@ -182,16 +183,32 @@ type createEpisodeParams struct {
 
 func createEpisode(ctx context.Context, db *sql.DB, params createEpisodeParams) error {
 	const stmt = `
-INSERT INTO episodes (id, visibility, topic_id, mask, quality, duration_sec, status, audio_url)
-VALUES ($1, $2, $3, $4, $5, $6, 'pending_upload', $7);
+INSERT INTO episodes (id, author_id, topic_id, visibility, mask, quality, duration_sec, storage_key)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 `
+	var (
+		author   interface{}
+		topic    interface{}
+		duration interface{}
+	)
+	if params.AuthorID != nil {
+		author = *params.AuthorID
+	}
+	if params.TopicID != nil {
+		topic = *params.TopicID
+	}
+	if params.DurationSec != nil {
+		duration = *params.DurationSec
+	}
+
 	_, err := db.ExecContext(ctx, stmt,
 		params.ID,
+		author,
+		topic,
 		params.Visibility,
-		params.TopicID,
 		params.Mask,
 		params.Quality,
-		params.DurationSec,
+		duration,
 		params.StorageKey,
 	)
 	return err
@@ -200,7 +217,10 @@ VALUES ($1, $2, $3, $4, $5, $6, 'pending_upload', $7);
 func setEpisodeStatus(ctx context.Context, db *sql.DB, id uuid.UUID, status string) error {
 	const stmt = `
 UPDATE episodes
-SET status = $2
+SET status = $2,
+    status_changed_at = now(),
+    updated_at = now(),
+    published_at = CASE WHEN $2 = 'public' THEN now() ELSE published_at END
 WHERE id = $1
 RETURNING id;
 `
@@ -211,10 +231,12 @@ RETURNING id;
 func undoEpisode(ctx context.Context, db *sql.DB, id uuid.UUID, undoSeconds int) (bool, error) {
 	const stmt = `
 UPDATE episodes
-SET status = 'deleted'
+SET status = 'deleted',
+    status_changed_at = now(),
+    updated_at = now()
 WHERE id = $1
   AND status = 'pending_public'
-  AND now() - created_at <= ($2::int || ' seconds')::interval
+  AND now() - status_changed_at <= ($2::int || ' seconds')::interval
 RETURNING id;
 `
 	var scanned uuid.UUID
