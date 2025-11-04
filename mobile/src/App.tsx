@@ -8,9 +8,17 @@ import { SessionProvider } from './store/session';
 import { initAnalytics } from './lib/analytics';
 import { initI18n } from '@i18n/index';
 import { theme } from '@theme/theme';
+import { usePushNotifications } from '@hooks/usePushNotifications';
 
 const queryClient = new QueryClient();
 initAnalytics();
+
+function AppContent() {
+  // Setup push notifications globally
+  usePushNotifications();
+
+  return <RootNavigator />;
+}
 
 const App: React.FC = () => {
   const [i18nReady, setI18nReady] = useState(false);
@@ -35,7 +43,7 @@ const App: React.FC = () => {
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
         <NavigationContainer>
-          <RootNavigator />
+          <AppContent />
         </NavigationContainer>
       </QueryClientProvider>
     </SessionProvider>
