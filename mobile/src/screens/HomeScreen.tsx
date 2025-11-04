@@ -1,25 +1,56 @@
-import React from 'react';
-import { Button, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { ActivityIndicator, Button, FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
+import { useFeedQuery } from '@api/feed';
+import type { FeedEpisode } from '@api/feed';
 import { useSession } from '@store/session';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '@navigation/RootNavigator';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+const FeedItem: React.FC<{ episode: FeedEpisode }> = ({ episode }) => {
+  const title = episode.summary ?? 'Voice note';
+  const published = episode.published_at ? new Date(episode.published_at).toLocaleString() : 'Pending';
 
-const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const { setToken } = useSession();
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <Text style={styles.meta}>Mask: {episode.mask}, Quality: {episode.quality}</Text>
+      <Text style={styles.meta}>Published: {published}</Text>
+      {episode.keywords && episode.keywords.length > 0 && <Text style={styles.meta}>Keywords: {episode.keywords.join(', ')}</Text>}
+      <Button title="Play" onPress={() => {}} />
+    </View>
+  );
+};
+
+const HomeScreen: React.FC = ({ navigation }: any) => {
+  const { token } = useSession();
+  const query = useFeedQuery(token);
+
+  const items = useMemo(() => query.data?.items ?? [], [query.data]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.heading}>AmunX Feed</Text>
+        <Text style={styles.headerTitle}>Your Feed</Text>
         <Button title="Record" onPress={() => navigation.navigate('Recorder')} />
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.placeholder}>Feed is coming soon. Publish your first voice note!</Text>
-      </ScrollView>
-      <Button title="Sign out" onPress={() => setToken(null)} />
+
+      {query.isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator />
+        </View>
+      ) : query.isError ? (
+        <View style={styles.center}>
+          <Text style={styles.error}>Failed to load feed.</Text>
+          <Button title="Retry" onPress={() => query.refetch()} />
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={({ item }) => <FeedItem episode={item} />}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -27,31 +58,49 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
-    padding: 16,
-    gap: 16
+    backgroundColor: '#0f172a'
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    padding: 16
   },
-  heading: {
+  headerTitle: {
     color: '#f8fafc',
-    fontSize: 22,
-    fontWeight: '600'
+    fontSize: 20,
+    fontWeight: '700'
   },
-  content: {
-    flexGrow: 1,
+  center: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  placeholder: {
-    color: '#94a3b8',
-    fontSize: 16,
-    textAlign: 'center'
+  error: {
+    color: '#f87171',
+    marginBottom: 12
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingBottom: 24
+  },
+  separator: {
+    height: 12
+  },
+  card: {
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 16,
+    gap: 8
+  },
+  cardTitle: {
+    color: '#f8fafc',
+    fontSize: 18,
+    fontWeight: '600'
+  },
+  meta: {
+    color: '#cbd5f5'
   }
 });
 
 export default HomeScreen;
-
