@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amunx
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/amunx?sslmode=disable
+      REDIS_ADDRESS: redis:6379
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/amunx?sslmode=disable
+      REDIS_ADDRESS: redis:6379
+    depends_on:
+      - postgres
+      - redis
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: "--dev --config /etc/livekit.yaml"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+
+  loki:
+    image: grafana/loki:3.1.0
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+
+  promtail:
+    image: grafana/promtail:3.1.0
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./backend/deploy/promtail-config.yml:/etc/promtail/config.yml:ro
+      - logs:/var/log
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana-oss:11.2.2
+    ports:
+      - "3000:3000"
+    depends_on:
+      - loki
+
+volumes:
+  pgdata:
+  logs:
+

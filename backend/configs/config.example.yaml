@@ -1,0 +1,14 @@
+environment: development
+http_host: 0.0.0.0
+http_port: 8080
+database_url: postgres://postgres:postgres@postgres:5432/amunx?sslmode=disable
+redis_address: redis:6379
+storage_endpoint: https://<account>.r2.cloudflarestorage.com
+storage_bucket: amunx
+storage_access_key: YOUR_ACCESS_KEY
+storage_secret_key: YOUR_SECRET_KEY
+cdn_base_url: https://cdn.example.com
+jwt_access_secret: change-me
+jwt_refresh_secret: change-me-too
+magic_link_token_secret: change-me-as-well
+

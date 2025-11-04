@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Install sqlc
+        run: |
+          mkdir -p $HOME/bin
+          curl -sSL https://github.com/sqlc-dev/sqlc/releases/download/v1.24.0/sqlc_1.24.0_linux_amd64.tar.gz | tar -xz -C $HOME/bin
+          echo "$HOME/bin" >> $GITHUB_PATH
+      - name: Go fmt
+        run: gofmt -l .
+      - name: Go vet
+        run: go vet ./...
+      - name: Go test
+        run: go test ./...
+      - name: Build API
+        run: go build ./cmd/api
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Lint
+        run: npm run lint
+      - name: Type Check
+        run: npm run typecheck
+      - name: Tests
+        run: npm test

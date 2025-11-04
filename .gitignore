@@ -1,0 +1,1 @@
+# Node\nmobile/node_modules\nmobile/ios/build\nmobile/android/app/build\nmobile/ios/Pods\n# Go\nbackend/bin\nbackend/tmp\nbackend/.env\n# Logs\n*.log\n# Editor\n.vscode\n.idea\n.DS_Store\n
