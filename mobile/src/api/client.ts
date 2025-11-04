@@ -24,3 +24,15 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   return (await response.json()) as T;
 }
+
+
+export async function authedFetch<T>(token: string, path: string, options: RequestInit = {}): Promise<T> {
+  return apiFetch<T>(path, {
+    ...options,
+    headers: {
+      ...(options.headers ?? {}),
+      Authorization: Bearer 
+    }
+  });
+}
+
