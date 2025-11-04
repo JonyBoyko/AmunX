@@ -6,6 +6,7 @@ import AuthScreen from '@screens/AuthScreen';
 import FeedScreen from '@screens/FeedScreen';
 import RecorderScreen from '@screens/RecorderScreen';
 import EpisodeDetailScreen from '@screens/EpisodeDetailScreen';
+import CommentsScreen from '@screens/CommentsScreen';
 import LiveHostScreen from '@screens/LiveHostScreen';
 import LiveListenerScreen from '@screens/LiveListenerScreen';
 import PaywallScreen from '@screens/PaywallScreen';
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   Feed: undefined;
   Recorder: undefined;
   Episode: { id: string };
+  Comments: { episodeId: string; episodeTitle?: string };
   LiveHost: undefined;
   LiveListener: undefined;
   Profile: undefined;
@@ -45,6 +47,7 @@ const RootNavigator: React.FC = () => {
           <Stack.Screen name="Feed" component={FeedScreen} />
           <Stack.Screen name="Recorder" component={RecorderScreen} />
           <Stack.Screen name="Episode" component={EpisodeDetailScreen} />
+          <Stack.Screen name="Comments" component={CommentsScreen} />
           <Stack.Screen name="LiveHost" component={LiveHostScreen} />
           <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
           <Stack.Screen name="Paywall" component={PaywallScreen} />

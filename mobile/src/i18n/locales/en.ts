@@ -254,6 +254,22 @@ export default {
       live: 'LIVE',
     },
 
+    // Comments
+    comments: {
+      title: 'Comments',
+      viewAll: 'View all comments',
+      placeholder: 'Add a comment...',
+      anonymous: 'Anonymous',
+      empty: {
+        title: 'No comments yet',
+        message: 'Be the first to comment!',
+      },
+      flagged: {
+        title: 'Comment Flagged',
+        message: 'Your comment has been flagged for review.',
+      },
+    },
+
     // Error Messages
     errors: {
       network: 'Network error. Please check your connection.',

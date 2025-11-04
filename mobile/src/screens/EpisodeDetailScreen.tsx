@@ -328,8 +328,15 @@ const EpisodeDetailScreen: React.FC<EpisodeDetailScreenProps> = ({ navigation, r
 
         {/* Comments Section */}
         <View style={styles.commentsCard}>
-          <Text style={styles.sectionTitle}>{t('episode.comments', { defaultValue: 'Comments', count: 0 })}</Text>
-          <Text style={styles.comingSoon}>Comments coming soon! 💬</Text>
+          <Text style={styles.sectionTitle}>{t('episode.comments', { defaultValue: 'Comments' })}</Text>
+          <Button
+            title={t('comments.viewAll', { defaultValue: 'View all comments' })}
+            kind="tonal"
+            onPress={() =>
+              navigation.navigate('Comments', { episodeId: id, episodeTitle: title })
+            }
+            icon={<Ionicons name="chatbubbles-outline" size={18} color={theme.colors.text.primary} />}
+          />
         </View>
 
         {/* Action Buttons */}
