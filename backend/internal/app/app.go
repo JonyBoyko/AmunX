@@ -3,9 +3,12 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/amunx/backend/internal/auth"
 )
 
 // App wires together long-lived dependencies for the service.
@@ -14,6 +17,8 @@ type App struct {
 
 	DB          *sql.DB
 	Redis       *redis.Client
+	MagicLinks  *auth.MagicLinkSigner
+	JWT         *auth.JWTManager
 	ShutdownFns []func(context.Context) error
 }
 
@@ -66,10 +71,21 @@ func Build(ctx context.Context, cfg Config) (*App, error) {
 		return nil, fmt.Errorf("ping redis: %w", err)
 	}
 
+	magicSigner, err := auth.NewMagicLinkSigner(cfg.MagicLinkTokenSecret, cfg.MagicLinkTTL)
+	if err != nil {
+		return nil, fmt.Errorf("magic link signer: %w", err)
+	}
+
+	if cfg.JWTAccessSecret == "" || cfg.JWTRefreshSecret == "" {
+		return nil, errors.New("jwt secrets must be provided")
+	}
+	jwtManager := auth.NewJWTManager(cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
+
 	return &App{
-		Config: cfg,
-		DB:     db,
-		Redis:  redisClient,
+		Config:     cfg,
+		DB:         db,
+		Redis:      redisClient,
+		MagicLinks: magicSigner,
+		JWT:        jwtManager,
 	}, nil
 }
-

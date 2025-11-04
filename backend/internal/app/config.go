@@ -15,6 +15,8 @@ type Config struct {
 	HTTPReadTimeout  time.Duration `envconfig:"HTTP_READ_TIMEOUT" default:"15s"`
 	HTTPWriteTimeout time.Duration `envconfig:"HTTP_WRITE_TIMEOUT" default:"30s"`
 	HTTPIdleTimeout  time.Duration `envconfig:"HTTP_IDLE_TIMEOUT" default:"60s"`
+	RateLimitWindow  time.Duration `envconfig:"RATE_LIMIT_WINDOW" default:"1m"`
+	RateLimitMax     int           `envconfig:"RATE_LIMIT_MAX" default:"120"`
 
 	DatabaseURL string `envconfig:"DATABASE_URL" default:"postgres://postgres:postgres@localhost:5432/amunx?sslmode=disable"`
 
@@ -59,4 +61,3 @@ func LoadConfig(prefix string) (Config, error) {
 	}
 	return cfg, nil
 }
-

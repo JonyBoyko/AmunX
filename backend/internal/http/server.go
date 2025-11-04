@@ -36,6 +36,9 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+	if deps.Redis != nil && cfg.RateLimitMax > 0 {
+		router.Use(mw.NewRateLimiter(deps.Redis, cfg.RateLimitWindow, cfg.RateLimitMax).Handler())
+	}
 	router.Use(mw.Logger(logger))
 	router.Use(mw.Gzip)
 
@@ -57,6 +60,10 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	router.Route("/v1", func(r chi.Router) {
+		registerAuthRoutes(r, deps, logger)
 	})
 
 	server := &http.Server{
