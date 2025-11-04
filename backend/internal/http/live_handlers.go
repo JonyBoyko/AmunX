@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	livekitauth "github.com/livekit/protocol/auth"
 
 	"github.com/amunx/backend/internal/app"
 	"github.com/amunx/backend/internal/httpctx"
@@ -78,7 +79,11 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 			return
 		}
 
-		token := generateLiveToken(deps.Config, sessionID.String(), user.ID.String(), "host", now.Add(1*time.Hour))
+		token, err := generateLiveToken(deps.Config, roomName, user.ID.String(), "host", now.Add(1*time.Hour))
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "token_generation_failed", err.Error())
+			return
+		}
 
 		WriteJSON(w, http.StatusCreated, map[string]any{
 			"session": map[string]any{
@@ -134,7 +139,7 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 
 		now := time.Now().UTC()
 		recordingKey := strings.TrimSpace(payload.RecordingKey)
-	if err := markLiveSessionEnded(req.Context(), deps.DB, sessionID, now, recordingKey, payload.DurationSec); err != nil {
+		if err := markLiveSessionEnded(req.Context(), deps.DB, sessionID, now, recordingKey, payload.DurationSec); err != nil {
 			WriteError(w, http.StatusInternalServerError, "session_end_failed", err.Error())
 			return
 		}
@@ -199,7 +204,11 @@ func registerPublicLiveRoutes(r chi.Router, deps *app.App) {
 		}
 
 		expiry := time.Now().UTC().Add(2 * time.Hour)
-		token := generateLiveToken(deps.Config, session.ID.String(), userID, role, expiry)
+		token, err := generateLiveToken(deps.Config, session.Room, userID, role, expiry)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "token_generation_failed", err.Error())
+			return
+		}
 
 		WriteJSON(w, http.StatusOK, map[string]any{
 			"session": session,
@@ -290,15 +299,37 @@ WHERE id = $1 AND ended_at IS NULL;
 	return nil
 }
 
-func generateLiveToken(cfg app.Config, sessionID, userID, role string, expiry time.Time) string {
-	payload := fmt.Sprintf("%s|%s|%s|%d", sessionID, userID, role, expiry.Unix())
-	secret := cfg.LiveKitAPISecret
-	if secret == "" {
-		secret = "dev-secret"
+func generateLiveToken(cfg app.Config, roomName, userID, role string, expiry time.Time) (string, error) {
+	if cfg.LiveKitAPIKey == "" || cfg.LiveKitAPISecret == "" {
+		payload := fmt.Sprintf("%s|%s|%s|%d", roomName, userID, role, expiry.Unix())
+		mac := hmac.New(sha256.New, []byte("dev-secret"))
+		mac.Write([]byte(payload))
+		sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+		return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + sig, nil
 	}
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload))
-	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	token := base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + sig
-	return token
+
+	duration := time.Until(expiry)
+	if duration <= 0 {
+		duration = time.Minute * 10
+	}
+
+	videoGrant := &livekitauth.VideoGrant{
+		RoomJoin: true,
+		Room:     roomName,
+	}
+	videoGrant.SetCanSubscribe(true)
+	if role == "host" {
+		videoGrant.RoomAdmin = true
+		videoGrant.SetCanPublish(true)
+		videoGrant.SetCanPublishData(true)
+	} else {
+		videoGrant.SetCanPublishData(true)
+	}
+
+	token := livekitauth.NewAccessToken(cfg.LiveKitAPIKey, cfg.LiveKitAPISecret).
+		SetIdentity(userID).
+		SetValidFor(duration).
+		AddGrant(videoGrant)
+
+	return token.ToJWT()
 }

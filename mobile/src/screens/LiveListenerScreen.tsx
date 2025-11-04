@@ -1,138 +1,209 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   Alert,
   Button,
+  FlatList,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  View,
-  FlatList
+  View
 } from 'react-native';
+
+import { AudioSession, LiveKitRoom } from '@livekit/react-native';
 
 import { getLiveSession, type LiveSessionCreateResponse } from '@api/live';
 import { useSession } from '@store/session';
 
-type ChatEntry = { id: string; sender: string; text: string; ts: string };
+type LogEntry = {
+  id: string;
+  text: string;
+  ts: string;
+};
 
 const LiveListenerScreen: React.FC = () => {
   const { token } = useSession();
 
-  const [sessionIdInput, setSessionIdInput] = useState('');
+  const [sessionInput, setSessionInput] = useState('');
   const [role, setRole] = useState<'listener' | 'host'>('listener');
   const [loading, setLoading] = useState(false);
-  const [session, setSession] = useState<LiveSessionCreateResponse | null>(null);
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState<ChatEntry[]>([]);
+  const [response, setResponse] = useState<LiveSessionCreateResponse | null>(null);
+  const [shouldConnect, setShouldConnect] = useState(false);
+  const [roomConnected, setRoomConnected] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [messageDraft, setMessageDraft] = useState('');
 
-  const summary = useMemo(() => {
-    if (!session) return null;
+  const liveDetails = useMemo(() => {
+    if (!response) return null;
     return {
-      id: session.session.id,
-      room: session.session.room,
-      token: session.token,
-      url: session.url,
-      startedAt: session.session.started_at,
-      title: session.session.title ?? ''
+      id: response.session.id,
+      room: response.session.room,
+      token: response.token,
+      url: response.url,
+      startedAt: response.session.started_at,
+      title: response.session.title ?? ''
     };
-  }, [session]);
+  }, [response]);
 
-  const handleJoin = useCallback(async () => {
-    const trimmed = sessionIdInput.trim();
-    if (!trimmed) {
-      Alert.alert('Missing session', 'Enter a session identifier to join.');
+  const logEvent = useCallback((text: string) => {
+    setLogs((prev) => [
+      { id: `log-${Date.now()}-${Math.random()}`, text, ts: new Date().toISOString() },
+      ...prev
+    ]);
+  }, []);
+
+  useEffect(() => {
+    if (shouldConnect) {
+      AudioSession.startAudioSession().catch((err) => logEvent(`Audio session error: ${(err as Error).message}`));
+    } else {
+      AudioSession.stopAudioSession().catch(() => undefined);
+    }
+    return () => {
+      AudioSession.stopAudioSession().catch(() => undefined);
+    };
+  }, [shouldConnect, logEvent]);
+
+  const handleFetch = useCallback(async () => {
+    const sessionId = sessionInput.trim();
+    if (!sessionId) {
+      Alert.alert('Missing session', 'Enter a live session ID to continue.');
       return;
     }
     if (loading) return;
     setLoading(true);
     try {
-      const res = await getLiveSession(trimmed, role, token);
-      setSession(res);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-${Date.now()}`,
-          sender: 'system',
-          text: 'Connected to live room. This is a placeholder chat feed.',
-          ts: new Date().toISOString()
-        }
-      ]);
+      const res = await getLiveSession(sessionId, role, token);
+      setResponse(res);
+      logEvent(`Retrieved join token for role "${role}".`);
     } catch (error: any) {
-      Alert.alert('Error', error?.message ?? 'Failed to load live session');
+      Alert.alert('Error', error?.message ?? 'Failed to fetch live session');
+      logEvent('Unable to retrieve join token.');
     } finally {
       setLoading(false);
     }
-  }, [loading, role, sessionIdInput, token]);
-
-  const handleSend = useCallback(() => {
-    if (!chatInput.trim()) return;
-    const entry: ChatEntry = {
-      id: `local-${Date.now()}`,
-      sender: 'you',
-      text: chatInput.trim(),
-      ts: new Date().toISOString()
-    };
-    setChatInput('');
-    setMessages((prev) => [entry, ...prev]);
-  }, [chatInput]);
+  }, [loading, logEvent, role, sessionInput, token]);
 
   const toggleRole = useCallback(() => {
     setRole((prev) => (prev === 'listener' ? 'host' : 'listener'));
   }, []);
 
+  const handleJoin = useCallback(() => {
+    if (!response) {
+      Alert.alert('Missing token', 'Fetch the session details first.');
+      return;
+    }
+    setShouldConnect(true);
+    logEvent('Connecting to LiveKit room…');
+  }, [logEvent, response]);
+
+  const handleLeave = useCallback(() => {
+    setShouldConnect(false);
+    setRoomConnected(false);
+    logEvent('Disconnected from LiveKit room.');
+  }, [logEvent]);
+
+  const handleSendLocalMessage = useCallback(() => {
+    if (!messageDraft.trim()) return;
+    logEvent(`(local) ${messageDraft.trim()}`);
+    setMessageDraft('');
+  }, [logEvent, messageDraft]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.heading}>Join Live Session</Text>
-        <Text style={styles.infoLine}>Use this screen to request a LiveKit token from the API.</Text>
+        <Text style={styles.helper}>
+          Request a temporary token from the backend, then connect to the LiveKit room to listen or act as a co-host.
+        </Text>
+
         <Text style={styles.label}>Session ID</Text>
         <TextInput
-          value={sessionIdInput}
-          onChangeText={setSessionIdInput}
+          value={sessionInput}
+          onChangeText={setSessionInput}
           placeholder="live session UUID"
           placeholderTextColor="#64748b"
           style={styles.input}
         />
-        <Text style={styles.label}>Role</Text>
-        <View style={styles.row}>
-          <Button title={`Role: ${role}`} onPress={toggleRole} />
-        </View>
-        <Button title={loading ? 'Joining...' : 'Join Session'} onPress={handleJoin} disabled={loading} />
 
-        {summary && (
+        <View style={styles.buttonRow}>
+          <Button title={`Role: ${role}`} onPress={toggleRole} />
+          <Button title={loading ? 'Fetching…' : 'Fetch token'} onPress={handleFetch} disabled={loading} />
+        </View>
+
+        {liveDetails && (
           <View style={styles.section}>
-            <Text style={styles.subheading}>Session Info</Text>
-            <Text style={styles.caption}>ID: {summary.id}</Text>
-            <Text style={styles.caption}>Room: {summary.room}</Text>
-            <Text style={styles.caption}>Title: {summary.title}</Text>
-            <Text style={styles.caption}>Started: {summary.startedAt}</Text>
-            <Text style={styles.caption}>Token: {summary.token}</Text>
-            <Text style={styles.caption}>URL: {summary.url}</Text>
+            <Text style={styles.subheading}>Session Details</Text>
+            <Text style={styles.info}>ID: {liveDetails.id}</Text>
+            <Text style={styles.info}>Room: {liveDetails.room}</Text>
+            <Text style={styles.info}>Title: {liveDetails.title}</Text>
+            <Text style={styles.info}>Started: {liveDetails.startedAt}</Text>
+            <Text style={styles.info}>Token: {liveDetails.token}</Text>
+            <Text style={styles.info}>URL: {liveDetails.url}</Text>
+
+            <View style={styles.buttonRow}>
+              <Button title="Join audio" onPress={handleJoin} disabled={shouldConnect} />
+              <Button title="Leave audio" onPress={handleLeave} disabled={!roomConnected && !shouldConnect} />
+            </View>
+          </View>
+        )}
+
+        {response && shouldConnect && (
+          <View style={styles.liveContainer}>
+            <LiveKitRoom
+              serverUrl={response.url}
+              token={response.token}
+              connect={true}
+              options={{ adaptiveStream: { pixelDensity: 'screen' } }}
+              onConnected={() => {
+                setRoomConnected(true);
+                logEvent('Connected to LiveKit as listener.');
+              }}
+              onDisconnected={() => {
+                setRoomConnected(false);
+                setShouldConnect(false);
+                logEvent('LiveKit connection closed.');
+              }}
+            >
+              <View style={styles.liveControls}>
+                <Text style={styles.liveStatus}>
+                  You are connected as <Text style={styles.roleBadge}>{role}</Text>.
+                </Text>
+                <Text style={styles.info}>
+                  Remote audio will play through the device speaker. Use the buttons above to disconnect when finished.
+                </Text>
+              </View>
+            </LiveKitRoom>
           </View>
         )}
 
         <View style={styles.section}>
-          <Text style={styles.subheading}>Chat (local placeholder)</Text>
+          <Text style={styles.subheading}>Connection Status</Text>
+          <Text style={styles.info}>
+            {roomConnected ? 'Receiving live audio…' : shouldConnect ? 'Connecting…' : 'Disconnected'}
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.subheading}>Quick Notes</Text>
           <View style={styles.chatRow}>
             <TextInput
               style={styles.chatInput}
-              placeholder="Say something"
+              placeholder="Log a local note"
               placeholderTextColor="#64748b"
-              value={chatInput}
-              onChangeText={setChatInput}
+              value={messageDraft}
+              onChangeText={setMessageDraft}
             />
-            <Button title="Send" onPress={handleSend} />
+            <Button title="Add" onPress={handleSendLocalMessage} />
           </View>
           <FlatList
-            data={messages}
+            data={logs}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{ gap: 8 }}
+            contentContainerStyle={styles.eventList}
             renderItem={({ item }) => (
-              <View style={styles.chatBubble}>
-                <Text style={styles.chatSender}>{item.sender}</Text>
-                <Text style={styles.chatText}>{item.text}</Text>
-                <Text style={styles.chatTimestamp}>{new Date(item.ts).toLocaleTimeString()}</Text>
+              <View style={styles.eventItem}>
+                <Text style={styles.eventText}>{item.text}</Text>
+                <Text style={styles.eventTimestamp}>{new Date(item.ts).toLocaleTimeString()}</Text>
               </View>
             )}
           />
@@ -156,25 +227,26 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700'
   },
-  infoLine: {
+  helper: {
     color: '#cbd5f5'
   },
   label: {
     color: '#cbd5f5',
     fontSize: 14,
-    marginTop: 12
+    marginTop: 8
   },
   input: {
     backgroundColor: '#1e293b',
     color: '#f1f5f9',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingVertical: 10,
+    marginBottom: 4
   },
-  row: {
+  buttonRow: {
     flexDirection: 'row',
     gap: 12,
-    alignItems: 'center'
+    marginTop: 8
   },
   section: {
     backgroundColor: '#1e293b',
@@ -187,8 +259,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600'
   },
-  caption: {
+  info: {
     color: '#cbd5f5'
+  },
+  liveContainer: {
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12
+  },
+  liveControls: {
+    gap: 12
+  },
+  liveStatus: {
+    color: '#38bdf8',
+    fontWeight: '600',
+    fontSize: 16
+  },
+  roleBadge: {
+    color: '#facc15',
+    fontWeight: '700'
   },
   chatRow: {
     flexDirection: 'row',
@@ -197,29 +287,27 @@ const styles = StyleSheet.create({
   },
   chatInput: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0b1220',
     color: '#f8fafc',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8
   },
-  chatBubble: {
+  eventList: {
+    gap: 8
+  },
+  eventItem: {
     backgroundColor: '#0b1220',
     borderRadius: 12,
-    padding: 12
+    padding: 12,
+    gap: 4
   },
-  chatSender: {
-    color: '#38bdf8',
-    fontWeight: '600'
+  eventText: {
+    color: '#f8fafc'
   },
-  chatText: {
-    color: '#f8fafc',
-    marginTop: 4
-  },
-  chatTimestamp: {
+  eventTimestamp: {
     color: '#64748b',
-    fontSize: 12,
-    marginTop: 4
+    fontSize: 12
   }
 });
 

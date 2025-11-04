@@ -11,11 +11,13 @@
                     "test":  "jest"
                 },
     "dependencies":  {
+                         "@livekit/react-native":  "^2.9.3",
                          "@react-native-async-storage/async-storage":  "^1.21.0",
                          "@react-navigation/native":  "^6.1.18",
                          "@react-navigation/native-stack":  "^6.9.27",
                          "@sentry/react-native":  "^5.17.0",
                          "@tanstack/react-query":  "^5.48.0",
+                         "livekit-client":  "^2.15.14",
                          "posthog-react-native":  "^3.5.0",
                          "react":  "18.2.0",
                          "react-native":  "0.74.3",
