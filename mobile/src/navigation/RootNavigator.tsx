@@ -5,6 +5,8 @@ import SplashScreen from '@screens/SplashScreen';
 import AuthScreen from '@screens/AuthScreen';
 import HomeScreen from '@screens/HomeScreen';
 import RecorderScreen from '@screens/RecorderScreen';
+import LiveHostScreen from '@screens/LiveHostScreen';
+import LiveListenerScreen from '@screens/LiveListenerScreen';
 
 import { useSession } from '@store/session';
 
@@ -14,6 +16,8 @@ export type RootStackParamList = {
   Home: undefined;
   Recorder: undefined;
   Episode: { id: string };
+  LiveHost: undefined;
+  LiveListener: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -34,11 +38,14 @@ const RootNavigator: React.FC = () => {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Recorder" component={RecorderScreen} />
           <Stack.Screen name="Episode" component={require('@screens/EpisodeScreen').default} />
+          <Stack.Screen name="LiveHost" component={LiveHostScreen} />
+          <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
         </>
       ) : (
         <>
           <Stack.Screen name="Auth" component={AuthScreen} />
           <Stack.Screen name="Recorder" component={RecorderScreen} />
+          <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
         </>
       )}
     </Stack.Navigator>

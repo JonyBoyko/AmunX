@@ -49,7 +49,11 @@ const HomeScreen: React.FC = ({ navigation }: any) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Your Feed</Text>
-        <Button title="Record" onPress={() => navigation.navigate('Recorder')} />
+        <View style={styles.headerRow}>
+          <Button title="Record" onPress={() => navigation.navigate('Recorder')} />
+          <Button title="Host Live" onPress={() => navigation.navigate('LiveHost')} />
+          <Button title="Join Live" onPress={() => navigation.navigate('LiveListener')} />
+        </View>
       </View>
 
       {query.isLoading ? (
@@ -80,10 +84,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a'
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 12,
     padding: 16
+  },
+  headerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center'
   },
   headerTitle: {
     color: '#f8fafc',
