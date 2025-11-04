@@ -64,7 +64,7 @@ func extractBearer(header string) string {
 
 func fetchUser(ctx context.Context, db *sql.DB, id uuid.UUID) (httpctx.User, error) {
 	const query = `
-SELECT id, handle, email, display_name, avatar, is_anon, plan
+SELECT id, handle, email, display_name, avatar, is_anon, plan, shadowbanned
 FROM users
 WHERE id = $1;
 `
@@ -83,6 +83,7 @@ WHERE id = $1;
 		&avatar,
 		&user.IsAnon,
 		&user.Plan,
+		&user.Shadowbanned,
 	)
 	if err != nil {
 		return httpctx.User{}, err

@@ -31,6 +31,27 @@ func registerCommentRoutes(r chi.Router, deps *app.App) {
 			WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
 			return
 		}
+		if currentUser.Shadowbanned {
+			WriteError(w, http.StatusForbidden, "account_restricted", "commenting is disabled for this account")
+			return
+		}
+
+		if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:comments:user:"+currentUser.ID.String(), commentUserRateLimit, commentUserRateWindow); !allowed {
+			if retry > 0 {
+				w.Header().Set("Retry-After", strconv.FormatInt(int64((retry+time.Second-1)/time.Second), 10))
+			}
+			WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many comments created recently")
+			return
+		}
+		if ip := clientIP(req); ip != "" {
+			if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:comments:ip:"+ip, commentIPRateLimit, commentIPRateWindow); !allowed {
+				if retry > 0 {
+					w.Header().Set("Retry-After", strconv.FormatInt(int64((retry+time.Second-1)/time.Second), 10))
+				}
+				WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many comments from this network")
+				return
+			}
+		}
 
 		episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
 		if err != nil {
@@ -135,7 +156,13 @@ func ensureEpisodeCommentable(ctx context.Context, db *sql.DB, episodeID uuid.UU
 	return nil
 }
 
-var bannedWords = []string{"spam", "scam", "fake"}
+var (
+	bannedWords                 = []string{"spam", "scam", "fake"}
+	commentUserRateLimit  int64 = 30
+	commentUserRateWindow       = time.Minute
+	commentIPRateLimit    int64 = 60
+	commentIPRateWindow         = 2 * time.Minute
+)
 
 func createComment(ctx context.Context, db *sql.DB, episodeID, userID uuid.UUID, text string) (commentResponse, bool, error) {
 	clean := strings.TrimSpace(text)

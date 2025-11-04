@@ -27,6 +27,16 @@ type episodeResponse struct {
 	UploadHeaders map[string]string `json:"upload_headers,omitempty"`
 }
 
+const (
+	episodeUserRateLimit int64 = 6
+)
+
+var (
+	episodeUserRateWindow       = 5 * time.Minute
+	episodeIPRateLimit    int64 = 20
+	episodeIPRateWindow         = 10 * time.Minute
+)
+
 type episodeSummary struct {
 	ID          string         `json:"id"`
 	AuthorID    string         `json:"author_id"`
@@ -53,6 +63,27 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 			if !ok {
 				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
 				return
+			}
+			if currentUser.Shadowbanned {
+				WriteError(w, http.StatusForbidden, "account_restricted", "publishing is disabled for this account")
+				return
+			}
+
+			if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:episodes:user:"+currentUser.ID.String(), episodeUserRateLimit, episodeUserRateWindow); !allowed {
+				if retry > 0 {
+					w.Header().Set("Retry-After", strconv.FormatInt(int64((retry+time.Second-1)/time.Second), 10))
+				}
+				WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many episodes created recently")
+				return
+			}
+			if ip := clientIP(req); ip != "" {
+				if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:episodes:ip:"+ip, episodeIPRateLimit, episodeIPRateWindow); !allowed {
+					if retry > 0 {
+						w.Header().Set("Retry-After", strconv.FormatInt(int64((retry+time.Second-1)/time.Second), 10))
+					}
+					WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many episodes from this network")
+					return
+				}
 			}
 
 			var payload struct {

@@ -169,28 +169,11 @@ func isValidReportStatus(status string) bool {
 
 func allowReport(ctx context.Context, deps *app.App, userID uuid.UUID) (bool, time.Duration) {
 	const (
-		limit     = 5
-		window    = time.Minute * 10
-		redisRate = "rl:reports:"
+		limit  int64 = 5
+		window       = 10 * time.Minute
 	)
-	if deps.Redis == nil {
-		return true, 0
-	}
-	key := redisRate + userID.String()
-	count, err := deps.Redis.Incr(ctx, key).Result()
-	if err != nil {
-		return true, 0
-	}
-	if count == 1 {
-		_ = deps.Redis.Expire(ctx, key, window).Err()
-	} else if count > limit {
-		ttl, err := deps.Redis.TTL(ctx, key).Result()
-		if err != nil || ttl < 0 {
-			ttl = window
-		}
-		return false, ttl
-	}
-	return true, 0
+	key := "rl:reports:" + userID.String()
+	return allowRate(ctx, deps.Redis, key, limit, window)
 }
 
 func ensureReportableObject(ctx context.Context, db *sql.DB, objectRef string) error {

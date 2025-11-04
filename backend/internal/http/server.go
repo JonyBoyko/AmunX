@@ -76,6 +76,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 			registerCommentRoutes(protected, deps)
 			registerReactionRoutes(protected, deps)
 			registerReportRoutes(protected, deps)
+			registerModerationRoutes(protected, deps)
 			if cfg.Environment == "development" {
 				registerDiagnosticsRoutes(protected, deps)
 			}

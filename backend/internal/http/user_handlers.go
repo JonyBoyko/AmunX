@@ -24,6 +24,7 @@ func registerUserRoutes(r chi.Router) {
 			"avatar":       user.Avatar,
 			"is_anon":      user.IsAnon,
 			"plan":         user.Plan,
+			"shadowbanned": user.Shadowbanned,
 		})
 	})
 }
