@@ -4,18 +4,31 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 import RootNavigator from './navigation/RootNavigator';
-import { SessionProvider } from './store/session';
+import { SessionProvider, useSession } from './store/session';
 import { initAnalytics } from './lib/analytics';
 import { initI18n } from '@i18n/index';
 import { theme } from '@theme/theme';
 import { usePushNotifications } from '@hooks/usePushNotifications';
+import { initRevenueCat, loginRevenueCat } from '@services/revenueCat';
 
 const queryClient = new QueryClient();
 initAnalytics();
 
+// Initialize RevenueCat
+initRevenueCat().catch(console.error);
+
 function AppContent() {
+  const { user } = useSession();
+
   // Setup push notifications globally
   usePushNotifications();
+
+  // Login to RevenueCat when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      loginRevenueCat(user.id).catch(console.error);
+    }
+  }, [user?.id]);
 
   return <RootNavigator />;
 }

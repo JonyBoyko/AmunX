@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,18 @@ import {
   Pressable,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
+import type { PurchasesPackage } from 'react-native-purchases';
 
 import { theme } from '@theme/theme';
 import { Button } from '@components/atoms/Button';
 import { Badge } from '@components/atoms/Badge';
+import { applyShadow } from '@theme/utils';
+import { useRevenueCat } from '@hooks/useRevenueCat';
 
 type PaywallScreenProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -56,24 +60,54 @@ const getProFeatures = (t: any) => [
 
 const PaywallScreen: React.FC<PaywallScreenProps> = ({ navigation }) => {
   const { t } = useTranslation();
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
-  const [loading, setLoading] = useState(false);
+  const { offerings, isPro, loading: rcLoading, purchasing, purchase, restore } = useRevenueCat();
+  const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
 
   const PRO_FEATURES = getProFeatures(t);
 
+  // Auto-select yearly package by default
+  useEffect(() => {
+    if (offerings?.availablePackages) {
+      const yearlyPackage = offerings.availablePackages.find(
+        (pkg) => pkg.identifier === '$rc_annual' || pkg.packageType === 'ANNUAL'
+      );
+      setSelectedPackage(yearlyPackage || offerings.availablePackages[0]);
+    }
+  }, [offerings]);
+
   const handleSubscribe = async () => {
-    setLoading(true);
-    // TODO: Integrate Stripe/RevenueCat
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setLoading(false);
-    Alert.alert(t('paywall.thankYou.title'), t('paywall.thankYou.message'));
-    navigation.goBack();
+    if (!selectedPackage) {
+      Alert.alert(t('common.error'), 'Please select a subscription plan');
+      return;
+    }
+
+    const success = await purchase(selectedPackage);
+    
+    if (success) {
+      Alert.alert(t('paywall.thankYou.title'), t('paywall.thankYou.message'));
+      navigation.goBack();
+    }
   };
 
   const handleRestore = async () => {
-    // TODO: Restore purchases
-    Alert.alert(t('paywall.restoring.title'), t('paywall.restoring.message'));
+    const success = await restore();
+    if (success) {
+      navigation.goBack();
+    }
   };
+
+  if (rcLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={theme.colors.brand.primary} />
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const packages = offerings?.availablePackages || [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -118,56 +152,68 @@ const PaywallScreen: React.FC<PaywallScreenProps> = ({ navigation }) => {
           ))}
         </View>
 
-        {/* Pricing */}
-        <View style={styles.pricing}>
-          <Text style={styles.pricingTitle}>{t('paywall.pricing.title')}</Text>
+            {/* Pricing */}
+            <View style={styles.pricing}>
+              <Text style={styles.pricingTitle}>{t('paywall.pricing.title')}</Text>
 
-          {/* Monthly Plan */}
-          <Pressable
-            onPress={() => setSelectedPlan('monthly')}
-            style={[
-              styles.planCard,
-              selectedPlan === 'monthly' && styles.planCardSelected,
-            ]}
-          >
-            <View style={styles.planRadio}>
-              {selectedPlan === 'monthly' && <View style={styles.planRadioSelected} />}
-            </View>
-            <View style={styles.planInfo}>
-              <Text style={styles.planName}>{t('paywall.pricing.monthly.name')}</Text>
-              <Text style={styles.planPrice}>{t('paywall.pricing.monthly.price')}</Text>
-            </View>
-          </Pressable>
+              {packages.length === 0 ? (
+                <Text style={styles.noPackagesText}>
+                  {t('paywall.noPackages', { defaultValue: 'No subscription plans available' })}
+                </Text>
+              ) : (
+                packages.map((pkg) => {
+                  const isSelected = selectedPackage?.identifier === pkg.identifier;
+                  const isYearly = pkg.identifier.includes('annual') || pkg.packageType === 'ANNUAL';
+                  
+                  return (
+                    <Pressable
+                      key={pkg.identifier}
+                      onPress={() => setSelectedPackage(pkg)}
+                      style={[
+                        styles.planCard,
+                        isSelected && styles.planCardSelected,
+                      ]}
+                    >
+                      <View style={styles.planRadio}>
+                        {isSelected && <View style={styles.planRadioSelected} />}
+                      </View>
+                      <View style={styles.planInfo}>
+                        <Text style={styles.planName}>
+                          {pkg.product.title || (isYearly ? 'Annual' : 'Monthly')}
+                        </Text>
+                        <Text style={styles.planPrice}>
+                          {pkg.product.priceString} / {isYearly ? 'year' : 'month'}
+                        </Text>
+                        {isYearly && (
+                          <Text style={styles.planSubtext}>
+                            {t('paywall.pricing.yearly.subtitle', { defaultValue: 'Best value!' })}
+                          </Text>
+                        )}
+                      </View>
+                      {isYearly && (
+                        <View style={styles.planBadge}>
+                          <Text style={styles.planBadgeText}>
+                            {t('paywall.pricing.yearly.badge', { defaultValue: 'Save 40%' })}
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })
+              )}
 
-          {/* Yearly Plan */}
-          <Pressable
-            onPress={() => setSelectedPlan('yearly')}
-            style={[
-              styles.planCard,
-              selectedPlan === 'yearly' && styles.planCardSelected,
-            ]}
-          >
-            <View style={styles.planRadio}>
-              {selectedPlan === 'yearly' && <View style={styles.planRadioSelected} />}
-            </View>
-            <View style={styles.planInfo}>
-              <Text style={styles.planName}>{t('paywall.pricing.yearly.name')}</Text>
-              <Text style={styles.planPrice}>{t('paywall.pricing.yearly.price')}</Text>
-              <Text style={styles.planSubtext}>{t('paywall.pricing.yearly.subtitle')}</Text>
-            </View>
-            <View style={styles.planBadge}>
-              <Text style={styles.planBadgeText}>{t('paywall.pricing.yearly.badge')}</Text>
-            </View>
-          </Pressable>
-        </View>
-
-        {/* CTA */}
-        <Button
-          title={loading ? t('paywall.processing') : t('paywall.cta')}
-          onPress={handleSubscribe}
-          loading={loading}
-          style={styles.ctaButton}
-        />
+            {/* CTA */}
+            <Button
+              title={
+                purchasing
+                  ? t('paywall.processing', { defaultValue: 'Processing...' })
+                  : t('paywall.cta', { defaultValue: 'Subscribe Now' })
+              }
+              onPress={handleSubscribe}
+              loading={purchasing}
+              style={styles.ctaButton}
+              disabled={!selectedPackage || packages.length === 0}
+            />
 
         {/* Fine Print */}
         <View style={styles.finePrint}>
@@ -192,6 +238,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.bg.base,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.md,
+  },
+  loadingText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.type.body.size,
+  },
+  noPackagesText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.type.body.size,
+    textAlign: 'center',
+    paddingVertical: theme.space.xl,
   },
   header: {
     alignItems: 'flex-end',
