@@ -5,6 +5,7 @@ import SplashScreen from '@screens/SplashScreen';
 import AuthScreen from '@screens/AuthScreen';
 import FeedScreen from '@screens/FeedScreen';
 import RecorderScreen from '@screens/RecorderScreen';
+import EpisodeDetailScreen from '@screens/EpisodeDetailScreen';
 import LiveHostScreen from '@screens/LiveHostScreen';
 import LiveListenerScreen from '@screens/LiveListenerScreen';
 import PaywallScreen from '@screens/PaywallScreen';
@@ -43,7 +44,7 @@ const RootNavigator: React.FC = () => {
         <>
           <Stack.Screen name="Feed" component={FeedScreen} />
           <Stack.Screen name="Recorder" component={RecorderScreen} />
-          <Stack.Screen name="Episode" component={require('@screens/EpisodeScreen').default} />
+          <Stack.Screen name="Episode" component={EpisodeDetailScreen} />
           <Stack.Screen name="LiveHost" component={LiveHostScreen} />
           <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
           <Stack.Screen name="Paywall" component={PaywallScreen} />

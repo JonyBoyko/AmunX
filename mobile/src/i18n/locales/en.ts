@@ -40,16 +40,8 @@ export default {
       like: 'Like',
       unlike: 'Unlike',
       open: 'Open',
-      comments: {
-        one: '{{count}} comment',
-        other: '{{count}} comments',
-      },
-      reactions: {
-        like: '👍',
-        love: '❤️',
-        laugh: '😂',
-        wow: '😮',
-      },
+      comments: 'Comments',
+      reactions: 'Reactions',
     },
 
     // Mini Player
