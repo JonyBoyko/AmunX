@@ -156,6 +156,25 @@ export default {
       },
     },
 
+    // Profile Screen
+    profile: {
+      title: 'Профіль',
+      guest: 'Гість',
+      editProfile: 'Редагувати профіль',
+      upgradeToPro: 'Оновити до PRO',
+      myEpisodes: 'Мої епізоди',
+      stats: {
+        episodes: 'Епізоди',
+        listens: 'Прослуховувань',
+        reactions: 'Реакції',
+      },
+      noEpisodes: {
+        title: 'Ще немає епізодів',
+        message: 'Почніть записувати, щоб побачити свої епізоди тут',
+      },
+      recordFirst: 'Записати перший епізод',
+    },
+
     // Settings Screen
     settings: {
       title: 'Налаштування',

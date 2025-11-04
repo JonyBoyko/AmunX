@@ -137,6 +137,12 @@ const FeedScreen: React.FC<FeedScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons name="person-outline" size={20} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={() => navigation.navigate('Settings')}
           >
             <Ionicons name="settings-outline" size={20} color={theme.colors.text.primary} />

@@ -156,6 +156,25 @@ export default {
       },
     },
 
+    // Profile Screen
+    profile: {
+      title: 'Profile',
+      guest: 'Guest',
+      editProfile: 'Edit Profile',
+      upgradeToPro: 'Upgrade to PRO',
+      myEpisodes: 'My Episodes',
+      stats: {
+        episodes: 'Episodes',
+        listens: 'Listens',
+        reactions: 'Reactions',
+      },
+      noEpisodes: {
+        title: 'No episodes yet',
+        message: 'Start recording to see your episodes here',
+      },
+      recordFirst: 'Record your first episode',
+    },
+
     // Settings Screen
     settings: {
       title: 'Settings',
