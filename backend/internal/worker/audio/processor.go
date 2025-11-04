@@ -375,10 +375,10 @@ func (p *Processor) handleFinalizeLive(ctx context.Context, sessionID uuid.UUID,
 	}
 
 	const insertEpisode = `
-INSERT INTO episodes (id, author_id, topic_id, visibility, status, title, duration_sec, storage_key, is_live, live_session_id)
-VALUES ($1, $2, $3, 'public', 'pending_public', $4, $5, $6, true, $7);
+INSERT INTO episodes (id, author_id, topic_id, visibility, status, title, duration_sec, storage_key, mask, is_live, live_session_id)
+VALUES ($1, $2, $3, 'public', 'pending_public', $4, $5, $6, $7, true, $8);
 `
-	_, err = p.DB.ExecContext(ctx, insertEpisode, episodeID, session.HostID, topic, title, durationValue, key, sessionID)
+	_, err = p.DB.ExecContext(ctx, insertEpisode, episodeID, session.HostID, topic, title, durationValue, key, session.Mask, sessionID)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil
@@ -403,12 +403,13 @@ type liveSessionRecord struct {
 	RecordingKey  string
 	DurationSec   *int
 	Title         string
+	Mask          string
 	EpisodeExists bool
 }
 
 func (p *Processor) loadLiveSession(ctx context.Context, id uuid.UUID) (liveSessionRecord, error) {
 	const query = `
-SELECT ls.host_id, ls.topic_id, ls.recording_key, ls.duration_sec, ls.ended_at, ls.title, e.id
+SELECT ls.host_id, ls.topic_id, ls.recording_key, ls.duration_sec, ls.ended_at, ls.title, ls.mask, e.id
 FROM live_sessions ls
 LEFT JOIN episodes e ON e.live_session_id = ls.id
 WHERE ls.id = $1;
@@ -421,9 +422,10 @@ WHERE ls.id = $1;
 		duration  sql.NullInt64
 		endedAt   sql.NullTime
 		title     sql.NullString
+		mask      string
 		episode   sql.NullString
 	)
-	err := p.DB.QueryRowContext(ctx, query, id).Scan(&hostID, &topic, &recording, &duration, &endedAt, &title, &episode)
+	err := p.DB.QueryRowContext(ctx, query, id).Scan(&hostID, &topic, &recording, &duration, &endedAt, &title, &mask, &episode)
 	if err != nil {
 		return rec, err
 	}
@@ -448,6 +450,7 @@ WHERE ls.id = $1;
 	if title.Valid {
 		rec.Title = strings.TrimSpace(title.String)
 	}
+	rec.Mask = mask
 	rec.EpisodeExists = episode.Valid
 	return rec, nil
 }

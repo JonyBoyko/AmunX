@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -243,9 +244,11 @@ func normalizeVisibility(v string, cfg app.Config) string {
 }
 
 func normalizeMask(mask string) string {
-	switch mask {
-	case "none", "basic", "studio":
-		return mask
+	switch strings.ToLower(strings.TrimSpace(mask)) {
+	case "basic":
+		return "basic"
+	case "studio":
+		return "studio"
 	default:
 		return "none"
 	}

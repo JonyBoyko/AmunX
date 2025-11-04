@@ -27,11 +27,23 @@ services:
       REDIS_ADDRESS: redis:6379
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: 8080
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-secret-change-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret}
+      MAGIC_LINK_TOKEN_SECRET: ${MAGIC_LINK_TOKEN_SECRET:-dev-magic-link-secret-change-in-production}
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-demo}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-supersecret}
+      CDN_BASE: ${CDN_BASE:-}
+      FEATURE_LIVE_RECORDING: ${FEATURE_LIVE_RECORDING:-true}
+      FEATURE_LIVE_MASK_BETA: ${FEATURE_LIVE_MASK_BETA:-true}
+      PUBLIC_BY_DEFAULT: ${PUBLIC_BY_DEFAULT:-false}
+      UNDO_SECONDS: ${UNDO_SECONDS:-300}
     ports:
       - "8080:8080"
     depends_on:
       - postgres
       - redis
+      - livekit
 
   worker:
     build:
@@ -41,9 +53,14 @@ services:
       ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/amunx?sslmode=disable
       REDIS_ADDRESS: redis:6379
+      CDN_BASE: ${CDN_BASE:-}
+      MEDIA_PATH: /tmp/media
+      MODERATION_KEYWORDS: ${MODERATION_KEYWORDS:-hate,abuse,violence}
     depends_on:
       - postgres
       - redis
+    volumes:
+      - media:/tmp/media
 
   livekit:
     image: livekit/livekit-server:latest
@@ -79,4 +96,9 @@ services:
 volumes:
   pgdata:
   logs:
+  media:
+
+networks:
+  default:
+    name: amunx_default
 

@@ -40,6 +40,7 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 		var payload struct {
 			TopicID *string `json:"topic_id"`
 			Title   string  `json:"title"`
+			Mask    string  `json:"mask"`
 		}
 		if err := decodeJSON(req, &payload); err != nil {
 			WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -69,12 +70,18 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 			topicID = &tID
 		}
 
+		mask := normalizeMask(payload.Mask)
+		if mask != "none" && !deps.Config.FeatureLiveMaskBeta {
+			WriteError(w, http.StatusForbidden, "feature_disabled", "live masking beta is disabled")
+			return
+		}
+
 		sessionID := uuid.New()
 		roomName := fmt.Sprintf("live-%s", sessionID.String())
 		now := time.Now().UTC()
 		title := strings.TrimSpace(payload.Title)
 
-		if err := createLiveSession(req.Context(), deps.DB, sessionID, user.ID, topicID, roomName, title, now); err != nil {
+		if err := createLiveSession(req.Context(), deps.DB, sessionID, user.ID, topicID, roomName, title, mask, now); err != nil {
 			WriteError(w, http.StatusInternalServerError, "live_create_failed", err.Error())
 			return
 		}
@@ -92,6 +99,7 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 				"host_id":    user.ID.String(),
 				"topic_id":   payload.TopicID,
 				"title":      title,
+				"mask":       mask,
 				"started_at": now.Format(time.RFC3339),
 			},
 			"token": token,
@@ -218,16 +226,16 @@ func registerPublicLiveRoutes(r chi.Router, deps *app.App) {
 	})
 }
 
-func createLiveSession(ctx context.Context, db *sql.DB, id, hostID uuid.UUID, topicID *uuid.UUID, room string, title string, started time.Time) error {
+func createLiveSession(ctx context.Context, db *sql.DB, id, hostID uuid.UUID, topicID *uuid.UUID, room string, title string, mask string, started time.Time) error {
 	const query = `
-INSERT INTO live_sessions (id, host_id, topic_id, sfu_room, title, started_at, ended_at)
-VALUES ($1, $2, $3, $4, $5, $6, NULL);
+INSERT INTO live_sessions (id, host_id, topic_id, sfu_room, title, mask, started_at, ended_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NULL);
 `
 	var topic interface{}
 	if topicID != nil {
 		topic = *topicID
 	}
-	_, err := db.ExecContext(ctx, query, id, hostID, topic, room, title, started)
+	_, err := db.ExecContext(ctx, query, id, hostID, topic, room, title, mask, started)
 	return err
 }
 
@@ -237,13 +245,14 @@ type liveSessionView struct {
 	TopicID   *string   `json:"topic_id,omitempty"`
 	Room      string    `json:"room"`
 	Title     *string   `json:"title,omitempty"`
+	Mask      string    `json:"mask"`
 	StartedAt string    `json:"started_at"`
 	EndedAt   *string   `json:"ended_at,omitempty"`
 }
 
 func getActiveLiveSession(ctx context.Context, db *sql.DB, id uuid.UUID) (liveSessionView, error) {
 	const query = `
-SELECT id, host_id, topic_id, sfu_room, title, started_at, ended_at
+SELECT id, host_id, topic_id, sfu_room, title, mask, started_at, ended_at
 FROM live_sessions
 WHERE id = $1;
 `
@@ -252,10 +261,11 @@ WHERE id = $1;
 		hostID    uuid.UUID
 		topic     sql.NullString
 		title     sql.NullString
+		mask      string
 		startedAt time.Time
 		endedAt   sql.NullTime
 	)
-	err := db.QueryRowContext(ctx, query, id).Scan(&rec.ID, &hostID, &topic, &rec.Room, &title, &startedAt, &endedAt)
+	err := db.QueryRowContext(ctx, query, id).Scan(&rec.ID, &hostID, &topic, &rec.Room, &title, &mask, &startedAt, &endedAt)
 	if err != nil {
 		return liveSessionView{}, err
 	}
@@ -269,6 +279,7 @@ WHERE id = $1;
 	if title.Valid {
 		rec.Title = &title.String
 	}
+	rec.Mask = mask
 	rec.StartedAt = startedAt.Format(time.RFC3339)
 	return rec, nil
 }
