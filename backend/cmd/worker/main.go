@@ -9,6 +9,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/amunx/backend/internal/app"
+	"github.com/amunx/backend/internal/worker/audio"
 	"github.com/amunx/backend/pkg/logger"
 )
 
@@ -37,7 +38,17 @@ func main() {
 
 	log.Info().Msg("worker started")
 
-	<-ctx.Done()
+	processor := audio.Processor{
+		DB:      deps.DB,
+		Storage: deps.Storage,
+		Queue:   deps.Queue,
+		Logger:  log.With().Str("processor", "audio").Logger(),
+		CDNBase: deps.Config.CDNBaseURL,
+	}
+
+	if err := processor.Run(ctx, deps.Config.WorkerPollInterval); err != nil && err != context.Canceled {
+		log.Error().Err(err).Msg("processor exited with error")
+	}
 
 	log.Info().Msg("worker exiting")
 }

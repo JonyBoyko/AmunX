@@ -32,6 +32,8 @@ type Config struct {
 	StorageSecret   string `envconfig:"STORAGE_SECRET_KEY" default:""`
 
 	CDNBaseURL string `envconfig:"CDN_BASE_URL" default:""`
+	LocalMediaPath     string        `envconfig:"LOCAL_MEDIA_PATH" default:"./media"`
+	WorkerPollInterval time.Duration `envconfig:"WORKER_POLL_INTERVAL" default:"2s"`
 
 	JWTAccessSecret      string        `envconfig:"JWT_ACCESS_SECRET" default:""`
 	JWTRefreshSecret     string        `envconfig:"JWT_REFRESH_SECRET" default:""`
