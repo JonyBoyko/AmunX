@@ -8,6 +8,12 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "owner": "amunx",
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EXPO_PROJECT_ID"
+      }
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",

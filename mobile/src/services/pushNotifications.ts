@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { API_BASE } from '@api/config';
+import config from '@config/index';
 
 /**
  * Configure notification behavior
@@ -50,7 +51,7 @@ export async function getExpoPushToken(): Promise<string | null> {
     }
 
     const token = await Notifications.getExpoPushTokenAsync({
-      projectId: 'your-expo-project-id', // TODO: Replace with actual project ID from app.json
+      projectId: config.expo.projectId,
     });
 
     return token.data;

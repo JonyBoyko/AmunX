@@ -5,10 +5,11 @@ import Purchases, {
   CustomerInfo,
 } from 'react-native-purchases';
 import { Platform } from 'react-native';
+import config from '@config/index';
 
-// TODO: Replace with your actual RevenueCat API keys
-const REVENUECAT_API_KEY_IOS = 'appl_YOUR_IOS_KEY_HERE';
-const REVENUECAT_API_KEY_ANDROID = 'goog_YOUR_ANDROID_KEY_HERE';
+// RevenueCat API keys from config
+const REVENUECAT_API_KEY_IOS = config.revenueCat.apiKeyIOS;
+const REVENUECAT_API_KEY_ANDROID = config.revenueCat.apiKeyAndroid;
 
 /**
  * Initialize RevenueCat SDK
