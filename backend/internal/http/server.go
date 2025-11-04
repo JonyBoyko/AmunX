@@ -67,6 +67,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 		registerPublicEpisodeRoutes(r, deps)
 		registerPublicTopicRoutes(r, deps)
 		registerPublicCommentRoutes(r, deps)
+		registerPublicLiveRoutes(r, deps)
 
 		r.Group(func(protected chi.Router) {
 			protected.Use(mw.Auth(deps, logger))
@@ -76,6 +77,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 			registerCommentRoutes(protected, deps)
 			registerReactionRoutes(protected, deps)
 			registerReportRoutes(protected, deps)
+			registerLiveRoutes(protected, deps)
 			registerModerationRoutes(protected, deps)
 			if cfg.Environment == "development" {
 				registerDiagnosticsRoutes(protected, deps)

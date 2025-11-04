@@ -53,6 +53,10 @@ type Config struct {
 	FeatureLiveMaskBeta  bool `envconfig:"FEATURE_LIVE_MASK_BETA" default:"false"`
 	FeatureProSTT        bool `envconfig:"FEATURE_PRO_STT" default:"true"`
 	FeaturePublicDefault bool `envconfig:"FEATURE_PUBLIC_DEFAULT" default:"true"`
+
+	LiveKitURL       string `envconfig:"LIVEKIT_URL" default:""`
+	LiveKitAPIKey    string `envconfig:"LIVEKIT_API_KEY" default:""`
+	LiveKitAPISecret string `envconfig:"LIVEKIT_API_SECRET" default:""`
 }
 
 // LoadConfig loads configuration using the provided environment variable prefix.

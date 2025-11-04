@@ -24,8 +24,10 @@ import (
 )
 
 const (
-	consumerGroup = "process_audio"
-	maxAttempts   = 3
+	consumerGroup     = "process_audio"
+	finalizeGroup     = "finalize_live"
+	maxAttempts       = 3
+	maxFinalizeTrials = 3
 )
 
 type Processor struct {
@@ -73,6 +75,9 @@ func (p *Processor) Run(ctx context.Context, pollInterval time.Duration) error {
 
 		if err := p.claimAndProcess(ctx, consumerName); err != nil {
 			p.Logger.Error().Err(err).Msg("processor loop error")
+		}
+		if err := p.claimAndFinalize(ctx, consumerName); err != nil {
+			p.Logger.Error().Err(err).Msg("finalize loop error")
 		}
 
 		select {
@@ -130,6 +135,69 @@ func (p *Processor) claimAndProcess(ctx context.Context, consumer string) error 
 	return nil
 }
 
+func (p *Processor) claimAndFinalize(ctx context.Context, consumer string) error {
+	messages, err := p.Queue.Claim(ctx, queue.TopicFinalizeLive, finalizeGroup, consumer, 5)
+	if err != nil {
+		return err
+	}
+	if len(messages) == 0 {
+		return nil
+	}
+
+	for _, msg := range messages {
+		sessionIDStr := stringValue(msg.Values["session_id"])
+		if sessionIDStr == "" {
+			p.Logger.Warn().Interface("message", msg).Msg("missing session_id in finalize job")
+			_ = p.Queue.Ack(ctx, queue.TopicFinalizeLive, finalizeGroup, msg.ID)
+			continue
+		}
+		sessionID, err := uuid.Parse(sessionIDStr)
+		if err != nil {
+			p.Logger.Warn().Str("session_id", sessionIDStr).Msg("invalid session_id in finalize job")
+			_ = p.Queue.Ack(ctx, queue.TopicFinalizeLive, finalizeGroup, msg.ID)
+			continue
+		}
+
+		recordingKey := stringValue(msg.Values["recording_key"])
+		var durationPtr *int
+		if raw, ok := msg.Values["duration_sec"]; ok {
+			if val, err := intValue(raw); err == nil {
+				durationPtr = &val
+			}
+		}
+
+		if err := p.handleFinalizeLive(ctx, sessionID, recordingKey, durationPtr); err != nil {
+			attempt := parseAttempt(msg.Values["attempt"])
+			p.Logger.Error().Err(err).Str("session_id", sessionID.String()).Int("attempt", attempt).Msg("finalize live failed")
+			if attempt+1 >= maxFinalizeTrials {
+				_ = p.Queue.Ack(ctx, queue.TopicFinalizeLive, finalizeGroup, msg.ID)
+				continue
+			}
+			requeue := map[string]any{
+				"session_id": sessionID.String(),
+				"attempt":    attempt + 1,
+			}
+			if recordingKey != "" {
+				requeue["recording_key"] = recordingKey
+			}
+			if durationPtr != nil {
+				requeue["duration_sec"] = *durationPtr
+			}
+			if err := p.Queue.Enqueue(ctx, queue.TopicFinalizeLive, requeue); err != nil {
+				p.Logger.Error().Err(err).Str("session_id", sessionID.String()).Msg("failed to requeue finalize job")
+			}
+			_ = p.Queue.Ack(ctx, queue.TopicFinalizeLive, finalizeGroup, msg.ID)
+			continue
+		}
+
+		if err := p.Queue.Ack(ctx, queue.TopicFinalizeLive, finalizeGroup, msg.ID); err != nil {
+			p.Logger.Error().Err(err).Str("session_id", sessionID.String()).Msg("failed to ack finalize job")
+		}
+	}
+
+	return nil
+}
+
 func parseAttempt(value any) int {
 	switch v := value.(type) {
 	case int64:
@@ -142,6 +210,39 @@ func parseAttempt(value any) int {
 		}
 	}
 	return 0
+}
+
+func stringValue(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case fmt.Stringer:
+		return v.String()
+	default:
+		return ""
+	}
+}
+
+func intValue(value any) (int, error) {
+	switch v := value.(type) {
+	case int:
+		return v, nil
+	case int64:
+		return int(v), nil
+	case float64:
+		return int(v), nil
+	case string:
+		if v == "" {
+			return 0, fmt.Errorf("empty string")
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, err
+		}
+		return n, nil
+	default:
+		return 0, fmt.Errorf("unsupported type %T", value)
+	}
 }
 
 func (p *Processor) handleMessage(ctx context.Context, episodeID string) error {
@@ -231,6 +332,145 @@ WHERE id = $1
 	}
 
 	return nil
+}
+
+func (p *Processor) handleFinalizeLive(ctx context.Context, sessionID uuid.UUID, recordingKey string, duration *int) error {
+	session, err := p.loadLiveSession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if session.EpisodeExists {
+		p.Logger.Info().Str("session_id", sessionID.String()).Msg("live session already finalized")
+		return nil
+	}
+
+	key := strings.TrimSpace(recordingKey)
+	if key == "" {
+		key = strings.TrimSpace(session.RecordingKey)
+	}
+	if key == "" {
+		return fmt.Errorf("recording key missing for session %s", sessionID)
+	}
+
+	if duration == nil && session.DurationSec != nil {
+		duration = session.DurationSec
+	}
+
+	if err := p.ensureLiveMetadata(ctx, sessionID, key, duration); err != nil {
+		return err
+	}
+
+	episodeID := uuid.New()
+	var topic interface{}
+	if session.TopicID != nil {
+		topic = *session.TopicID
+	}
+	var durationValue interface{}
+	if duration != nil {
+		durationValue = *duration
+	}
+	title := session.Title
+	if strings.TrimSpace(title) == "" {
+		title = "Live session"
+	}
+
+	const insertEpisode = `
+INSERT INTO episodes (id, author_id, topic_id, visibility, status, title, duration_sec, storage_key, is_live, live_session_id)
+VALUES ($1, $2, $3, 'public', 'pending_public', $4, $5, $6, true, $7);
+`
+	_, err = p.DB.ExecContext(ctx, insertEpisode, episodeID, session.HostID, topic, title, durationValue, key, sessionID)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil
+		}
+		return err
+	}
+
+	if err := p.Queue.Enqueue(ctx, queue.TopicProcessAudio, map[string]any{
+		"episode_id": episodeID.String(),
+		"attempt":    0,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type liveSessionRecord struct {
+	ID            uuid.UUID
+	HostID        uuid.UUID
+	TopicID       *uuid.UUID
+	RecordingKey  string
+	DurationSec   *int
+	Title         string
+	EpisodeExists bool
+}
+
+func (p *Processor) loadLiveSession(ctx context.Context, id uuid.UUID) (liveSessionRecord, error) {
+	const query = `
+SELECT ls.host_id, ls.topic_id, ls.recording_key, ls.duration_sec, ls.ended_at, ls.title, e.id
+FROM live_sessions ls
+LEFT JOIN episodes e ON e.live_session_id = ls.id
+WHERE ls.id = $1;
+`
+	var (
+		rec       liveSessionRecord
+		hostID    uuid.UUID
+		topic     sql.NullString
+		recording sql.NullString
+		duration  sql.NullInt64
+		endedAt   sql.NullTime
+		title     sql.NullString
+		episode   sql.NullString
+	)
+	err := p.DB.QueryRowContext(ctx, query, id).Scan(&hostID, &topic, &recording, &duration, &endedAt, &title, &episode)
+	if err != nil {
+		return rec, err
+	}
+	if !endedAt.Valid {
+		return rec, fmt.Errorf("live session %s not ended", id)
+	}
+	rec.ID = id
+	rec.HostID = hostID
+	if topic.Valid {
+		if tid, err := uuid.Parse(topic.String); err == nil {
+			topicID := tid
+			rec.TopicID = &topicID
+		}
+	}
+	if recording.Valid {
+		rec.RecordingKey = recording.String
+	}
+	if duration.Valid {
+		dur := int(duration.Int64)
+		rec.DurationSec = &dur
+	}
+	if title.Valid {
+		rec.Title = strings.TrimSpace(title.String)
+	}
+	rec.EpisodeExists = episode.Valid
+	return rec, nil
+}
+
+func (p *Processor) ensureLiveMetadata(ctx context.Context, sessionID uuid.UUID, recordingKey string, duration *int) error {
+	var durationValue interface{}
+	if duration != nil {
+		durationValue = *duration
+	}
+	_, err := p.DB.ExecContext(ctx, `
+UPDATE live_sessions
+SET recording_key = COALESCE(NULLIF($2, ''), recording_key),
+    duration_sec = COALESCE($3, duration_sec)
+WHERE id = $1;
+`, sessionID, recordingKey, durationValue)
+	return err
+}
+
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "duplicate key")
 }
 
 func (p *Processor) downloadOriginal(ctx context.Context, storageKey, destPath string) error {
