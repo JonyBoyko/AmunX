@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/amunx/backend/internal/app"
+	"github.com/amunx/backend/internal/httpctx"
 	"github.com/amunx/backend/internal/queue"
 	"github.com/amunx/backend/internal/storage"
 )
@@ -25,6 +26,12 @@ type episodeResponse struct {
 func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 	r.Route("/episodes", func(er chi.Router) {
 		er.Post("/", func(w http.ResponseWriter, req *http.Request) {
+			currentUser, ok := httpctx.UserFromContext(req.Context())
+			if !ok {
+				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+				return
+			}
+
 			var payload struct {
 				Visibility  string  `json:"visibility"`
 				TopicID     *string `json:"topic_id"`
@@ -34,8 +41,18 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 				ContentType string  `json:"content_type"`
 			}
 			if err := decodeJSON(req, &payload); err != nil {
-				writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+				WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
 				return
+			}
+
+			var topicID *uuid.UUID
+			if payload.TopicID != nil {
+				parsed, err := uuid.Parse(*payload.TopicID)
+				if err != nil {
+					WriteError(w, http.StatusBadRequest, "invalid_topic_id", "topic_id must be a valid UUID")
+					return
+				}
+				topicID = &parsed
 			}
 
 			episodeID := uuid.New()
@@ -44,23 +61,24 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 			upload, err := deps.Storage.PresignUpload(req.Context(), key, 15*time.Minute, coalesceContentType(payload.ContentType))
 			if err != nil {
 				if errors.Is(err, storage.ErrNotImplemented) {
-					writeError(w, http.StatusServiceUnavailable, "storage_disabled", "object storage not configured")
+					WriteError(w, http.StatusServiceUnavailable, "storage_disabled", "object storage not configured")
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "storage_error", err.Error())
+				WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
 				return
 			}
 
 			if err := createEpisode(req.Context(), deps.DB, createEpisodeParams{
 				ID:          episodeID,
+				AuthorID:    currentUser.ID,
 				Visibility:  normalizeVisibility(payload.Visibility, deps.Config),
-				TopicID:     payload.TopicID,
+				TopicID:     topicID,
 				Mask:        normalizeMask(payload.Mask),
 				Quality:     normalizeQuality(payload.Quality),
 				DurationSec: payload.DurationSec,
 				StorageKey:  key,
 			}); err != nil {
-				writeError(w, http.StatusInternalServerError, "episode_create_failed", err.Error())
+				WriteError(w, http.StatusInternalServerError, "episode_create_failed", err.Error())
 				return
 			}
 
@@ -71,7 +89,7 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 				}
 			}
 
-			writeJSON(w, http.StatusCreated, episodeResponse{
+			WriteJSON(w, http.StatusCreated, episodeResponse{
 				ID:            episodeID.String(),
 				Status:        "pending_upload",
 				UploadURL:     upload.URL,
@@ -80,51 +98,63 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 		})
 
 		er.Post("/{id}/finalize", func(w http.ResponseWriter, req *http.Request) {
-			episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
-			if err != nil {
-				writeError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
+			currentUser, ok := httpctx.UserFromContext(req.Context())
+			if !ok {
+				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
 				return
 			}
 
-			if err := setEpisodeStatus(req.Context(), deps.DB, episodeID, "pending_public"); err != nil {
+			episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
+			if err != nil {
+				WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
+				return
+			}
+
+			if err := setEpisodeStatus(req.Context(), deps.DB, episodeID, currentUser.ID, "pending_public"); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, "not_found", "episode not found")
+					WriteError(w, http.StatusNotFound, "not_found", "episode not found")
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "episode_finalize_failed", err.Error())
+				WriteError(w, http.StatusInternalServerError, "episode_finalize_failed", err.Error())
 				return
 			}
 
 			if err := deps.Queue.Enqueue(req.Context(), queue.TopicProcessAudio, map[string]any{
 				"episode_id": episodeID.String(),
 			}); err != nil {
-				writeError(w, http.StatusInternalServerError, "enqueue_failed", err.Error())
+				WriteError(w, http.StatusInternalServerError, "enqueue_failed", err.Error())
 				return
 			}
 
-			writeJSON(w, http.StatusOK, map[string]any{
+			WriteJSON(w, http.StatusOK, map[string]any{
 				"status": "queued",
 			})
 		})
 
 		er.Post("/{id}/undo", func(w http.ResponseWriter, req *http.Request) {
+			currentUser, ok := httpctx.UserFromContext(req.Context())
+			if !ok {
+				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+				return
+			}
+
 			episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
 			if err != nil {
-				writeError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
+				WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
 				return
 			}
 
-			ok, err := undoEpisode(req.Context(), deps.DB, episodeID, deps.Config.UndoSeconds)
+			okUndo, err := undoEpisode(req.Context(), deps.DB, episodeID, currentUser.ID, deps.Config.UndoSeconds)
 			if err != nil {
-				writeError(w, http.StatusInternalServerError, "undo_failed", err.Error())
+				WriteError(w, http.StatusInternalServerError, "undo_failed", err.Error())
 				return
 			}
-			if !ok {
-				writeError(w, http.StatusForbidden, "undo_window_elapsed", "undo window has expired or episode not pending")
+			if !okUndo {
+				WriteError(w, http.StatusForbidden, "undo_window_elapsed", "undo window has expired or episode not pending")
 				return
 			}
 
-			writeJSON(w, http.StatusOK, map[string]any{"status": "undone"})
+			WriteJSON(w, http.StatusOK, map[string]any{"status": "undone"})
 		})
 	})
 }
@@ -172,9 +202,9 @@ func uuidFromParam(value string) (uuid.UUID, error) {
 
 type createEpisodeParams struct {
 	ID          uuid.UUID
-	AuthorID    *uuid.UUID
+	AuthorID    uuid.UUID
 	Visibility  string
-	TopicID     *string
+	TopicID     *uuid.UUID
 	Mask        string
 	Quality     string
 	DurationSec *int
@@ -187,13 +217,9 @@ INSERT INTO episodes (id, author_id, topic_id, visibility, mask, quality, durati
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 `
 	var (
-		author   interface{}
 		topic    interface{}
 		duration interface{}
 	)
-	if params.AuthorID != nil {
-		author = *params.AuthorID
-	}
 	if params.TopicID != nil {
 		topic = *params.TopicID
 	}
@@ -203,7 +229,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 
 	_, err := db.ExecContext(ctx, stmt,
 		params.ID,
-		author,
+		params.AuthorID,
 		topic,
 		params.Visibility,
 		params.Mask,
@@ -214,7 +240,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 	return err
 }
 
-func setEpisodeStatus(ctx context.Context, db *sql.DB, id uuid.UUID, status string) error {
+func setEpisodeStatus(ctx context.Context, db *sql.DB, id uuid.UUID, author uuid.UUID, status string) error {
 	const stmt = `
 UPDATE episodes
 SET status = $2,
@@ -222,25 +248,27 @@ SET status = $2,
     updated_at = now(),
     published_at = CASE WHEN $2 = 'public' THEN now() ELSE published_at END
 WHERE id = $1
+  AND author_id = $3
 RETURNING id;
 `
 	var scanned uuid.UUID
-	return db.QueryRowContext(ctx, stmt, id, status).Scan(&scanned)
+	return db.QueryRowContext(ctx, stmt, id, status, author).Scan(&scanned)
 }
 
-func undoEpisode(ctx context.Context, db *sql.DB, id uuid.UUID, undoSeconds int) (bool, error) {
+func undoEpisode(ctx context.Context, db *sql.DB, id uuid.UUID, author uuid.UUID, undoSeconds int) (bool, error) {
 	const stmt = `
 UPDATE episodes
 SET status = 'deleted',
     status_changed_at = now(),
     updated_at = now()
 WHERE id = $1
+  AND author_id = $3
   AND status = 'pending_public'
   AND now() - status_changed_at <= ($2::int || ' seconds')::interval
 RETURNING id;
 `
 	var scanned uuid.UUID
-	err := db.QueryRowContext(ctx, stmt, id, undoSeconds).Scan(&scanned)
+	err := db.QueryRowContext(ctx, stmt, id, undoSeconds, author).Scan(&scanned)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}

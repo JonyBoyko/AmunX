@@ -18,20 +18,22 @@ func TestUndoEpisodeWithinWindow(t *testing.T) {
 	defer db.Close()
 
 	episodeID := uuid.New()
+	authorID := uuid.New()
 	stmt := `
 UPDATE episodes
 SET status = 'deleted',
     status_changed_at = now(),
     updated_at = now()
 WHERE id = $1
+  AND author_id = $3
   AND status = 'pending_public'
   AND now() - status_changed_at <= ($2::int || ' seconds')::interval
 RETURNING id;
 `
-	mock.ExpectQuery(regexp.QuoteMeta(stmt)).WithArgs(episodeID, 10).
+	mock.ExpectQuery(regexp.QuoteMeta(stmt)).WithArgs(episodeID, 10, authorID).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(episodeID))
 
-	ok, err := undoEpisode(context.Background(), db, episodeID, 10)
+	ok, err := undoEpisode(context.Background(), db, episodeID, authorID, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,20 +54,22 @@ func TestUndoEpisodeExpiredWindow(t *testing.T) {
 	defer db.Close()
 
 	episodeID := uuid.New()
+	authorID := uuid.New()
 	stmt := `
 UPDATE episodes
 SET status = 'deleted',
     status_changed_at = now(),
     updated_at = now()
 WHERE id = $1
+  AND author_id = $3
   AND status = 'pending_public'
   AND now() - status_changed_at <= ($2::int || ' seconds')::interval
 RETURNING id;
 `
-	mock.ExpectQuery(regexp.QuoteMeta(stmt)).WithArgs(episodeID, 10).
+	mock.ExpectQuery(regexp.QuoteMeta(stmt)).WithArgs(episodeID, 10, authorID).
 		WillReturnError(sql.ErrNoRows)
 
-	ok, err := undoEpisode(context.Background(), db, episodeID, 10)
+	ok, err := undoEpisode(context.Background(), db, episodeID, authorID, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,6 +90,7 @@ func TestSetEpisodeStatus(t *testing.T) {
 	defer db.Close()
 
 	episodeID := uuid.New()
+	authorID := uuid.New()
 	stmt := `
 UPDATE episodes
 SET status = $2,
@@ -93,12 +98,13 @@ SET status = $2,
     updated_at = now(),
     published_at = CASE WHEN $2 = 'public' THEN now() ELSE published_at END
 WHERE id = $1
+  AND author_id = $3
 RETURNING id;
 `
-	mock.ExpectQuery(regexp.QuoteMeta(stmt)).WithArgs(episodeID, "pending_public").
+	mock.ExpectQuery(regexp.QuoteMeta(stmt)).WithArgs(episodeID, "pending_public", authorID).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(episodeID))
 
-	if err := setEpisodeStatus(context.Background(), db, episodeID, "pending_public"); err != nil {
+	if err := setEpisodeStatus(context.Background(), db, episodeID, authorID, "pending_public"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

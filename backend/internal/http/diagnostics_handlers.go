@@ -15,11 +15,11 @@ func registerDiagnosticsRoutes(r chi.Router, deps *app.App) {
 		_, err := deps.Storage.PresignUpload(req.Context(), "diagnostics/ping", time.Second, "application/octet-stream")
 		switch {
 		case err == nil:
-			writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+			WriteJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 		case err == storage.ErrNotImplemented:
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "disabled"})
+			WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "disabled"})
 		default:
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			WriteJSON(w, http.StatusServiceUnavailable, map[string]any{
 				"status": "error",
 				"error":  err.Error(),
 			})
@@ -31,12 +31,12 @@ func registerDiagnosticsRoutes(r chi.Router, deps *app.App) {
 			"type": "ping",
 		})
 		if err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			WriteJSON(w, http.StatusServiceUnavailable, map[string]any{
 				"status": "error",
 				"error":  err.Error(),
 			})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+		WriteJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 	})
 }
