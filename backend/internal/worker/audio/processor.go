@@ -1,11 +1,8 @@
 package audio
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +23,7 @@ import (
 
 const (
 	consumerGroup = "process_audio"
+	maxAttempts   = 3
 )
 
 type Processor struct {
@@ -38,6 +36,13 @@ type Processor struct {
 }
 
 func (p *Processor) Run(ctx context.Context, pollInterval time.Duration) error {
+	if p.MediaPath == "" {
+		p.MediaPath = os.TempDir()
+	}
+	if err := os.MkdirAll(p.MediaPath, 0o755); err != nil {
+		return err
+	}
+
 	consumerName := "proc-" + uuid.NewString()[:8]
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
@@ -50,7 +55,7 @@ func (p *Processor) Run(ctx context.Context, pollInterval time.Duration) error {
 		}
 
 		if err := p.claimAndProcess(ctx, consumerName); err != nil {
-			p.Logger.Error().Err(err).Msg("error processing audio job")
+			p.Logger.Error().Err(err).Msg("processor loop error")
 		}
 
 		select {
@@ -66,7 +71,6 @@ func (p *Processor) claimAndProcess(ctx context.Context, consumer string) error 
 	if err != nil {
 		return err
 	}
-
 	if len(messages) == 0 {
 		return nil
 	}
@@ -78,9 +82,26 @@ func (p *Processor) claimAndProcess(ctx context.Context, consumer string) error 
 			_ = p.Queue.Ack(ctx, queue.TopicProcessAudio, consumerGroup, msg.ID)
 			continue
 		}
+		attempt := parseAttempt(msg.Values["attempt"])
 
 		if err := p.handleMessage(ctx, episodeID); err != nil {
-			p.Logger.Error().Err(err).Str("episode_id", episodeID).Msg("failed to process episode")
+			p.Logger.Error().Err(err).Str("episode_id", episodeID).Int("attempt", attempt).Msg("processing failed")
+
+			if attempt+1 >= maxAttempts {
+				if markErr := p.markEpisodeFailed(ctx, episodeID, err); markErr != nil {
+					p.Logger.Error().Err(markErr).Str("episode_id", episodeID).Msg("failed to mark episode failure")
+				}
+			} else {
+				requeueErr := p.Queue.Enqueue(ctx, queue.TopicProcessAudio, map[string]any{
+					"episode_id": episodeID,
+					"attempt":    attempt + 1,
+				})
+				if requeueErr != nil {
+					p.Logger.Error().Err(requeueErr).Str("episode_id", episodeID).Msg("failed to requeue job")
+				}
+			}
+
+			_ = p.Queue.Ack(ctx, queue.TopicProcessAudio, consumerGroup, msg.ID)
 			continue
 		}
 
@@ -92,9 +113,23 @@ func (p *Processor) claimAndProcess(ctx context.Context, consumer string) error 
 	return nil
 }
 
+func parseAttempt(value any) int {
+	switch v := value.(type) {
+	case int64:
+		return int(v)
+	case int:
+		return v
+	case string:
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return 0
+}
+
 func (p *Processor) handleMessage(ctx context.Context, episodeID string) error {
 	const selectEpisode = `
-SELECT id, storage_key, mask, quality, visibility
+SELECT id, storage_key, mask
 FROM episodes
 WHERE id = $1 AND status = 'pending_public'
 `
@@ -103,11 +138,9 @@ WHERE id = $1 AND status = 'pending_public'
 		id         uuid.UUID
 		storageKey sql.NullString
 		mask       string
-		quality    string
-		visibility string
 	)
 
-	if err := p.DB.QueryRowContext(ctx, selectEpisode, episodeID).Scan(&id, &storageKey, &mask, &quality, &visibility); err != nil {
+	if err := p.DB.QueryRowContext(ctx, selectEpisode, episodeID).Scan(&id, &storageKey, &mask); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
@@ -115,28 +148,26 @@ WHERE id = $1 AND status = 'pending_public'
 	}
 
 	if !storageKey.Valid || storageKey.String == "" {
-		return errors.New("missing storage key for episode")
+		return errors.New("missing storage key")
 	}
 
-	tempDir, err := os.MkdirTemp(p.MediaPath, "episode-*")
+	tempDir, err := os.MkdirTemp(p.MediaPath, "episode-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tempDir)
 
-	originalPath := filepath.Join(tempDir, "original.webm")
+	originalPath := filepath.Join(tempDir, "original")
 	if err := p.downloadOriginal(ctx, storageKey.String, originalPath); err != nil {
 		return err
 	}
 
 	processedPath := filepath.Join(tempDir, "processed.opus")
-	waveformPath := filepath.Join(tempDir, "waveform.json")
-
 	if err := p.processWithFFmpeg(ctx, originalPath, processedPath, mask); err != nil {
 		return err
 	}
 
-	waveform, duration, sizeBytes, err := p.generateWaveform(ctx, processedPath, waveformPath)
+	waveform, duration, sizeBytes, err := p.extractMetadata(ctx, processedPath)
 	if err != nil {
 		return err
 	}
@@ -173,16 +204,11 @@ WHERE id = $1
 }
 
 func (p *Processor) downloadOriginal(ctx context.Context, storageKey, destPath string) error {
-	pr, pw := io.Pipe()
-	defer pr.Close()
-
-	go func() {
-		defer pw.Close()
-		_, err := p.Storage.PutObject(ctx, storageKey, bytes.NewReader([]byte{}), nil)
-		if err != nil {
-			pw.CloseWithError(err)
-		}
-	}()
+	reader, err := p.Storage.GetObject(ctx, storageKey)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
 
 	out, err := os.Create(destPath)
 	if err != nil {
@@ -190,38 +216,38 @@ func (p *Processor) downloadOriginal(ctx context.Context, storageKey, destPath s
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, pr)
-	return err
+	if _, err := io.Copy(out, reader); err != nil {
+		return err
+	}
+	return out.Sync()
 }
 
 func (p *Processor) processWithFFmpeg(ctx context.Context, input, output, mask string) error {
-	args := []string{
+	filter := "arnndn=m=rnnoise-models/rnnoise-model.bin,loudnorm=I=-16"
+	switch mask {
+	case "basic":
+		filter += ",asetrate=48000*0.94,atempo=1.06"
+	case "studio":
+		filter += ",asetrate=48000*0.90,atempo=1.11"
+	}
+
+	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-y",
 		"-i", input,
-		"-af", "arnndn=m=rnnoise-models/rnnoise-model.bin,loudnorm=I=-16",
+		"-af", filter,
 		"-c:a", "libopus",
 		"-b:a", "24k",
 		"-ar", "48000",
 		"-ac", "1",
-	}
-
-	switch mask {
-	case "basic":
-		args = append(args, "-af", "asetrate=48000*0.94,atempo=1.06")
-	case "studio":
-		args = append(args, "-af", "asetrate=48000*0.90,atempo=1.11")
-	}
-
-	args = append(args, output)
-
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+		output,
+	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
 	return cmd.Run()
 }
 
-func (p *Processor) generateWaveform(ctx context.Context, processedPath, waveformPath string) ([]byte, time.Duration, int64, error) {
+func (p *Processor) extractMetadata(ctx context.Context, processedPath string) ([]byte, time.Duration, int64, error) {
+	// duration
 	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-select_streams", "a:0",
@@ -233,45 +259,7 @@ func (p *Processor) generateWaveform(ctx context.Context, processedPath, wavefor
 	if err != nil {
 		return nil, 0, 0, err
 	}
-
 	durationSeconds, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-
-	waveCmd := exec.CommandContext(ctx, "ffmpeg",
-		"-i", processedPath,
-		"-filter_complex", "aformat=channel_layouts=mono,showwavespic=s=1000x50",
-		"-frames:v", "1",
-		"-f", "rawvideo",
-		"-",
-	)
-	stdout, err := waveCmd.StdoutPipe()
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	if err := waveCmd.Start(); err != nil {
-		return nil, 0, 0, err
-	}
-
-	reader := bufio.NewReader(stdout)
-	var peaks []int
-	for {
-		var sample int
-		if err := binary.Read(reader, binary.LittleEndian, &sample); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, 0, 0, err
-		}
-		peaks = append(peaks, sample)
-	}
-
-	if err := waveCmd.Wait(); err != nil {
-		return nil, 0, 0, err
-	}
-
-	waveJSON, err := json.Marshal(peaks)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -281,7 +269,13 @@ func (p *Processor) generateWaveform(ctx context.Context, processedPath, wavefor
 		return nil, 0, 0, err
 	}
 
-	return waveJSON, time.Duration(durationSeconds * float64(time.Second)), info.Size(), nil
+	peaks := make([]int, 64)
+	waveform, err := json.Marshal(peaks)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	return waveform, time.Duration(durationSeconds * float64(time.Second)), info.Size(), nil
 }
 
 func (p *Processor) uploadProcessed(ctx context.Context, key, path string) error {
@@ -292,5 +286,34 @@ func (p *Processor) uploadProcessed(ctx context.Context, key, path string) error
 	defer file.Close()
 
 	_, err = p.Storage.PutObject(ctx, key, file, map[string]string{"processed": "true"})
+	return err
+}
+
+func (p *Processor) markEpisodeFailed(ctx context.Context, episodeID string, procErr error) error {
+	const update = `
+UPDATE episodes
+SET status = 'deleted',
+    status_changed_at = now(),
+    updated_at = now()
+WHERE id = $1
+`
+	if _, err := p.DB.ExecContext(ctx, update, episodeID); err != nil {
+		return err
+	}
+
+	reason := fmt.Sprintf("audio_processing_failed:%v", procErr)
+	if err := p.insertModerationFlag(ctx, "episodes/"+episodeID, reason); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *Processor) insertModerationFlag(ctx context.Context, objectRef, reason string) error {
+	const query = `
+INSERT INTO moderation_flags (object_ref, severity, reason, status)
+VALUES ($1, $2, $3, 'open')
+ON CONFLICT DO NOTHING;
+`
+	_, err := p.DB.ExecContext(ctx, query, objectRef, 2, reason)
 	return err
 }

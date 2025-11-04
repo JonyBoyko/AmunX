@@ -124,3 +124,14 @@ func (c *s3Client) PresignUpload(ctx context.Context, key string, ttl time.Durat
 func (c *s3Client) objectURL(key string) string {
 	return fmt.Sprintf("%s/%s/%s", strings.TrimSuffix(c.baseURL, "/"), c.bucket, strings.TrimPrefix(key, "/"))
 }
+
+func (c *s3Client) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	resp, err := c.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Body, nil
+}

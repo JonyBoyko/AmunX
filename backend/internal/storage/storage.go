@@ -12,6 +12,7 @@ import (
 type Client interface {
 	PutObject(ctx context.Context, key string, body io.Reader, metadata map[string]string) (string, error)
 	PresignUpload(ctx context.Context, key string, ttl time.Duration, contentType string) (PresignedUpload, error)
+	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
 }
 
 // PresignedUpload holds metadata for generated upload URLs.
@@ -40,4 +41,8 @@ func (noopClient) PutObject(context.Context, string, io.Reader, map[string]strin
 
 func (noopClient) PresignUpload(context.Context, string, time.Duration, string) (PresignedUpload, error) {
 	return PresignedUpload{}, ErrNotImplemented
+}
+
+func (noopClient) GetObject(context.Context, string) (io.ReadCloser, error) {
+	return nil, ErrNotImplemented
 }

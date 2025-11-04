@@ -155,6 +155,7 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 
 			if err := deps.Queue.Enqueue(req.Context(), queue.TopicProcessAudio, map[string]any{
 				"episode_id": episodeID.String(),
+				"attempt":    0,
 			}); err != nil {
 				WriteError(w, http.StatusInternalServerError, "enqueue_failed", err.Error())
 				return
