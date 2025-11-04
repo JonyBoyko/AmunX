@@ -9,6 +9,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/amunx/backend/internal/auth"
+	"github.com/amunx/backend/internal/queue"
+	"github.com/amunx/backend/internal/storage"
 )
 
 // App wires together long-lived dependencies for the service.
@@ -19,6 +21,8 @@ type App struct {
 	Redis       *redis.Client
 	MagicLinks  *auth.MagicLinkSigner
 	JWT         *auth.JWTManager
+	Storage     storage.Client
+	Queue       queue.Stream
 	ShutdownFns []func(context.Context) error
 }
 
@@ -81,11 +85,33 @@ func Build(ctx context.Context, cfg Config) (*App, error) {
 	}
 	jwtManager := auth.NewJWTManager(cfg.JWTAccessSecret, cfg.JWTRefreshSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 
+	store, err := storage.NewS3Client(storage.S3Config{
+		Endpoint:  cfg.StorageEndpoint,
+		Region:    cfg.StorageRegion,
+		Bucket:    cfg.StorageBucket,
+		AccessKey: cfg.StorageAccess,
+		SecretKey: cfg.StorageSecret,
+	})
+	if err != nil {
+		if !errors.Is(err, storage.ErrIncompleteConfig) {
+			return nil, fmt.Errorf("storage client: %w", err)
+		}
+		if cfg.Environment == "development" {
+			store = storage.NewNoopClient()
+		} else {
+			return nil, fmt.Errorf("storage client: %w", err)
+		}
+	}
+
+	queueClient := queue.NewRedisStream(redisClient)
+
 	return &App{
 		Config:     cfg,
 		DB:         db,
 		Redis:      redisClient,
 		MagicLinks: magicSigner,
 		JWT:        jwtManager,
+		Storage:    store,
+		Queue:      queueClient,
 	}, nil
 }
