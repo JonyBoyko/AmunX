@@ -1,292 +1,313 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  StatusBar,
+  Pressable,
+  Alert,
+  Animated,
+} from 'react-native';
+import { Audio } from 'expo-av';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
-import { createEpisode, finalizeEpisode, undoEpisode } from '@api/episodes';
-import type { EpisodeMask, EpisodeQuality, EpisodeVisibility } from '@api/episodes';
+import { theme } from '@theme/theme';
+import { applyShadow } from '@theme/utils';
+import { Badge } from '@components/atoms/Badge';
+import { Chip } from '@components/atoms/Chip';
+import { UndoToast } from '@components/molecules/UndoToast';
 import { useSession } from '@store/session';
+import { uploadEpisode, deleteEpisode } from '@api/episodes';
 
-const UNDO_WINDOW_SECONDS = 10;
-const MASK_OPTIONS: EpisodeMask[] = ['none', 'basic', 'studio'];
-const QUALITY_OPTIONS: EpisodeQuality[] = ['raw', 'clean'];
-const VISIBILITY_OPTIONS: EpisodeVisibility[] = ['public', 'anon'];
+type RecorderScreenProps = {
+  navigation: NativeStackNavigationProp<any>;
+};
 
-const RecorderScreen: React.FC = () => {
+const MAX_DURATION_MS = 60 * 1000; // 1 minute
+const UNDO_SECONDS = 10;
+
+const RecorderScreen: React.FC<RecorderScreenProps> = ({ navigation }) => {
   const { token } = useSession();
-
+  const { t } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'recording' | 'uploading' | 'undo' | 'completed'>('idle');
-  const [visibility, setVisibility] = useState<EpisodeVisibility>('public');
-  const [quality, setQuality] = useState<EpisodeQuality>('clean');
-  const [mask, setMask] = useState<EpisodeMask>('none');
-  const [durationSec, setDurationSec] = useState(0);
-  const [noiseLevel, setNoiseLevel] = useState(0);
-  const [undoRemaining, setUndoRemaining] = useState(0);
-  const [episodeId, setEpisodeId] = useState<string | null>(null);
-  const [publicReminderCount, setPublicReminderCount] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPublic, setIsPublic] = useState(true);
+  const [mask, setMask] = useState<'none' | 'light' | 'heavy'>('none');
+  const [quality, setQuality] = useState<'raw' | 'clean' | 'studio'>('clean');
+  const [uploading, setUploading] = useState(false);
+  const [showUndo, setShowUndo] = useState(false);
+  const [pendingEpisodeId, setPendingEpisodeId] = useState<string | null>(null);
 
-  const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const noiseTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const recordingDisabled = status === 'uploading';
-  const showPublicReminder = publicReminderCount < 3;
+  const recording = useRef<Audio.Recording | null>(null);
+  const durationInterval = useRef<NodeJS.Timeout | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Request audio permissions
     (async () => {
-      try {
-        const stored = await AsyncStorage.getItem('publicReminderCount');
-        if (stored) {
-          const parsed = parseInt(stored, 10);
-          if (!Number.isNaN(parsed)) {
-            setPublicReminderCount(parsed);
-          }
-        }
-      } catch {
-        // ignore hydration issues
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(t('recorder.permission.title'), t('recorder.permission.message'));
       }
     })();
-    return () => {
-      if (durationTimerRef.current) clearInterval(durationTimerRef.current);
-      if (noiseTimerRef.current) clearInterval(noiseTimerRef.current);
-      if (undoTimerRef.current) clearInterval(undoTimerRef.current);
-    };
-  }, []);
+  }, [t]);
 
-  const clearRecordingTimers = useCallback(() => {
-    if (durationTimerRef.current) {
-      clearInterval(durationTimerRef.current);
-      durationTimerRef.current = null;
-    }
-    if (noiseTimerRef.current) {
-      clearInterval(noiseTimerRef.current);
-      noiseTimerRef.current = null;
-    }
-  }, []);
-
-  const clearUndoTimer = useCallback(() => {
-    if (undoTimerRef.current) {
-      clearInterval(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
-    setUndoRemaining(0);
-    setEpisodeId(null);
-  }, []);
-
-  const reset = useCallback(() => {
-    clearRecordingTimers();
-    clearUndoTimer();
-    setDurationSec(0);
-    setNoiseLevel(0);
-    setStatus('idle');
-    setIsRecording(false);
-  }, [clearRecordingTimers, clearUndoTimer]);
-
-  const startRecording = useCallback(() => {
-    setStatus('recording');
-    setIsRecording(true);
-    setDurationSec(0);
-    setNoiseLevel(0);
-
-    durationTimerRef.current = setInterval(() => {
-      setDurationSec((prev) => prev + 1);
-    }, 1000);
-
-    noiseTimerRef.current = setInterval(() => {
-      setNoiseLevel(Math.floor(Math.random() * 60) + 20);
-    }, 700);
-  }, []);
-
-  const startUndoTimer = useCallback(() => {
-    clearUndoTimer();
-    setStatus('undo');
-    setUndoRemaining(UNDO_WINDOW_SECONDS);
-
-    undoTimerRef.current = setInterval(() => {
-      setUndoRemaining((prev) => {
-        if (prev <= 1) {
-          clearUndoTimer();
-          setStatus('completed');
-          Alert.alert('Published', 'Episode is now public.');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [clearUndoTimer]);
-
-  const processRecording = useCallback(async () => {
-    if (!token) {
-      Alert.alert('Sign in required', 'Please sign in to publish voice notes.');
-      return;
-    }
-
-    setStatus('uploading');
-
-    const safeDuration = Math.max(durationSec, 1);
-
-    try {
-      const response = await createEpisode({
-        token,
-        visibility,
-        mask,
-        quality,
-        durationSec: safeDuration
-      });
-
-      const audioPayload = new Uint8Array(Math.max(1, safeDuration * 500)).fill(128);
-      const uploadHeaders: Record<string, string> = {};
-      if (response.upload_headers) {
-        Object.entries(response.upload_headers).forEach(([key, value]) => {
-          uploadHeaders[key] = value;
-        });
-      }
-      if (!uploadHeaders['Content-Type']) {
-        uploadHeaders['Content-Type'] = 'audio/webm';
-      }
-
-      const uploadResult = await fetch(response.upload_url, {
-        method: 'PUT',
-        headers: uploadHeaders,
-        body: audioPayload
-      });
-
-      if (!uploadResult.ok) {
-        const text = await uploadResult.text();
-        throw new Error(text || 'Upload failed');
-      }
-
-      await finalizeEpisode(token, response.id);
-      setEpisodeId(response.id);
-      setPublicReminderCount((prev) => {
-        const next = prev + 1;
-        AsyncStorage.setItem('publicReminderCount', String(next)).catch(() => {});
-        return next;
-      });
-      startUndoTimer();
-      Alert.alert('Uploaded', 'Episode is queued. You can undo within 10 seconds.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unexpected error';
-      Alert.alert('Error', message);
-      reset();
-    }
-  }, [durationSec, mask, quality, reset, startUndoTimer, token, visibility]);
-
-  const handleRecordToggle = useCallback(async () => {
-    if (!token) {
-      Alert.alert('Sign in required', 'Please sign in to record.');
-      return;
-    }
-
+  useEffect(() => {
+    // Pulse animation for recording indicator
     if (isRecording) {
-      clearRecordingTimers();
-      setIsRecording(false);
-      await processRecording();
-    } else if (!recordingDisabled) {
-      startRecording();
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.3,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
     }
-  }, [clearRecordingTimers, isRecording, processRecording, recordingDisabled, startRecording, token]);
+  }, [isRecording, pulseAnim]);
 
-  const handleUndo = useCallback(async () => {
-    if (!token || !episodeId) {
+  const startRecording = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recording.current = newRecording;
+      setIsRecording(true);
+      setDuration(0);
+
+      // Track duration
+      durationInterval.current = setInterval(() => {
+        setDuration((prev) => {
+          const next = prev + 100;
+          if (next >= MAX_DURATION_MS) {
+            stopRecording();
+            return MAX_DURATION_MS;
+          }
+          return next;
+        });
+      }, 100);
+    } catch (err: any) {
+      Alert.alert(t('common.error'), t('recorder.uploadError') + ': ' + err?.message);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording.current) return;
+
+    try {
+      setIsRecording(false);
+      if (durationInterval.current) {
+        clearInterval(durationInterval.current);
+      }
+
+      await recording.current.stopAndUnloadAsync();
+      const uri = recording.current.getURI();
+      recording.current = null;
+
+      if (uri) {
+        handleUpload(uri);
+      }
+    } catch (err: any) {
+      Alert.alert(t('common.error'), t('recorder.uploadError') + ': ' + err?.message);
+    }
+  };
+
+  const handleUpload = async (uri: string) => {
+    if (!token) {
+      Alert.alert(t('errors.unauthorized'), t('errors.unauthorized'));
       return;
     }
 
+    setUploading(true);
+
     try {
-      await undoEpisode(token, episodeId);
-      Alert.alert('Undo', 'Episode has been cancelled.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Undo failed';
-      Alert.alert('Undo failed', message);
+      const formData = new FormData();
+      formData.append('audio', {
+        uri,
+        type: 'audio/m4a',
+        name: `recording_${Date.now()}.m4a`,
+      } as any);
+      formData.append('title', 'Voice note');
+      formData.append('is_public', isPublic ? 'true' : 'false');
+      formData.append('mask', mask);
+      formData.append('quality', quality);
+
+      const episode = await uploadEpisode(token, formData);
+      
+      setPendingEpisodeId(episode.id);
+      setShowUndo(true);
+      setDuration(0);
+    } catch (err: any) {
+      Alert.alert(t('recorder.uploadError'), err?.message ?? t('common.retry'));
     } finally {
-      clearUndoTimer();
-      reset();
+      setUploading(false);
     }
-  }, [clearUndoTimer, episodeId, reset, token]);
+  };
 
-  const noiseText = useMemo(() => {
-    if (!isRecording) return '�';
-    return `${noiseLevel} dB`;
-  }, [isRecording, noiseLevel]);
+  const handleUndo = async () => {
+    if (!pendingEpisodeId || !token) return;
 
-  const timerText = useMemo(() => {
-    const minutes = Math.floor(durationSec / 60)
-      .toString()
-      .padStart(2, '0');
-    const seconds = (durationSec % 60)
-      .toString()
-      .padStart(2, '0');
-    return `${minutes}:${seconds}`;
-  }, [durationSec]);
+    try {
+      await deleteEpisode(token, pendingEpisodeId);
+      setPendingEpisodeId(null);
+      setShowUndo(false);
+      Alert.alert(t('recorder.cancelled.title'), t('recorder.cancelled.message'));
+    } catch (err: any) {
+      Alert.alert(t('common.error'), t('common.error') + ': ' + err?.message);
+    }
+  };
+
+  const handleUndoComplete = () => {
+    setShowUndo(false);
+    setPendingEpisodeId(null);
+    Alert.alert(t('recorder.published.title'), t('recorder.published.message'));
+    navigation.navigate('Feed');
+  };
+
+  const formatDuration = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    return `${seconds}s / 60s`;
+  };
+
+  const progressPercent = (duration / MAX_DURATION_MS) * 100;
 
   return (
     <SafeAreaView style={styles.container}>
-      {showPublicReminder && (
-        <View style={styles.reminder}>
-          <Text style={styles.reminderText}>Heads up: posts are public by default. You can undo within 10 seconds.</Text>
+      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.base} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text.primary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>{t('recorder.title')}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Main Content */}
+      <View style={styles.content}>
+        {/* Status Badges */}
+        <View style={styles.badgeRow}>
+          <Badge variant={isPublic ? 'public' : 'anon'} />
+          {mask !== 'none' && <Badge variant="mask" label={mask.toUpperCase()} />}
+          <Badge variant={quality as any} />
+        </View>
+
+        {/* Recording Button */}
+        <View style={styles.recordSection}>
+          <Pressable
+            onPress={isRecording ? stopRecording : startRecording}
+            disabled={uploading}
+            style={styles.recordButtonContainer}
+          >
+            <Animated.View
+              style={[
+                styles.recordButton,
+                isRecording && styles.recordButtonActive,
+                { transform: [{ scale: pulseAnim }] },
+              ]}
+            >
+              <Ionicons
+                name={isRecording ? 'stop' : 'mic'}
+                size={48}
+                color={theme.colors.text.inverse}
+              />
+            </Animated.View>
+          </Pressable>
+
+          {/* Duration */}
+          <Text style={styles.durationText}>{formatDuration(duration)}</Text>
+
+          {/* Progress Bar */}
+          {isRecording && (
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
+            </View>
+          )}
+        </View>
+
+        {/* Settings */}
+        <View style={styles.settings}>
+          {/* Privacy Toggle */}
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>{t('recorder.privacy')}</Text>
+            <View style={styles.chipGroup}>
+              <Chip
+                label={t('recorder.public')}
+                selected={isPublic}
+                onPress={() => setIsPublic(true)}
+              />
+              <Chip
+                label={t('recorder.anonymous')}
+                selected={!isPublic}
+                onPress={() => setIsPublic(false)}
+              />
+            </View>
+          </View>
+
+          {/* Mask */}
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>{t('recorder.mask')}</Text>
+            <View style={styles.chipGroup}>
+              <Chip label={t('recorder.maskNone')} selected={mask === 'none'} onPress={() => setMask('none')} />
+              <Chip label={t('recorder.maskLight')} selected={mask === 'light'} onPress={() => setMask('light')} />
+              <Chip label={t('recorder.maskHeavy')} selected={mask === 'heavy'} onPress={() => setMask('heavy')} />
+            </View>
+          </View>
+
+          {/* Quality */}
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>{t('recorder.quality')}</Text>
+            <View style={styles.chipGroup}>
+              <Chip label={t('recorder.qualityRaw')} selected={quality === 'raw'} onPress={() => setQuality('raw')} />
+              <Chip label={t('recorder.qualityClean')} selected={quality === 'clean'} onPress={() => setQuality('clean')} />
+              <Chip label={t('recorder.qualityStudio')} selected={quality === 'studio'} onPress={() => setQuality('studio')} />
+            </View>
+          </View>
+        </View>
+
+        {/* Instructions */}
+        <Text style={styles.instructions}>
+          {isRecording
+            ? t('recorder.instructions.recording')
+            : t('recorder.instructions.idle')}
+        </Text>
+      </View>
+
+      {/* Undo Toast */}
+      {showUndo && (
+        <UndoToast
+          seconds={UNDO_SECONDS}
+          onUndo={handleUndo}
+          onComplete={handleUndoComplete}
+        />
+      )}
+
+      {/* Uploading Overlay */}
+      {uploading && (
+        <View style={styles.uploadingOverlay}>
+          <View style={styles.uploadingCard}>
+            <Text style={styles.uploadingText}>{t('recorder.uploading')}</Text>
+          </View>
         </View>
       )}
-      <View style={styles.stateCard}>
-        <Text style={styles.sectionTitle}>Visibility</Text>
-        <View style={styles.row}>
-          {VISIBILITY_OPTIONS.map((option) => (
-            <Button
-              key={option}
-              title={option === 'public' ? 'Public' : 'Anon'}
-              onPress={() => setVisibility(option)}
-              color={visibility === option ? '#22c55e' : undefined}
-              disabled={isRecording || recordingDisabled || status === 'undo'}
-            />
-          ))}
-        </View>
-
-        <Text style={styles.sectionTitle}>Quality</Text>
-        <View style={styles.row}>
-          {QUALITY_OPTIONS.map((option) => (
-            <Button
-              key={option}
-              title={option.toUpperCase()}
-              onPress={() => setQuality(option)}
-              color={quality === option ? '#f97316' : undefined}
-              disabled={isRecording || recordingDisabled || status === 'undo'}
-            />
-          ))}
-        </View>
-
-        <Text style={styles.sectionTitle}>Mask</Text>
-        <View style={styles.row}>
-          {MASK_OPTIONS.map((option) => (
-            <Button
-              key={option}
-              title={option.charAt(0).toUpperCase() + option.slice(1)}
-              onPress={() => setMask(option)}
-              color={mask === option ? '#38bdf8' : undefined}
-              disabled={isRecording || recordingDisabled || status === 'undo'}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.recorderCard}>
-        <Text style={styles.timer}>{timerText}</Text>
-        <Text style={styles.statusText}>{status.toUpperCase()}</Text>
-        <Text style={styles.noiseText}>Noise level: {noiseText}</Text>
-        <Button
-          title={isRecording ? 'Stop' : status === 'uploading' ? 'Uploading...' : 'Record'}
-          onPress={handleRecordToggle}
-          color={isRecording ? '#ef4444' : '#22c55e'}
-          disabled={recordingDisabled && !isRecording}
-        />
-        {status === 'undo' && (
-          <>
-            <Text style={styles.undoText}>Publishing in {undoRemaining}s</Text>
-            <Button title="Undo" onPress={handleUndo} color="#facc15" />
-          </>
-        )}
-        {status === 'completed' && (
-          <Button title="Record again" onPress={reset} />
-        )}
-      </View>
     </SafeAreaView>
   );
 };
@@ -294,62 +315,121 @@ const RecorderScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    gap: 16,
-    padding: 16,
-    backgroundColor: '#0f172a'
+    backgroundColor: theme.colors.bg.base,
   },
-  reminder: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 12
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.surface.border,
   },
-  reminderText: {
-    color: '#facc15',
-    fontSize: 14
-  },
-  stateCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 16,
-    gap: 12
-  },
-  recorderCard: {
-    flex: 1,
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 16,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12
   },
-  sectionTitle: {
-    color: '#cbd5f5',
-    fontSize: 14,
-    fontWeight: '600'
+  headerTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.type.h2.size,
+    fontWeight: theme.type.h2.weight,
   },
-  row: {
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.space.lg,
+    paddingTop: theme.space.xxl,
+    gap: theme.space.xxl,
+  },
+  badgeRow: {
     flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-around'
+    flexWrap: 'wrap',
+    gap: theme.space.sm,
+    justifyContent: 'center',
   },
-  timer: {
-    color: '#f8fafc',
-    fontSize: 32,
-    fontWeight: '700'
+  recordSection: {
+    alignItems: 'center',
+    gap: theme.space.lg,
   },
-  statusText: {
-    color: '#93c5fd',
-    fontSize: 16,
-    marginBottom: 4
+  recordButtonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  noiseText: {
-    color: '#f8fafc',
-    marginBottom: 12
+  recordButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: theme.colors.brand.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...applyShadow(8),
   },
-  undoText: {
-    color: '#facc15',
-    fontWeight: '600'
-  }
+  recordButtonActive: {
+    backgroundColor: theme.colors.state.danger,
+  },
+  durationText: {
+    color: theme.colors.text.primary,
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: 6,
+    backgroundColor: theme.colors.surface.chip,
+    borderRadius: theme.radius.xs,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: theme.colors.brand.primary,
+    borderRadius: theme.radius.xs,
+  },
+  settings: {
+    gap: theme.space.xl,
+  },
+  settingRow: {
+    gap: theme.space.md,
+  },
+  settingLabel: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.type.body.size,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  chipGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space.sm,
+  },
+  instructions: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.type.caption.size,
+    textAlign: 'center',
+    lineHeight: theme.type.caption.lineHeight,
+  },
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  uploadingCard: {
+    backgroundColor: theme.colors.surface.raised,
+    paddingHorizontal: theme.space.xxl,
+    paddingVertical: theme.space.xl,
+    borderRadius: theme.radius.lg,
+    ...applyShadow(12),
+  },
+  uploadingText: {
+    color: theme.colors.text.primary,
+    fontSize: theme.type.body.size,
+    fontWeight: '600',
+  },
 });
 
 export default RecorderScreen;

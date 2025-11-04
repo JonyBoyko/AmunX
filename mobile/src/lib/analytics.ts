@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react-native';
-import PostHog, { PostHogOptions, PostHogEventProperties } from 'posthog-react-native';
+import PostHog, { PostHogOptions } from 'posthog-react-native';
 import Config from 'react-native-config';
 
 let posthogClient: PostHog | null = null;
@@ -20,7 +20,9 @@ export function initAnalytics() {
   }
 }
 
-export function track(event: string, properties?: PostHogEventProperties) {
+export type AnalyticsEventProperties = Parameters<PostHog['capture']>[1];
+
+export function track(event: string, properties?: AnalyticsEventProperties) {
   if (!posthogClient) {
     return;
   }

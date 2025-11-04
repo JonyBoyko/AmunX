@@ -6,6 +6,7 @@ export type LiveSession = {
   host_id: string;
   topic_id?: string | null;
   title?: string | null;
+  mask?: string | null;
   started_at: string;
   ended_at?: string | null;
 };
@@ -18,7 +19,7 @@ export type LiveSessionCreateResponse = {
 
 export async function createLiveSession(
   token: string,
-  payload: { topic_id?: string | null; title?: string }
+  payload: { topic_id?: string | null; title?: string; mask?: 'none' | 'basic' | 'studio' }
 ): Promise<LiveSessionCreateResponse> {
   return authedFetch(token, '/v1/live/sessions', {
     method: 'POST',

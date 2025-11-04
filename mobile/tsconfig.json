@@ -23,8 +23,17 @@
                                                      ],
                                           "@hooks/*":  [
                                                            "src/hooks/*"
-                                                       ]
-                                      },
+                                                       ],
+                        "@utils/*":  [
+                                         "src/utils/*"
+                                     ],
+                        "@theme/*":  [
+                                         "src/theme/*"
+                                     ],
+                        "@i18n/*":  [
+                                        "src/i18n/*"
+                                    ]
+                    },
                             "types":  [
                                           "jest",
                                           "react-native",

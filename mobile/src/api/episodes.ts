@@ -67,3 +67,53 @@ export async function getSelfReactions(
     method: 'GET'
   });
 }
+
+/**
+ * Upload episode (wrapper for create + upload + finalize flow)
+ */
+export async function uploadEpisode(
+  token: string,
+  formData: FormData
+): Promise<{ id: string; status: string }> {
+  // Extract metadata from FormData
+  const isPublic = formData.get('is_public') === 'true';
+  const mask = (formData.get('mask') as EpisodeMask) || 'none';
+  const quality = (formData.get('quality') as EpisodeQuality) || 'clean';
+  const audioFile = formData.get('audio') as any;
+
+  // Step 1: Create episode and get upload URL
+  const createResponse = await createEpisode({
+    token,
+    visibility: isPublic ? 'public' : 'private',
+    mask,
+    quality,
+    durationSec: 60, // Default to 60s, will be updated after processing
+  });
+
+  // Step 2: Upload audio file to S3
+  const uploadHeaders: Record<string, string> = createResponse.upload_headers || {
+    'Content-Type': 'audio/m4a',
+  };
+
+  const uploadResponse = await fetch(createResponse.upload_url, {
+    method: 'PUT',
+    headers: uploadHeaders,
+    body: audioFile.uri ? await fetch(audioFile.uri).then((r) => r.blob()) : audioFile,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+  }
+
+  // Step 3: Finalize episode
+  await finalizeEpisode(token, createResponse.id);
+
+  return { id: createResponse.id, status: 'processing' };
+}
+
+/**
+ * Delete episode (alias for undoEpisode)
+ */
+export async function deleteEpisode(token: string, episodeId: string): Promise<void> {
+  return undoEpisode(token, episodeId);
+}

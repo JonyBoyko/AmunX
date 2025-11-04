@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Button, FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useFeedQuery } from '@api/feed';
 import type { FeedEpisode } from '@api/feed';
@@ -27,8 +29,12 @@ const FeedItem: React.FC<{ episode: FeedEpisode; token?: string | null; onOpen: 
 
   return (
     <View style={styles.card}>
+      {episode.is_live && <Text style={styles.badge}>Live replay</Text>}
       <Text style={styles.cardTitle}>{title}</Text>
       <Text style={styles.meta}>Mask: {episode.mask}, Quality: {episode.quality}</Text>
+      {typeof episode.duration_sec === 'number' && (
+        <Text style={styles.meta}>Duration: {formatSeconds(episode.duration_sec)}</Text>
+      )}
       <Text style={styles.meta}>Published: {published}</Text>
       {episode.keywords && episode.keywords.length > 0 && <Text style={styles.meta}>Keywords: {episode.keywords.join(', ')}</Text>}
       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -42,6 +48,17 @@ const FeedItem: React.FC<{ episode: FeedEpisode; token?: string | null; onOpen: 
 const HomeScreen: React.FC = ({ navigation }: any) => {
   const { token } = useSession();
   const query = useFeedQuery(token);
+  const refetch = query.refetch;
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+      const timer = setInterval(() => {
+        refetch();
+      }, 15000);
+      return () => clearInterval(timer);
+    }, [refetch])
+  );
 
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
 
@@ -120,6 +137,16 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8
   },
+  badge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#22c55e33',
+    color: '#bbf7d0',
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999
+  },
   cardTitle: {
     color: '#f8fafc',
     fontSize: 18,
@@ -131,3 +158,9 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
+
+function formatSeconds(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}

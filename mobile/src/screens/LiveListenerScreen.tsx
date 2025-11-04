@@ -11,16 +11,26 @@ import {
   View
 } from 'react-native';
 
-import { AudioSession, LiveKitRoom } from '@livekit/react-native';
+import {
+  AudioSession,
+  LiveKitRoom,
+  useDataChannel,
+  useParticipants
+} from '@livekit/react-native';
+import type { ReceivedDataMessage } from '@livekit/react-native';
 
 import { getLiveSession, type LiveSessionCreateResponse } from '@api/live';
 import { useSession } from '@store/session';
+import { decodeMessage, encodeMessage } from '@utils/dataMessages';
 
 type LogEntry = {
   id: string;
   text: string;
   ts: string;
 };
+
+const REACTION_TOPIC = 'amunx.reaction';
+const CHAT_TOPIC = 'amunx.chat';
 
 const LiveListenerScreen: React.FC = () => {
   const { token } = useSession();
@@ -42,7 +52,8 @@ const LiveListenerScreen: React.FC = () => {
       token: response.token,
       url: response.url,
       startedAt: response.session.started_at,
-      title: response.session.title ?? ''
+      title: response.session.title ?? '',
+      mask: (response.session.mask as 'none' | 'basic' | 'studio') ?? 'none'
     };
   }, [response]);
 
@@ -94,7 +105,7 @@ const LiveListenerScreen: React.FC = () => {
       return;
     }
     setShouldConnect(true);
-    logEvent('Connecting to LiveKit room…');
+    logEvent('Connecting to LiveKit room...');
   }, [logEvent, response]);
 
   const handleLeave = useCallback(() => {
@@ -137,6 +148,7 @@ const LiveListenerScreen: React.FC = () => {
             <Text style={styles.info}>ID: {liveDetails.id}</Text>
             <Text style={styles.info}>Room: {liveDetails.room}</Text>
             <Text style={styles.info}>Title: {liveDetails.title}</Text>
+            <Text style={styles.info}>Mask: {liveDetails.mask}</Text>
             <Text style={styles.info}>Started: {liveDetails.startedAt}</Text>
             <Text style={styles.info}>Token: {liveDetails.token}</Text>
             <Text style={styles.info}>URL: {liveDetails.url}</Text>
@@ -169,6 +181,9 @@ const LiveListenerScreen: React.FC = () => {
                 <Text style={styles.liveStatus}>
                   You are connected as <Text style={styles.roleBadge}>{role}</Text>.
                 </Text>
+                <ListenerStats />
+                <ReactionPanel onEvent={logEvent} />
+                <ChatPanel onEvent={logEvent} />
                 <Text style={styles.info}>
                   Remote audio will play through the device speaker. Use the buttons above to disconnect when finished.
                 </Text>
@@ -180,7 +195,7 @@ const LiveListenerScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.subheading}>Connection Status</Text>
           <Text style={styles.info}>
-            {roomConnected ? 'Receiving live audio…' : shouldConnect ? 'Connecting…' : 'Disconnected'}
+            {roomConnected ? 'Receiving live audio...' : shouldConnect ? 'Connecting...' : 'Disconnected'}
           </Text>
         </View>
 
@@ -210,6 +225,128 @@ const LiveListenerScreen: React.FC = () => {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+};
+
+const ListenerStats: React.FC = () => {
+  const participants = useParticipants();
+  const listenerCount = useMemo(
+    () => (participants ? participants.filter((participant) => !participant.isLocal).length : 0),
+    [participants]
+  );
+
+  return <Text style={styles.info}>Listeners connected: {listenerCount}</Text>;
+};
+
+const ReactionPanel: React.FC<{ onEvent: (text: string) => void }> = ({ onEvent }) => {
+  const [lastReaction, setLastReaction] = useState<string | null>(null);
+  const { send } = useDataChannel(REACTION_TOPIC, (msg: ReceivedDataMessage<typeof REACTION_TOPIC>) => {
+    const decoded = decodeMessage(msg.payload);
+    const actor = msg.from?.identity ?? 'Participant';
+    if (decoded) {
+      onEvent(`${actor} shared ${decoded}`);
+      setLastReaction(decoded);
+    }
+  });
+
+  const sendReaction = useCallback(
+    async (reaction: string) => {
+      try {
+        await send(encodeMessage(reaction), { reliable: false });
+        onEvent(`You sent ${reaction}`);
+        setLastReaction(reaction);
+      } catch (error: any) {
+        Alert.alert('Reaction error', error?.message ?? 'Unable to send reaction');
+      }
+    },
+    [onEvent, send]
+  );
+
+  const emojiOptions = ['\\u{1F44F}', '\\u{1F389}', '\\u{1F64C}', '\\u{1F602}'];
+
+  return (
+    <View style={styles.reactionSection}>
+      <Text style={styles.liveStatus}>Send a reaction</Text>
+      <View style={styles.reactionRow}>
+        {emojiOptions.map((code) => {
+          const rendered = code.replace(/\\u\\{([0-9A-Fa-f]+)\\}/g, (_, hex) =>
+            String.fromCodePoint(parseInt(hex, 16))
+          );
+          return (
+            <Button
+              key={code}
+              title={rendered}
+              onPress={() => void sendReaction(rendered)}
+            />
+          );
+        })}
+      </View>
+      {lastReaction && <Text style={styles.reactionNote}>Last reaction: {lastReaction}</Text>}
+    </View>
+  );
+};
+
+const ChatPanel: React.FC<{ onEvent: (text: string) => void }> = ({ onEvent }) => {
+  const [messages, setMessages] = useState<Array<{ id: string; author: string; text: string; ts: string }>>([]);
+  const [draft, setDraft] = useState('');
+  const { send } = useDataChannel(CHAT_TOPIC, (msg: ReceivedDataMessage<typeof CHAT_TOPIC>) => {
+    const decoded = decodeMessage(msg.payload);
+    if (!decoded) return;
+    const author = msg.from?.identity ?? 'Participant';
+    const entry = {
+      id: `chat-${author}-${Date.now()}-${Math.random()}`,
+      author,
+      text: decoded,
+      ts: new Date().toISOString()
+    };
+    setMessages((prev) => [entry, ...prev].slice(0, 50));
+    onEvent(`${author}: ${decoded}`);
+  });
+
+  const handleSend = useCallback(async () => {
+    const text = draft.trim();
+    if (!text) return;
+    try {
+      await send(encodeMessage(text), { reliable: true });
+      const entry = {
+        id: `chat-self-${Date.now()}-${Math.random()}`,
+        author: 'You',
+        text,
+        ts: new Date().toISOString()
+      };
+      setMessages((prev) => [entry, ...prev].slice(0, 50));
+      onEvent(`You: ${text}`);
+      setDraft('');
+    } catch (error: any) {
+      Alert.alert('Chat error', error?.message ?? 'Unable to send message');
+    }
+  }, [draft, onEvent, send]);
+
+  return (
+    <View style={styles.chatSection}>
+      <Text style={styles.liveStatus}>Chat</Text>
+      <View style={styles.chatInputRow}>
+        <TextInput
+          style={styles.chatInput}
+          placeholder="Say hello"
+          placeholderTextColor="#64748b"
+          value={draft}
+          onChangeText={setDraft}
+          autoCapitalize="sentences"
+        />
+        <Button title="Send" onPress={handleSend} />
+      </View>
+      {messages.length > 0 && (
+        <View style={styles.chatMessages}>
+          {messages.map((msg) => (
+            <Text key={msg.id} style={styles.chatMessage}>
+              <Text style={styles.chatAuthor}>{msg.author}: </Text>
+              {msg.text}
+            </Text>
+          ))}
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -253,6 +390,35 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     gap: 12
+  },
+  reactionSection: {
+    gap: 8
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    gap: 12
+  },
+  reactionNote: {
+    color: '#cbd5f5',
+    fontSize: 12
+  },
+  chatSection: {
+    gap: 8
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center'
+  },
+  chatMessages: {
+    gap: 6
+  },
+  chatMessage: {
+    color: '#f8fafc'
+  },
+  chatAuthor: {
+    color: '#38bdf8',
+    fontWeight: '600'
   },
   subheading: {
     color: '#f8fafc',
