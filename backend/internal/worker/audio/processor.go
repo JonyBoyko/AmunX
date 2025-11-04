@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/rs/zerolog"
 
 	"github.com/amunx/backend/internal/queue"
@@ -200,6 +201,11 @@ WHERE id = $1
 		return err
 	}
 
+	summary, keywords, mood := generatePlaceholderSummary(mask, duration)
+	if err := p.upsertSummary(ctx, id, summary, keywords, mood); err != nil {
+		p.Logger.Warn().Err(err).Str("episode_id", episodeID).Msg("failed to upsert summary")
+	}
+
 	return nil
 }
 
@@ -316,4 +322,49 @@ ON CONFLICT DO NOTHING;
 `
 	_, err := p.DB.ExecContext(ctx, query, objectRef, 2, reason)
 	return err
+}
+
+func (p *Processor) upsertSummary(ctx context.Context, episodeID uuid.UUID, summary string, keywords []string, mood map[string]float64) error {
+	moodJSON, err := json.Marshal(mood)
+	if err != nil {
+		return err
+	}
+
+	const query = `
+INSERT INTO summaries (episode_id, tldr, keywords, mood)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (episode_id) DO UPDATE SET
+	tldr = EXCLUDED.tldr,
+	keywords = EXCLUDED.keywords,
+	mood = EXCLUDED.mood
+`
+	_, err = p.DB.ExecContext(ctx, query, episodeID, summary, pq.Array(keywords), moodJSON)
+	return err
+}
+
+func generatePlaceholderSummary(mask string, duration time.Duration) (string, []string, map[string]float64) {
+	base := "Voice note"
+	switch mask {
+	case "basic":
+		base = "Lightly masked voice note"
+	case "studio":
+		base = "Studio treated voice note"
+	}
+
+	minutes := int(duration.Seconds()) / 60
+	if minutes > 0 {
+		base = fmt.Sprintf("%s (~%d min)", base, minutes)
+	}
+
+	keywords := []string{"voice", "note"}
+	if mask != "none" {
+		keywords = append(keywords, mask)
+	}
+
+	mood := map[string]float64{
+		"valence": 0.1,
+		"arousal": 0.3,
+	}
+
+	return base, keywords, mood
 }

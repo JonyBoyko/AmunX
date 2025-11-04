@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"github.com/amunx/backend/internal/app"
 	"github.com/amunx/backend/internal/httpctx"
@@ -26,19 +28,22 @@ type episodeResponse struct {
 }
 
 type episodeSummary struct {
-	ID          string     `json:"id"`
-	AuthorID    string     `json:"author_id"`
-	TopicID     *string    `json:"topic_id,omitempty"`
-	Title       *string    `json:"title,omitempty"`
-	Visibility  string     `json:"visibility"`
-	Status      string     `json:"status"`
-	DurationSec *int       `json:"duration_sec,omitempty"`
-	AudioURL    *string    `json:"audio_url,omitempty"`
-	Mask        string     `json:"mask"`
-	Quality     string     `json:"quality"`
-	IsLive      bool       `json:"is_live"`
-	PublishedAt *time.Time `json:"published_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID          string         `json:"id"`
+	AuthorID    string         `json:"author_id"`
+	TopicID     *string        `json:"topic_id,omitempty"`
+	Title       *string        `json:"title,omitempty"`
+	Visibility  string         `json:"visibility"`
+	Status      string         `json:"status"`
+	DurationSec *int           `json:"duration_sec,omitempty"`
+	AudioURL    *string        `json:"audio_url,omitempty"`
+	Mask        string         `json:"mask"`
+	Quality     string         `json:"quality"`
+	IsLive      bool           `json:"is_live"`
+	PublishedAt *time.Time     `json:"published_at,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	Summary     *string        `json:"summary,omitempty"`
+	Keywords    []string       `json:"keywords,omitempty"`
+	Mood        map[string]any `json:"mood,omitempty"`
 }
 
 func registerEpisodeRoutes(r chi.Router, deps *app.App) {
@@ -432,30 +437,31 @@ func parseLimit(raw string, def, max int) int {
 }
 
 func listPublicEpisodes(ctx context.Context, db *sql.DB, params listEpisodesParams) ([]episodeSummary, error) {
-	query := `SELECT id, author_id, topic_id, title, visibility, status, duration_sec, audio_url, mask, quality, is_live, published_at, created_at
-FROM episodes
-WHERE status = 'public'`
+	query := `SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood
+FROM episodes e
+LEFT JOIN summaries s ON s.episode_id = e.id
+WHERE e.status = 'public'`
 	var (
 		args   []any
 		cursor = 1
 	)
 	if params.TopicID != nil {
-		query += fmt.Sprintf(" AND topic_id = $%d", cursor)
+		query += fmt.Sprintf(" AND e.topic_id = $%d", cursor)
 		args = append(args, *params.TopicID)
 		cursor++
 	}
 	if params.AuthorID != nil {
-		query += fmt.Sprintf(" AND author_id = $%d", cursor)
+		query += fmt.Sprintf(" AND e.author_id = $%d", cursor)
 		args = append(args, *params.AuthorID)
 		cursor++
 	}
 	if params.After != nil {
-		query += fmt.Sprintf(" AND published_at < $%d", cursor)
+		query += fmt.Sprintf(" AND e.published_at < $%d", cursor)
 		args = append(args, *params.After)
 		cursor++
 	}
 
-	query += " ORDER BY published_at DESC NULLS LAST, created_at DESC"
+	query += " ORDER BY e.published_at DESC NULLS LAST, e.created_at DESC"
 	query += fmt.Sprintf(" LIMIT $%d", cursor)
 	args = append(args, params.Limit)
 
@@ -475,6 +481,9 @@ WHERE status = 'public'`
 			audioURL    sql.NullString
 			publishedAt sql.NullTime
 			authorUUID  uuid.UUID
+			tldr        sql.NullString
+			keywordsArr pq.StringArray
+			moodJSON    sql.NullString
 		)
 		if err := rows.Scan(
 			&rec.ID,
@@ -490,6 +499,9 @@ WHERE status = 'public'`
 			&rec.IsLive,
 			&publishedAt,
 			&rec.CreatedAt,
+			&tldr,
+			&keywordsArr,
+			&moodJSON,
 		); err != nil {
 			return nil, err
 		}
@@ -511,15 +523,28 @@ WHERE status = 'public'`
 		if publishedAt.Valid {
 			rec.PublishedAt = &publishedAt.Time
 		}
+		if tldr.Valid {
+			rec.Summary = &tldr.String
+		}
+		if len(keywordsArr) > 0 {
+			rec.Keywords = append(rec.Keywords, keywordsArr...)
+		}
+		if moodJSON.Valid {
+			var mood map[string]any
+			if err := json.Unmarshal([]byte(moodJSON.String), &mood); err == nil {
+				rec.Mood = mood
+			}
+		}
 		results = append(results, rec)
 	}
 	return results, rows.Err()
 }
 
 func getEpisodeByID(ctx context.Context, db *sql.DB, id uuid.UUID) (episodeSummary, error) {
-	const query = `SELECT id, author_id, topic_id, title, visibility, status, duration_sec, audio_url, mask, quality, is_live, published_at, created_at
-FROM episodes
-WHERE id = $1`
+	const query = `SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood
+FROM episodes e
+LEFT JOIN summaries s ON s.episode_id = e.id
+WHERE e.id = $1`
 	var (
 		rec         episodeSummary
 		topicID     sql.NullString
@@ -528,6 +553,9 @@ WHERE id = $1`
 		audioURL    sql.NullString
 		publishedAt sql.NullTime
 		authorUUID  uuid.UUID
+		tldr        sql.NullString
+		keywordsArr pq.StringArray
+		moodJSON    sql.NullString
 	)
 	err := db.QueryRowContext(ctx, query, id).Scan(
 		&rec.ID,
@@ -543,6 +571,9 @@ WHERE id = $1`
 		&rec.IsLive,
 		&publishedAt,
 		&rec.CreatedAt,
+		&tldr,
+		&keywordsArr,
+		&moodJSON,
 	)
 	if err != nil {
 		return episodeSummary{}, err
@@ -564,6 +595,18 @@ WHERE id = $1`
 	}
 	if publishedAt.Valid {
 		rec.PublishedAt = &publishedAt.Time
+	}
+	if tldr.Valid {
+		rec.Summary = &tldr.String
+	}
+	if len(keywordsArr) > 0 {
+		rec.Keywords = append(rec.Keywords, keywordsArr...)
+	}
+	if moodJSON.Valid {
+		var mood map[string]any
+		if err := json.Unmarshal([]byte(moodJSON.String), &mood); err == nil {
+			rec.Mood = mood
+		}
 	}
 	return rec, nil
 }
