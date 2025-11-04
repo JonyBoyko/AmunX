@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { createEpisode, finalizeEpisode, undoEpisode } from '@api/episodes';
 import type { EpisodeMask, EpisodeQuality, EpisodeVisibility } from '@api/episodes';
@@ -22,14 +23,29 @@ const RecorderScreen: React.FC = () => {
   const [noiseLevel, setNoiseLevel] = useState(0);
   const [undoRemaining, setUndoRemaining] = useState(0);
   const [episodeId, setEpisodeId] = useState<string | null>(null);
+  const [publicReminderCount, setPublicReminderCount] = useState(0);
 
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const noiseTimerRef = useRef<NodeJS.Timeout | null>(null);
   const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const recordingDisabled = status === 'uploading';
+  const showPublicReminder = publicReminderCount < 3;
 
   useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('publicReminderCount');
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!Number.isNaN(parsed)) {
+            setPublicReminderCount(parsed);
+          }
+        }
+      } catch {
+        // ignore hydration issues
+      }
+    })();
     return () => {
       if (durationTimerRef.current) clearInterval(durationTimerRef.current);
       if (noiseTimerRef.current) clearInterval(noiseTimerRef.current);
@@ -142,6 +158,11 @@ const RecorderScreen: React.FC = () => {
 
       await finalizeEpisode(token, response.id);
       setEpisodeId(response.id);
+      setPublicReminderCount((prev) => {
+        const next = prev + 1;
+        AsyncStorage.setItem('publicReminderCount', String(next)).catch(() => {});
+        return next;
+      });
       startUndoTimer();
       Alert.alert('Uploaded', 'Episode is queued. You can undo within 10 seconds.');
     } catch (error) {
@@ -184,7 +205,7 @@ const RecorderScreen: React.FC = () => {
   }, [clearUndoTimer, episodeId, reset, token]);
 
   const noiseText = useMemo(() => {
-    if (!isRecording) return '—';
+    if (!isRecording) return 'ï¿½';
     return `${noiseLevel} dB`;
   }, [isRecording, noiseLevel]);
 
@@ -200,6 +221,11 @@ const RecorderScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {showPublicReminder && (
+        <View style={styles.reminder}>
+          <Text style={styles.reminderText}>Heads up: posts are public by default. You can undo within 10 seconds.</Text>
+        </View>
+      )}
       <View style={styles.stateCard}>
         <Text style={styles.sectionTitle}>Visibility</Text>
         <View style={styles.row}>
@@ -246,7 +272,7 @@ const RecorderScreen: React.FC = () => {
         <Text style={styles.statusText}>{status.toUpperCase()}</Text>
         <Text style={styles.noiseText}>Noise level: {noiseText}</Text>
         <Button
-          title={isRecording ? 'Stop' : status === 'uploading' ? 'Uploading…' : 'Record'}
+          title={isRecording ? 'Stop' : status === 'uploading' ? 'Uploading...' : 'Record'}
           onPress={handleRecordToggle}
           color={isRecording ? '#ef4444' : '#22c55e'}
           disabled={recordingDisabled && !isRecording}
@@ -271,6 +297,15 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 16,
     backgroundColor: '#0f172a'
+  },
+  reminder: {
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    padding: 12
+  },
+  reminderText: {
+    color: '#facc15',
+    fontSize: 14
   },
   stateCard: {
     backgroundColor: '#1e293b',

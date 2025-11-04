@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/RootNavigator';
 import { getEpisodeById, type FeedEpisode } from '@api/feed';
 import { listComments, postComment, type Comment } from '@api/comments';
+import { submitReport } from '@api/reports';
 import { useSession } from '@store/session';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Episode'>;
@@ -17,6 +18,7 @@ const EpisodeScreen: React.FC<Props> = ({ route, navigation }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const load = async () => {
     try {
@@ -58,6 +60,40 @@ const EpisodeScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  const promptReport = (objectRef: string) => {
+    if (!token) {
+      Alert.alert('Sign in required', 'Please sign in to report content.');
+      return;
+    }
+    if (reporting) return;
+    const reasons = ['Harassment', 'Spam', 'Sensitive', 'Other'];
+    Alert.alert(
+      'Report content',
+      'Why are you reporting this?',
+      [
+        ...reasons.map((reason) => ({
+          text: reason,
+          onPress: () => submitReportWithReason(objectRef, reason)
+        })),
+        { text: 'Cancel', style: 'cancel' }
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const submitReportWithReason = async (objectRef: string, reason: string) => {
+    if (!token) return;
+    try {
+      setReporting(true);
+      await submitReport(token, { object_ref: objectRef, reason });
+      Alert.alert('Report submitted', 'Thanks — our moderators will review it soon.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to submit report');
+    } finally {
+      setReporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -79,7 +115,12 @@ const EpisodeScreen: React.FC<Props> = ({ route, navigation }) => {
       <View style={styles.header}>
         <Button title="Back" onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>{episode.summary ?? 'Voice note'}</Text>
-        <View style={{ width: 64 }} />
+        <Button
+          title={reporting ? '...' : 'Report'}
+          onPress={() => promptReport(`episodes/${episode.id}`)}
+          disabled={reporting}
+          color="#f87171"
+        />
       </View>
 
       <View style={styles.card}>
@@ -109,7 +150,15 @@ const EpisodeScreen: React.FC<Props> = ({ route, navigation }) => {
           renderItem={({ item }) => (
             <View style={styles.comment}>
               <Text style={styles.commentText}>{item.text}</Text>
-              <Text style={styles.commentMeta}>{new Date(item.created_at).toLocaleString()}</Text>
+              <View style={styles.commentFooter}>
+                <Text style={styles.commentMeta}>{new Date(item.created_at).toLocaleString()}</Text>
+                <Button
+                  title="Report"
+                  onPress={() => promptReport(`comments/${item.id}`)}
+                  color="#f87171"
+                  disabled={reporting}
+                />
+              </View>
             </View>
           )}
         />
@@ -131,8 +180,8 @@ const styles = StyleSheet.create({
   input: { flex: 1, backgroundColor: '#0f172a', color: '#f8fafc', borderRadius: 8, paddingHorizontal: 12, height: 40 },
   comment: { backgroundColor: '#0b1220', borderRadius: 12, padding: 12 },
   commentText: { color: '#f8fafc' },
-  commentMeta: { color: '#64748b', fontSize: 12, marginTop: 4 }
+  commentFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+  commentMeta: { color: '#64748b', fontSize: 12 }
 });
 
 export default EpisodeScreen;
-

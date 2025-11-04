@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,12 +29,24 @@ const (
 )
 
 type Processor struct {
-	DB        *sql.DB
-	Storage   storage.Client
-	Queue     queue.Stream
-	Logger    zerolog.Logger
-	CDNBase   string
-	MediaPath string
+	DB                 *sql.DB
+	Storage            storage.Client
+	Queue              queue.Stream
+	Logger             zerolog.Logger
+	CDNBase            string
+	MediaPath          string
+	ModerationKeywords []string
+}
+
+var defaultModerationKeywords = []string{
+	"hate",
+	"abuse",
+	"violence",
+	"kill",
+	"weapon",
+	"drugs",
+	"terror",
+	"self-harm",
 }
 
 func (p *Processor) Run(ctx context.Context, pollInterval time.Duration) error {
@@ -42,6 +55,9 @@ func (p *Processor) Run(ctx context.Context, pollInterval time.Duration) error {
 	}
 	if err := os.MkdirAll(p.MediaPath, 0o755); err != nil {
 		return err
+	}
+	if len(p.ModerationKeywords) == 0 {
+		p.ModerationKeywords = defaultModerationKeywords
 	}
 
 	consumerName := "proc-" + uuid.NewString()[:8]
@@ -205,6 +221,14 @@ WHERE id = $1
 	if err := p.upsertSummary(ctx, id, summary, keywords, mood); err != nil {
 		p.Logger.Warn().Err(err).Str("episode_id", episodeID).Msg("failed to upsert summary")
 	}
+	if hits := p.scanKeywordHits(summary, keywords); len(hits) > 0 {
+		for _, word := range hits {
+			reason := "keyword_hit:" + word
+			if err := p.insertModerationFlag(ctx, "episodes/"+id.String(), reason); err != nil {
+				p.Logger.Warn().Err(err).Str("episode_id", episodeID).Str("keyword", word).Msg("failed to record moderation flag")
+			}
+		}
+	}
 
 	return nil
 }
@@ -340,6 +364,42 @@ ON CONFLICT (episode_id) DO UPDATE SET
 `
 	_, err = p.DB.ExecContext(ctx, query, episodeID, summary, pq.Array(keywords), moodJSON)
 	return err
+}
+
+func (p *Processor) scanKeywordHits(summary string, keywords []string) []string {
+	if len(p.ModerationKeywords) == 0 {
+		return nil
+	}
+	lowerSummary := strings.ToLower(summary)
+	seen := make(map[string]struct{})
+
+	check := func(candidate string) {
+		candidate = strings.ToLower(candidate)
+		for _, banned := range p.ModerationKeywords {
+			bannedLower := strings.ToLower(strings.TrimSpace(banned))
+			if bannedLower == "" {
+				continue
+			}
+			if strings.Contains(candidate, bannedLower) {
+				seen[bannedLower] = struct{}{}
+			}
+		}
+	}
+
+	check(lowerSummary)
+	for _, kw := range keywords {
+		check(kw)
+	}
+
+	if len(seen) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(seen))
+	for word := range seen {
+		result = append(result, word)
+	}
+	sort.Strings(result)
+	return result
 }
 
 func generatePlaceholderSummary(mask string, duration time.Duration) (string, []string, map[string]float64) {

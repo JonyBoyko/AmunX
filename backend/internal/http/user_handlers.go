@@ -5,11 +5,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/amunx/backend/internal/app"
 	"github.com/amunx/backend/internal/httpctx"
 )
 
-func registerUserRoutes(r chi.Router, deps *app.App) {
+func registerUserRoutes(r chi.Router) {
 	r.Get("/me", func(w http.ResponseWriter, req *http.Request) {
 		user, ok := httpctx.UserFromContext(req.Context())
 		if !ok {
