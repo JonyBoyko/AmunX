@@ -46,3 +46,24 @@ export async function undoEpisode(token: string, episodeId: string): Promise<voi
     method: 'POST'
   });
 }
+
+export async function reactToEpisode(
+  token: string,
+  episodeId: string,
+  type: string,
+  remove: boolean = false
+): Promise<{ ok: boolean; self: string[] }> {
+  return authedFetch<{ ok: boolean; self: string[] }>(token, `/v1/episodes/${episodeId}/react`, {
+    method: 'POST',
+    body: JSON.stringify({ type, remove })
+  });
+}
+
+export async function getSelfReactions(
+  token: string,
+  episodeId: string
+): Promise<{ self: string[] }> {
+  return authedFetch<{ self: string[] }>(token, `/v1/episodes/${episodeId}/reactions/self`, {
+    method: 'GET'
+  });
+}

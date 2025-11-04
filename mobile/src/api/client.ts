@@ -31,7 +31,7 @@ export async function authedFetch<T>(token: string, path: string, options: Reque
     ...options,
     headers: {
       ...(options.headers ?? {}),
-      Authorization: Bearer 
+      Authorization: `Bearer ${token}`
     }
   });
 }

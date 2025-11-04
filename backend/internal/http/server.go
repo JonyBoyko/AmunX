@@ -62,21 +62,24 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	router.Route("/v1", func(r chi.Router) {
-		registerAuthRoutes(r, deps, logger)
-		registerPublicEpisodeRoutes(r, deps)
-		registerPublicTopicRoutes(r, deps)
+    router.Route("/v1", func(r chi.Router) {
+        registerAuthRoutes(r, deps, logger)
+        registerPublicEpisodeRoutes(r, deps)
+        registerPublicTopicRoutes(r, deps)
+        registerPublicCommentRoutes(r, deps)
 
-		r.Group(func(protected chi.Router) {
-			protected.Use(mw.Auth(deps, logger))
-			registerUserRoutes(protected, deps)
-			registerEpisodeRoutes(protected, deps)
-			registerTopicRoutes(protected, deps)
-			if cfg.Environment == "development" {
-				registerDiagnosticsRoutes(protected, deps)
-			}
-		})
-	})
+        r.Group(func(protected chi.Router) {
+            protected.Use(mw.Auth(deps, logger))
+            registerUserRoutes(protected, deps)
+            registerEpisodeRoutes(protected, deps)
+            registerTopicRoutes(protected, deps)
+            registerCommentRoutes(protected, deps)
+            registerReactionRoutes(protected, deps)
+            if cfg.Environment == "development" {
+                registerDiagnosticsRoutes(protected, deps)
+            }
+        })
+    })
 
 	server := &http.Server{
 		Addr:         cfg.HTTPHost + ":" + itoa(cfg.HTTPPort),

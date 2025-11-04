@@ -13,6 +13,7 @@ export type RootStackParamList = {
   Auth: undefined;
   Home: undefined;
   Recorder: undefined;
+  Episode: { id: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -32,6 +33,7 @@ const RootNavigator: React.FC = () => {
         <>
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Recorder" component={RecorderScreen} />
+          <Stack.Screen name="Episode" component={require('@screens/EpisodeScreen').default} />
         </>
       ) : (
         <>
@@ -44,4 +46,3 @@ const RootNavigator: React.FC = () => {
 };
 
 export default RootNavigator;
-

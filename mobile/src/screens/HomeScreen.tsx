@@ -1,13 +1,29 @@
-import React, { useMemo } from 'react';
-import { ActivityIndicator, Button, FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Button, FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { useFeedQuery } from '@api/feed';
 import type { FeedEpisode } from '@api/feed';
 import { useSession } from '@store/session';
+import { reactToEpisode } from '@api/episodes';
 
-const FeedItem: React.FC<{ episode: FeedEpisode }> = ({ episode }) => {
+const FeedItem: React.FC<{ episode: FeedEpisode; token?: string | null; onOpen: (id: string) => void }>
+  = ({ episode, token, onOpen }) => {
   const title = episode.summary ?? 'Voice note';
   const published = episode.published_at ? new Date(episode.published_at).toLocaleString() : 'Pending';
+  const [liked, setLiked] = useState(false);
+
+  const onToggleLike = async () => {
+    if (!token) {
+      Alert.alert('Sign in required', 'Please sign in to react.');
+      return;
+    }
+    try {
+      const res = await reactToEpisode(token, episode.id, 'like', liked);
+      setLiked(res.self.includes('like'));
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to update reaction');
+    }
+  };
 
   return (
     <View style={styles.card}>
@@ -15,7 +31,10 @@ const FeedItem: React.FC<{ episode: FeedEpisode }> = ({ episode }) => {
       <Text style={styles.meta}>Mask: {episode.mask}, Quality: {episode.quality}</Text>
       <Text style={styles.meta}>Published: {published}</Text>
       {episode.keywords && episode.keywords.length > 0 && <Text style={styles.meta}>Keywords: {episode.keywords.join(', ')}</Text>}
-      <Button title="Play" onPress={() => {}} />
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Button title={liked ? 'Unlike' : 'Like'} onPress={onToggleLike} />
+        <Button title="Open" onPress={() => onOpen(episode.id)} />
+      </View>
     </View>
   );
 };
@@ -48,7 +67,7 @@ const HomeScreen: React.FC = ({ navigation }: any) => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => <FeedItem episode={item} />}
+          renderItem={({ item }) => <FeedItem episode={item} token={token} onOpen={(id) => navigation.navigate('Episode', { id })} />}
         />
       )}
     </SafeAreaView>

@@ -36,3 +36,8 @@ export function useFeedQuery(token?: string | null) {
     }
   });
 }
+
+export async function getEpisodeById(id: string): Promise<FeedEpisode> {
+  const res = await apiFetch<FeedEpisode>(`/v1/episodes/${id}`);
+  return res;
+}
