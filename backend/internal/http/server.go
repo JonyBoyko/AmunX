@@ -64,6 +64,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 
 	router.Route("/v1", func(r chi.Router) {
 		registerAuthRoutes(r, deps, logger)
+		registerEpisodeRoutes(r, deps)
 		if cfg.Environment == "development" {
 			registerDiagnosticsRoutes(r, deps)
 		}
