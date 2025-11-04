@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -21,6 +23,22 @@ type episodeResponse struct {
 	Status        string            `json:"status"`
 	UploadURL     string            `json:"upload_url"`
 	UploadHeaders map[string]string `json:"upload_headers,omitempty"`
+}
+
+type episodeSummary struct {
+	ID          string     `json:"id"`
+	AuthorID    string     `json:"author_id"`
+	TopicID     *string    `json:"topic_id,omitempty"`
+	Title       *string    `json:"title,omitempty"`
+	Visibility  string     `json:"visibility"`
+	Status      string     `json:"status"`
+	DurationSec *int       `json:"duration_sec,omitempty"`
+	AudioURL    *string    `json:"audio_url,omitempty"`
+	Mask        string     `json:"mask"`
+	Quality     string     `json:"quality"`
+	IsLive      bool       `json:"is_live"`
+	PublishedAt *time.Time `json:"published_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 func registerEpisodeRoutes(r chi.Router, deps *app.App) {
@@ -66,6 +84,22 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 				}
 				WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
 				return
+			}
+
+			if topicID != nil {
+				if err := ensureTopicAccessible(req.Context(), deps.DB, *topicID, currentUser.ID); err != nil {
+					switch {
+					case errors.Is(err, sql.ErrNoRows):
+						WriteError(w, http.StatusNotFound, "topic_not_found", "topic does not exist")
+						return
+					case errors.Is(err, errTopicNotAccessible):
+						WriteError(w, http.StatusForbidden, "topic_not_accessible", err.Error())
+						return
+					default:
+						WriteError(w, http.StatusInternalServerError, "topic_validation_failed", err.Error())
+						return
+					}
+				}
 			}
 
 			if err := createEpisode(req.Context(), deps.DB, createEpisodeParams{
@@ -276,4 +310,259 @@ RETURNING id;
 		return false, err
 	}
 	return true, nil
+}
+
+func ensureTopicAccessible(ctx context.Context, db *sql.DB, topicID uuid.UUID, userID uuid.UUID) error {
+	const query = `SELECT owner_id, is_public FROM topics WHERE id = $1`
+	var (
+		owner    uuid.UUID
+		isPublic bool
+	)
+	if err := db.QueryRowContext(ctx, query, topicID).Scan(&owner, &isPublic); err != nil {
+		return err
+	}
+	if !isPublic && owner != userID {
+		return errTopicNotAccessible
+	}
+	return nil
+}
+
+func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
+	r.Get("/episodes", func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+
+		limit := parseLimit(req.URL.Query().Get("limit"), 20, 50)
+		var (
+			topicID  *uuid.UUID
+			authorID *uuid.UUID
+			after    *time.Time
+		)
+
+		if topic := req.URL.Query().Get("topic"); topic != "" {
+			id, err := uuid.Parse(topic)
+			if err != nil {
+				WriteError(w, http.StatusBadRequest, "invalid_topic_id", "topic must be a valid UUID")
+				return
+			}
+			topicID = &id
+		}
+
+		if author := req.URL.Query().Get("author"); author != "" {
+			id, err := uuid.Parse(author)
+			if err != nil {
+				WriteError(w, http.StatusBadRequest, "invalid_author_id", "author must be a valid UUID")
+				return
+			}
+			authorID = &id
+		}
+
+		if afterParam := req.URL.Query().Get("after"); afterParam != "" {
+			ts, err := time.Parse(time.RFC3339, afterParam)
+			if err != nil {
+				WriteError(w, http.StatusBadRequest, "invalid_after", "after must be RFC3339 timestamp")
+				return
+			}
+			after = &ts
+		}
+
+		items, err := listPublicEpisodes(ctx, deps.DB, listEpisodesParams{
+			Limit:    limit,
+			TopicID:  topicID,
+			AuthorID: authorID,
+			After:    after,
+		})
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "episodes_list_failed", err.Error())
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"items": items,
+		})
+	})
+
+	r.Get("/episodes/{id}", func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
+			return
+		}
+
+		episode, err := getEpisodeByID(ctx, deps.DB, episodeID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				WriteError(w, http.StatusNotFound, "not_found", "episode not found")
+				return
+			}
+			WriteError(w, http.StatusInternalServerError, "episode_fetch_failed", err.Error())
+			return
+		}
+
+		currentUser, ok := httpctx.UserFromContext(ctx)
+		if episode.Status != "public" && (!ok || currentUser.ID.String() != episode.AuthorID) {
+			WriteError(w, http.StatusForbidden, "forbidden", "episode not available")
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, episode)
+	})
+}
+
+type listEpisodesParams struct {
+	Limit    int
+	TopicID  *uuid.UUID
+	AuthorID *uuid.UUID
+	After    *time.Time
+}
+
+func parseLimit(raw string, def, max int) int {
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return def
+	}
+	if n > max {
+		return max
+	}
+	return n
+}
+
+func listPublicEpisodes(ctx context.Context, db *sql.DB, params listEpisodesParams) ([]episodeSummary, error) {
+	query := `SELECT id, author_id, topic_id, title, visibility, status, duration_sec, audio_url, mask, quality, is_live, published_at, created_at
+FROM episodes
+WHERE status = 'public'`
+	var (
+		args   []any
+		cursor = 1
+	)
+	if params.TopicID != nil {
+		query += fmt.Sprintf(" AND topic_id = $%d", cursor)
+		args = append(args, *params.TopicID)
+		cursor++
+	}
+	if params.AuthorID != nil {
+		query += fmt.Sprintf(" AND author_id = $%d", cursor)
+		args = append(args, *params.AuthorID)
+		cursor++
+	}
+	if params.After != nil {
+		query += fmt.Sprintf(" AND published_at < $%d", cursor)
+		args = append(args, *params.After)
+		cursor++
+	}
+
+	query += " ORDER BY published_at DESC NULLS LAST, created_at DESC"
+	query += fmt.Sprintf(" LIMIT $%d", cursor)
+	args = append(args, params.Limit)
+
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []episodeSummary
+	for rows.Next() {
+		var (
+			rec         episodeSummary
+			topicID     sql.NullString
+			title       sql.NullString
+			duration    sql.NullInt64
+			audioURL    sql.NullString
+			publishedAt sql.NullTime
+			authorUUID  uuid.UUID
+		)
+		if err := rows.Scan(
+			&rec.ID,
+			&authorUUID,
+			&topicID,
+			&title,
+			&rec.Visibility,
+			&rec.Status,
+			&duration,
+			&audioURL,
+			&rec.Mask,
+			&rec.Quality,
+			&rec.IsLive,
+			&publishedAt,
+			&rec.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		rec.AuthorID = authorUUID.String()
+		if topicID.Valid {
+			rec.TopicID = &topicID.String
+		}
+		if title.Valid {
+			rec.Title = &title.String
+		}
+		if duration.Valid {
+			val := int(duration.Int64)
+			rec.DurationSec = &val
+		}
+		if audioURL.Valid {
+			url := audioURL.String
+			rec.AudioURL = &url
+		}
+		if publishedAt.Valid {
+			rec.PublishedAt = &publishedAt.Time
+		}
+		results = append(results, rec)
+	}
+	return results, rows.Err()
+}
+
+func getEpisodeByID(ctx context.Context, db *sql.DB, id uuid.UUID) (episodeSummary, error) {
+	const query = `SELECT id, author_id, topic_id, title, visibility, status, duration_sec, audio_url, mask, quality, is_live, published_at, created_at
+FROM episodes
+WHERE id = $1`
+	var (
+		rec         episodeSummary
+		topicID     sql.NullString
+		title       sql.NullString
+		duration    sql.NullInt64
+		audioURL    sql.NullString
+		publishedAt sql.NullTime
+		authorUUID  uuid.UUID
+	)
+	err := db.QueryRowContext(ctx, query, id).Scan(
+		&rec.ID,
+		&authorUUID,
+		&topicID,
+		&title,
+		&rec.Visibility,
+		&rec.Status,
+		&duration,
+		&audioURL,
+		&rec.Mask,
+		&rec.Quality,
+		&rec.IsLive,
+		&publishedAt,
+		&rec.CreatedAt,
+	)
+	if err != nil {
+		return episodeSummary{}, err
+	}
+	rec.AuthorID = authorUUID.String()
+	if topicID.Valid {
+		rec.TopicID = &topicID.String
+	}
+	if title.Valid {
+		rec.Title = &title.String
+	}
+	if duration.Valid {
+		val := int(duration.Int64)
+		rec.DurationSec = &val
+	}
+	if audioURL.Valid {
+		url := audioURL.String
+		rec.AudioURL = &url
+	}
+	if publishedAt.Valid {
+		rec.PublishedAt = &publishedAt.Time
+	}
+	return rec, nil
 }
