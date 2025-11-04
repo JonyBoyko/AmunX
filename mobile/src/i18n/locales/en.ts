@@ -210,6 +210,29 @@ export default {
       },
     },
 
+    // Onboarding
+    onboarding: {
+      skip: 'Skip',
+      next: 'Next',
+      getStarted: 'Get Started',
+      slide1: {
+        title: 'One-Tap Voice Notes',
+        description: 'Record 1-minute voice notes with a single tap. No setup, no hassle.',
+      },
+      slide2: {
+        title: 'Auto Processing',
+        description: 'AI removes noise, normalizes loudness, and enhances audio quality automatically.',
+      },
+      slide3: {
+        title: 'Live Streaming',
+        description: 'Host live audio sessions with real-time comments and reactions.',
+      },
+      slide4: {
+        title: 'Privacy First',
+        description: 'Go anonymous, use voice masking, or keep episodes private. You control everything.',
+      },
+    },
+
     // Auth Screen
     auth: {
       title: 'Welcome to AmunX',

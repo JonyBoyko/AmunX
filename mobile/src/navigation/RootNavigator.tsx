@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import SplashScreen from '@screens/SplashScreen';
+import OnboardingScreen from '@screens/OnboardingScreen';
 import AuthScreen from '@screens/AuthScreen';
 import FeedScreen from '@screens/FeedScreen';
 import RecorderScreen from '@screens/RecorderScreen';
@@ -16,6 +17,7 @@ import { useSession } from '@store/session';
 
 export type RootStackParamList = {
   Splash: undefined;
+  Onboarding: undefined;
   Auth: undefined;
   Home: undefined;
   Feed: undefined;
@@ -55,6 +57,7 @@ const RootNavigator: React.FC = () => {
         </>
       ) : (
         <>
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Auth" component={AuthScreen} />
           <Stack.Screen name="Recorder" component={RecorderScreen} />
           <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
