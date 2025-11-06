@@ -28,3 +28,4 @@ func registerUserRoutes(r chi.Router) {
 		})
 	})
 }
+

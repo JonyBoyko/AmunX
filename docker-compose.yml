@@ -56,6 +56,9 @@ services:
       CDN_BASE: ${CDN_BASE:-}
       MEDIA_PATH: /tmp/media
       MODERATION_KEYWORDS: ${MODERATION_KEYWORDS:-hate,abuse,violence}
+      MAGIC_LINK_TOKEN_SECRET: ${MAGIC_LINK_TOKEN_SECRET:-dev-magic-link-secret-change-in-production}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-secret-change-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret}
     depends_on:
       - postgres
       - redis

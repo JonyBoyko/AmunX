@@ -168,7 +168,7 @@ export default {
       notFound: 'Тему не знайдено',
       empty: {
         title: 'Немає доступних тем',
-        message: 'Теми з'являться тут після створення',
+        message: 'Теми з\'являться тут після створення',
       },
       noEpisodes: {
         title: 'Ще немає епізодів',
@@ -296,8 +296,8 @@ export default {
         disconnected: 'Відключено',
         viewers: 'Глядачі',
         mask: 'Голосова маска',
-        topicId: 'ID теми (необов'язково)',
-        sessionTitle: 'Назва сесії (необов'язково)',
+        topicId: 'ID теми (необов\'язково)',
+        sessionTitle: 'Назва сесії (необов\'язково)',
         recordingKey: 'Ключ запису',
         duration: 'Тривалість',
         eventLog: 'Лог подій',

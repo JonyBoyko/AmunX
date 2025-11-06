@@ -141,3 +141,4 @@ func normalizeEmail(email string) string {
 func magicLinkCacheKey(token string) string {
 	return "magiclink:" + token
 }
+

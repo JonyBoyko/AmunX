@@ -6,12 +6,6 @@ rtc:
   udp_port: 7882
   use_external_ip: false
 
-ingress:
-  enabled: false
-
-egress:
-  enabled: false
-
 logging:
   level: info
 

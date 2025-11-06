@@ -58,8 +58,7 @@ type episodeSummary struct {
 }
 
 func registerEpisodeRoutes(r chi.Router, deps *app.App) {
-	r.Route("/episodes", func(er chi.Router) {
-		er.Post("/", func(w http.ResponseWriter, req *http.Request) {
+	r.Post("/episodes", func(w http.ResponseWriter, req *http.Request) {
 			currentUser, ok := httpctx.UserFromContext(req.Context())
 			if !ok {
 				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
@@ -164,11 +163,11 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 				ID:            episodeID.String(),
 				Status:        "pending_upload",
 				UploadURL:     upload.URL,
-				UploadHeaders: headers,
-			})
+			UploadHeaders: headers,
 		})
+	})
 
-		er.Post("/{id}/finalize", func(w http.ResponseWriter, req *http.Request) {
+	r.Post("/episodes/{id}/finalize", func(w http.ResponseWriter, req *http.Request) {
 			currentUser, ok := httpctx.UserFromContext(req.Context())
 			if !ok {
 				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
@@ -199,11 +198,11 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 			}
 
 			WriteJSON(w, http.StatusOK, map[string]any{
-				"status": "queued",
-			})
+			"status": "queued",
 		})
+	})
 
-		er.Post("/{id}/undo", func(w http.ResponseWriter, req *http.Request) {
+	r.Post("/episodes/{id}/undo", func(w http.ResponseWriter, req *http.Request) {
 			currentUser, ok := httpctx.UserFromContext(req.Context())
 			if !ok {
 				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
@@ -227,7 +226,6 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 			}
 
 			WriteJSON(w, http.StatusOK, map[string]any{"status": "undone"})
-		})
 	})
 }
 
@@ -644,3 +642,4 @@ WHERE e.id = $1`
 	}
 	return rec, nil
 }
+

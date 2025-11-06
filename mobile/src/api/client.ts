@@ -1,8 +1,6 @@
-import Config from 'react-native-config';
+import config from '@config/index';
 
-const DEFAULT_API_BASE = 'http://localhost:8080';
-
-export const API_BASE_URL = Config.API_BASE_URL ?? DEFAULT_API_BASE;
+export const API_BASE_URL = config.api.baseUrl.replace('/v1', ''); // Remove /v1 suffix as it's in the paths
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {

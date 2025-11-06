@@ -11,9 +11,6 @@ import CommentsScreen from '@screens/CommentsScreen';
 import ProfileScreen from '@screens/ProfileScreen';
 import TopicsScreen from '@screens/TopicsScreen';
 import TopicDetailScreen from '@screens/TopicDetailScreen';
-import LiveHostScreen from '@screens/LiveHostScreen';
-import LiveListenerScreen from '@screens/LiveListenerScreen';
-import PaywallScreen from '@screens/PaywallScreen';
 import SettingsScreen from '@screens/SettingsScreen';
 
 import { useSession } from '@store/session';
@@ -30,8 +27,8 @@ export type RootStackParamList = {
   Profile: undefined;
   Topics: undefined;
   TopicDetail: { topicId: string };
-  LiveHost: undefined;
-  LiveListener: undefined;
+  // LiveHost: undefined;
+  // LiveListener: undefined;
   Paywall: undefined;
   Settings: undefined;
 };
@@ -58,9 +55,6 @@ const RootNavigator: React.FC = () => {
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="Topics" component={TopicsScreen} />
           <Stack.Screen name="TopicDetail" component={TopicDetailScreen} />
-          <Stack.Screen name="LiveHost" component={LiveHostScreen} />
-          <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
-          <Stack.Screen name="Paywall" component={PaywallScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
         </>
       ) : (
@@ -68,7 +62,6 @@ const RootNavigator: React.FC = () => {
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Auth" component={AuthScreen} />
           <Stack.Screen name="Recorder" component={RecorderScreen} />
-          <Stack.Screen name="LiveListener" component={LiveListenerScreen} />
         </>
       )}
     </Stack.Navigator>

@@ -28,3 +28,4 @@ func allowRate(ctx context.Context, client *redis.Client, key string, limit int6
 
 	return true, 0
 }
+

@@ -6,7 +6,10 @@
 export const config = {
   // API Configuration
   api: {
-    baseUrl: process.env.API_BASE_URL || 'http://localhost:8080/api/v1',
+    // Use your computer's IP address for mobile devices (not localhost)
+    // Windows: Get IP with 'ipconfig' → use IPv4 Address
+    // Mac/Linux: Get IP with 'ifconfig' → use inet address
+    baseUrl: process.env.API_BASE_URL || 'http://192.168.177.107:8080/v1',
   },
 
   // RevenueCat Configuration

@@ -243,3 +243,4 @@ ON CONFLICT DO NOTHING;
 `, objectRef, severity, details)
 	return err
 }
+

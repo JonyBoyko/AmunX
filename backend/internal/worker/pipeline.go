@@ -1,0 +1,293 @@
+package worker
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+)
+
+// PipelineJob represents a job in the processing pipeline
+type PipelineJob struct {
+	AudioID   uuid.UUID `json:"audio_id"`
+	Step      string    `json:"step"` // transcribe, summarize, chapters, clips, embeddings
+	RetryCount int      `json:"retry_count"`
+}
+
+// Pipeline processes audio items through multiple stages
+type Pipeline struct {
+	logger     zerolog.Logger
+	transcriber Transcriber
+	summarizer  Summarizer
+	clipper     Clipper
+	embedder    Embedder
+}
+
+// Transcriber interface for transcription service
+type Transcriber interface {
+	Transcribe(ctx context.Context, audioURL string) (*TranscriptResult, error)
+}
+
+// Summarizer interface for summarization service
+type Summarizer interface {
+	Summarize(ctx context.Context, transcript string) (*SummaryResult, error)
+}
+
+// Clipper interface for auto-clip generation
+type Clipper interface {
+	GenerateClips(ctx context.Context, audioID uuid.UUID, transcript string, audioURL string) ([]*Clip, error)
+}
+
+// Embedder interface for embedding generation
+type Embedder interface {
+	GenerateEmbeddings(ctx context.Context, transcript string) ([]*Embedding, error)
+}
+
+// TranscriptResult represents transcription output
+type TranscriptResult struct {
+	Text  string         `json:"text"`
+	Lang  string         `json:"lang"`
+	Words []TranscriptWord `json:"words"`
+}
+
+type TranscriptWord struct {
+	Word  string  `json:"word"`
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
+}
+
+// SummaryResult represents summarization output
+type SummaryResult struct {
+	PreviewSentence string    `json:"preview_sentence"` // ≤140 chars
+	TLDR            string    `json:"tldr"`
+	Chapters        []Chapter `json:"chapters"`
+	Keywords        []string  `json:"keywords"`
+}
+
+type Chapter struct {
+	Start int    `json:"start"`
+	End   int    `json:"end"`
+	Title string `json:"title"`
+}
+
+// Clip represents an auto-generated clip
+type Clip struct {
+	StartSec int    `json:"start_sec"`
+	EndSec   int    `json:"end_sec"`
+	Title    string `json:"title"`
+	Quote    string `json:"quote"`
+}
+
+// Embedding represents a vector embedding
+type Embedding struct {
+	ChunkIndex int       `json:"chunk_index"`
+	Vector     []float32 `json:"vector"`
+	TextChunk  string    `json:"text_chunk"`
+}
+
+// NewPipeline creates a new processing pipeline
+func NewPipeline(
+	logger zerolog.Logger,
+	transcriber Transcriber,
+	summarizer Summarizer,
+	clipper Clipper,
+	embedder Embedder,
+) *Pipeline {
+	return &Pipeline{
+		logger:     logger,
+		transcriber: transcriber,
+		summarizer:  summarizer,
+		clipper:     clipper,
+		embedder:    embedder,
+	}
+}
+
+// ProcessAudioItem runs the full pipeline for an audio item
+func (p *Pipeline) ProcessAudioItem(ctx context.Context, audioID uuid.UUID, audioURL string) error {
+	p.logger.Info().
+		Str("audio_id", audioID.String()).
+		Msg("Starting pipeline processing")
+
+	// Step 1: Transcribe
+	p.logger.Info().Msg("Step 1: Transcribing...")
+	transcriptResult, err := p.transcriber.Transcribe(ctx, audioURL)
+	if err != nil {
+		return fmt.Errorf("transcription failed: %w", err)
+	}
+
+	// TODO: Save transcript to database using sqlc
+	p.logger.Info().
+		Int("text_length", len(transcriptResult.Text)).
+		Str("lang", transcriptResult.Lang).
+		Msg("Transcription complete")
+
+	// Step 2: Summarize
+	p.logger.Info().Msg("Step 2: Generating summary...")
+	summaryResult, err := p.summarizer.Summarize(ctx, transcriptResult.Text)
+	if err != nil {
+		return fmt.Errorf("summarization failed: %w", err)
+	}
+
+	// TODO: Save summary to database using sqlc
+	p.logger.Info().
+		Int("chapters", len(summaryResult.Chapters)).
+		Msg("Summary complete")
+
+	// Step 3: Generate clips
+	p.logger.Info().Msg("Step 3: Generating smart clips...")
+	clips, err := p.clipper.GenerateClips(ctx, audioID, transcriptResult.Text, audioURL)
+	if err != nil {
+		p.logger.Warn().Err(err).Msg("Clip generation failed, continuing...")
+	} else {
+		// TODO: Save clips to database using sqlc
+		p.logger.Info().
+			Int("clips", len(clips)).
+			Msg("Clips generated")
+	}
+
+	// Step 4: Generate embeddings
+	p.logger.Info().Msg("Step 4: Generating embeddings...")
+	embeddings, err := p.embedder.GenerateEmbeddings(ctx, transcriptResult.Text)
+	if err != nil {
+		p.logger.Warn().Err(err).Msg("Embedding generation failed, continuing...")
+	} else {
+		// TODO: Save embeddings to database using sqlc
+		p.logger.Info().
+			Int("embeddings", len(embeddings)).
+			Msg("Embeddings generated")
+	}
+
+	p.logger.Info().
+		Str("audio_id", audioID.String()).
+		Msg("Pipeline processing complete")
+
+	return nil
+}
+
+// MockTranscriber for testing/development
+type MockTranscriber struct{}
+
+func (m *MockTranscriber) Transcribe(ctx context.Context, audioURL string) (*TranscriptResult, error) {
+	time.Sleep(2 * time.Second) // Simulate API call
+	return &TranscriptResult{
+		Text: "This is a mock transcription of the audio file. In production, this would be generated by Whisper API.",
+		Lang: "en",
+		Words: []TranscriptWord{
+			{Word: "This", Start: 0.0, End: 0.5},
+			{Word: "is", Start: 0.6, End: 0.8},
+			{Word: "a", Start: 0.9, End: 1.0},
+			{Word: "mock", Start: 1.1, End: 1.5},
+		},
+	}, nil
+}
+
+// MockSummarizer for testing/development
+type MockSummarizer struct{}
+
+func (m *MockSummarizer) Summarize(ctx context.Context, transcript string) (*SummaryResult, error) {
+	time.Sleep(1 * time.Second) // Simulate API call
+	
+	// Generate preview (first 140 chars)
+	preview := transcript
+	if len(preview) > 140 {
+		preview = preview[:137] + "..."
+	}
+
+	return &SummaryResult{
+		PreviewSentence: preview,
+		TLDR:            "This is a mock summary. In production, this would be generated by GPT-4.",
+		Chapters: []Chapter{
+			{Start: 0, End: 60, Title: "Introduction"},
+			{Start: 60, End: 180, Title: "Main Discussion"},
+			{Start: 180, End: 240, Title: "Conclusion"},
+		},
+		Keywords: []string{"mock", "test", "example"},
+	}, nil
+}
+
+// MockClipper for testing/development
+type MockClipper struct{}
+
+func (m *MockClipper) GenerateClips(ctx context.Context, audioID uuid.UUID, transcript string, audioURL string) ([]*Clip, error) {
+	time.Sleep(1 * time.Second) // Simulate processing
+	
+	return []*Clip{
+		{
+			StartSec: 10,
+			EndSec:   25,
+			Title:    "Key Quote 1",
+			Quote:    "This is the most important part",
+		},
+		{
+			StartSec: 45,
+			EndSec:   60,
+			Title:    "Key Quote 2",
+			Quote:    "Another important insight",
+		},
+	}, nil
+}
+
+// MockEmbedder for testing/development
+type MockEmbedder struct{}
+
+func (m *MockEmbedder) GenerateEmbeddings(ctx context.Context, transcript string) ([]*Embedding, error) {
+	time.Sleep(1 * time.Second) // Simulate API call
+	
+	// In production, chunk transcript and generate embeddings for each chunk
+	chunks := chunkText(transcript, 500, 100) // 500 chars with 100 char overlap
+	
+	embeddings := make([]*Embedding, len(chunks))
+	for i, chunk := range chunks {
+		// Mock 1536-dim vector (OpenAI ada-002 size)
+		vector := make([]float32, 1536)
+		for j := range vector {
+			vector[j] = 0.1 // Mock value
+		}
+		
+		embeddings[i] = &Embedding{
+			ChunkIndex: i,
+			Vector:     vector,
+			TextChunk:  chunk,
+		}
+	}
+	
+	return embeddings, nil
+}
+
+// chunkText splits text into overlapping chunks
+func chunkText(text string, chunkSize int, overlap int) []string {
+	if len(text) <= chunkSize {
+		return []string{text}
+	}
+	
+	var chunks []string
+	start := 0
+	
+	for start < len(text) {
+		end := start + chunkSize
+		if end > len(text) {
+			end = len(text)
+		}
+		
+		chunks = append(chunks, text[start:end])
+		
+		start += chunkSize - overlap
+		if start >= len(text) {
+			break
+		}
+	}
+	
+	return chunks
+}
+
+// QueueJob serializes and queues a pipeline job (using Redis)
+func QueueJob(ctx context.Context, job PipelineJob) error {
+	// TODO: Push to Redis queue
+	jobJSON, _ := json.Marshal(job)
+	fmt.Printf("Queued job: %s\n", string(jobJSON))
+	return nil
+}
+

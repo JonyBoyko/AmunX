@@ -40,3 +40,4 @@ func registerDiagnosticsRoutes(r chi.Router, deps *app.App) {
 		WriteJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 	})
 }
+

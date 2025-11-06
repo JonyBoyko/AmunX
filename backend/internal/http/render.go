@@ -32,3 +32,4 @@ func decodeJSON(r *http.Request, dst any) error {
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(dst)
 }
+

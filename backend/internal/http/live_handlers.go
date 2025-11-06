@@ -344,3 +344,4 @@ func generateLiveToken(cfg app.Config, roomName, userID, role string, expiry tim
 
 	return token.ToJWT()
 }
+

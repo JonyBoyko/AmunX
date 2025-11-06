@@ -85,3 +85,4 @@ func toHTTPURL(raw string) (string, error) {
 	u.Fragment = ""
 	return strings.TrimRight(u.String(), "/"), nil
 }
+
