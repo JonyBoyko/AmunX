@@ -48,11 +48,14 @@ type Config struct {
 	LiveShareMax    float64 `envconfig:"LIVE_SHARE_PERCENT" default:"5"`
 	STTProOnly      bool    `envconfig:"STT_PRO_ONLY" default:"true"`
 
-	FeatureFreeKeywords  bool `envconfig:"FEATURE_FREE_KEYWORDS" default:"true"`
-	FeatureLiveRecording bool `envconfig:"FEATURE_LIVE_RECORDING" default:"true"`
-	FeatureLiveMaskBeta  bool `envconfig:"FEATURE_LIVE_MASK_BETA" default:"false"`
-	FeatureProSTT        bool `envconfig:"FEATURE_PRO_STT" default:"true"`
-	FeaturePublicDefault bool `envconfig:"FEATURE_PUBLIC_DEFAULT" default:"true"`
+	FeatureFreeKeywords      bool `envconfig:"FEATURE_FREE_KEYWORDS" default:"true"`
+	FeatureLiveRecording     bool `envconfig:"FEATURE_LIVE_RECORDING" default:"true"`
+	FeatureLiveMaskBeta      bool `envconfig:"FEATURE_LIVE_MASK_BETA" default:"false"`
+	FeatureProSTT            bool `envconfig:"FEATURE_PRO_STT" default:"true"`
+	FeaturePublicDefault     bool `envconfig:"FEATURE_PUBLIC_DEFAULT" default:"true"`
+	FeatureAudiogramExport   bool `envconfig:"FEATURE_AUDIOGRAM_EXPORT" default:"true"`
+	FeatureCrosspostYoutube  bool `envconfig:"FEATURE_CROSSPOST_YOUTUBE" default:"false"`
+	FeaturePodcastRSS        bool `envconfig:"FEATURE_PODCAST_RSS" default:"true"`
 
 	LiveKitURL       string `envconfig:"LIVEKIT_URL" default:""`
 	LiveKitAPIKey    string `envconfig:"LIVEKIT_API_KEY" default:""`

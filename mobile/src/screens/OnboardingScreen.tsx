@@ -1,250 +1,373 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  Dimensions,
+  TouchableOpacity,
   ScrollView,
-  Pressable,
+  StyleSheet,
+  Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useTranslation } from 'react-i18next';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { theme } from '../theme/theme';
 
-import { theme } from '@theme/theme';
-import { applyShadow } from '@theme/utils';
-import { Button } from '@components/atoms/Button';
+const { width } = Dimensions.get('window');
 
-type OnboardingScreenProps = {
-  navigation: NativeStackNavigationProp<any>;
-};
+const TOPICS = [
+  'Founders',
+  'Self-Improvement',
+  'Tech & Coding',
+  'Finance',
+  'College Life',
+  'Fitness',
+  'News & Takes',
+  'Language Learning',
+  'Design',
+  'Productivity',
+];
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+interface OnboardingScreenProps {
+  navigation: any;
+}
 
-const ONBOARDING_KEY = '@amunx_onboarding_complete';
+export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
+  navigation,
+}) => {
+  const [step, setStep] = useState(0);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [agreedPrivacy, setAgreedPrivacy] = useState(false);
 
-const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
-  const { t } = useTranslation();
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  const slides = [
-    {
-      icon: 'mic' as const,
-      title: t('onboarding.slide1.title', { defaultValue: 'One-Tap Voice Notes' }),
-      description: t('onboarding.slide1.description', {
-        defaultValue: 'Record 1-minute voice notes with a single tap. No setup, no hassle.',
-      }),
-    },
-    {
-      icon: 'volume-high' as const,
-      title: t('onboarding.slide2.title', { defaultValue: 'Auto Processing' }),
-      description: t('onboarding.slide2.description', {
-        defaultValue: 'AI removes noise, normalizes loudness, and enhances audio quality automatically.',
-      }),
-    },
-    {
-      icon: 'chatbubbles' as const,
-      title: t('onboarding.slide3.title', { defaultValue: 'Live Streaming' }),
-      description: t('onboarding.slide3.description', {
-        defaultValue: 'Host live audio sessions with real-time comments and reactions.',
-      }),
-    },
-    {
-      icon: 'shield-checkmark' as const,
-      title: t('onboarding.slide4.title', { defaultValue: 'Privacy First' }),
-      description: t('onboarding.slide4.description', {
-        defaultValue: 'Go anonymous, use voice masking, or keep episodes private. You control everything.',
-      }),
-    },
-  ];
-
-  const handleScroll = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / SCREEN_WIDTH);
-    setCurrentIndex(index);
+  const handleTopicToggle = (topic: string) => {
+    setSelectedTopics(prev =>
+      prev.includes(topic)
+        ? prev.filter(t => t !== topic)
+        : [...prev, topic]
+    );
   };
 
   const handleNext = () => {
-    if (currentIndex < slides.length - 1) {
-      scrollViewRef.current?.scrollTo({
-        x: SCREEN_WIDTH * (currentIndex + 1),
-        animated: true,
-      });
-    } else {
-      handleComplete();
+    if (step === 0) {
+      setStep(1); // Topics
+    } else if (step === 1 && selectedTopics.length >= 3) {
+      setStep(2); // Privacy
+    } else if (step === 2 && agreedPrivacy) {
+      setStep(3); // Notifications
     }
   };
 
-  const handleSkip = () => {
-    handleComplete();
+  const handleFinish = () => {
+    // Save onboarding state
+    navigation.replace('Home');
   };
 
-  const handleComplete = async () => {
-    try {
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-      navigation.replace('Auth');
-    } catch (error) {
-      console.error('Failed to save onboarding status:', error);
-      navigation.replace('Auth');
-    }
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bg.base} />
-
-      {/* Skip Button */}
-      {currentIndex < slides.length - 1 && (
-        <Pressable onPress={handleSkip} style={styles.skipButton}>
-          <Text style={styles.skipText}>{t('onboarding.skip', { defaultValue: 'Skip' })}</Text>
-        </Pressable>
-      )}
-
-      {/* Slides */}
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        style={styles.scrollView}
-      >
-        {slides.map((slide, index) => (
-          <View key={index} style={styles.slide}>
-            <View style={styles.iconContainer}>
-              <Ionicons name={slide.icon} size={80} color={theme.colors.brand.primary} />
-            </View>
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.description}>{slide.description}</Text>
+  // Step 0: Welcome
+  if (step === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.title}>Speak your mind.{'\n'}We'll do the rest.</Text>
+          
+          <View style={styles.bullets}>
+            <Text style={styles.bullet}>✓ Private by default</Text>
+            <Text style={styles.bullet}>✓ 60–120s notes</Text>
+            <Text style={styles.bullet}>✓ One-tap sharing</Text>
           </View>
-        ))}
-      </ScrollView>
 
-      {/* Pagination Dots */}
-      <View style={styles.pagination}>
-        {slides.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dot,
-              index === currentIndex && styles.dotActive,
-            ]}
-          />
-        ))}
+          <Text style={styles.subtitle}>
+            Your voice notes, auto-transcribed with smart clips.
+            Share to Explore or keep them private.
+          </Text>
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.button} onPress={handleNext}>
+            <Text style={styles.buttonText}>Continue with Apple</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.button, styles.buttonSecondary]}
+            onPress={handleNext}
+          >
+            <Text style={[styles.buttonText, styles.buttonTextSecondary]}>
+              Continue with Google
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Step 1: Topics
+  if (step === 1) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Pick your topics</Text>
+          <Text style={styles.headerSubtitle}>
+            Select 3+ topics to personalize your feed
+          </Text>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.topicsContainer}>
+          {TOPICS.map(topic => (
+            <TouchableOpacity
+              key={topic}
+              style={[
+                styles.topicChip,
+                selectedTopics.includes(topic) && styles.topicChipSelected,
+              ]}
+              onPress={() => handleTopicToggle(topic)}
+            >
+              <Text
+                style={[
+                  styles.topicText,
+                  selectedTopics.includes(topic) && styles.topicTextSelected,
+                ]}
+              >
+                {topic}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.button, selectedTopics.length < 3 && styles.buttonDisabled]}
+            onPress={handleNext}
+            disabled={selectedTopics.length < 3}
+          >
+            <Text style={styles.buttonText}>
+              Next ({selectedTopics.length}/3)
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Step 2: Privacy
+  if (step === 2) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.icon}>🔒</Text>
+          <Text style={styles.title}>Your recordings are private</Text>
+          
+          <Text style={styles.privacyText}>
+            Everything you record is{' '}
+            <Text style={styles.privacyHighlight}>private</Text> unless you
+            share it to Explore or a Circle.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.checkbox}
+            onPress={() => setAgreedPrivacy(!agreedPrivacy)}
+          >
+            <View
+              style={[
+                styles.checkboxBox,
+                agreedPrivacy && styles.checkboxBoxChecked,
+              ]}
+            >
+              {agreedPrivacy && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.checkboxLabel}>
+              I understand my recordings stay private until I share them
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.button, !agreedPrivacy && styles.buttonDisabled]}
+            onPress={handleNext}
+            disabled={!agreedPrivacy}
+          >
+            <Text style={styles.buttonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Step 3: Notifications
+  return (
+    <View style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.icon}>🔔</Text>
+        <Text style={styles.title}>Enable notifications</Text>
+        
+        <Text style={styles.privacyText}>
+          Get gentle prompts and replies from your Circles.
+          You can always change this later.
+        </Text>
       </View>
 
-      {/* Next / Get Started Button */}
       <View style={styles.footer}>
-        <Button
-          title={
-            currentIndex === slides.length - 1
-              ? t('onboarding.getStarted', { defaultValue: 'Get Started' })
-              : t('onboarding.next', { defaultValue: 'Next' })
-          }
-          onPress={handleNext}
-          icon={
-            currentIndex === slides.length - 1 ? (
-              <Ionicons name="arrow-forward" size={20} color={theme.colors.text.inverse} />
-            ) : undefined
-          }
-        />
+        <TouchableOpacity style={styles.button} onPress={handleFinish}>
+          <Text style={styles.buttonText}>Enable</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.buttonLink}
+          onPress={handleFinish}
+        >
+          <Text style={styles.buttonLinkText}>Not now</Text>
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.bg.base,
+    backgroundColor: theme.colors.background.primary,
   },
-  skipButton: {
-    position: 'absolute',
-    top: theme.space.lg,
-    right: theme.space.lg,
-    zIndex: 10,
-    paddingHorizontal: theme.space.lg,
-    paddingVertical: theme.space.md,
+  header: {
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xl * 2,
   },
-  skipText: {
-    color: theme.colors.text.secondary,
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  headerSubtitle: {
     fontSize: 16,
-    fontWeight: '600',
+    color: theme.colors.text.secondary,
   },
-  scrollView: {
+  content: {
     flex: 1,
-  },
-  slide: {
-    width: SCREEN_WIDTH,
-    flex: 1,
-    alignItems: 'center',
+    padding: theme.spacing.xl,
     justifyContent: 'center',
-    paddingHorizontal: theme.space.xl,
-    gap: theme.space.xl,
-  },
-  iconContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: theme.colors.brand.primary + '22',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.space.xl,
-    ...applyShadow(8),
+  },
+  icon: {
+    fontSize: 64,
+    marginBottom: theme.spacing.xl,
   },
   title: {
-    color: theme.colors.text.primary,
     fontSize: 32,
     fontWeight: '700',
+    color: theme.colors.text.primary,
     textAlign: 'center',
-    lineHeight: 40,
+    marginBottom: theme.spacing.lg,
   },
-  description: {
-    color: theme.colors.text.secondary,
+  subtitle: {
     fontSize: 18,
+    lineHeight: 28,
+    color: theme.colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 26,
-    paddingHorizontal: theme.space.lg,
   },
-  pagination: {
+  bullets: {
+    alignSelf: 'stretch',
+    marginVertical: theme.spacing.xl,
+  },
+  bullet: {
+    fontSize: 18,
+    lineHeight: 32,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.sm,
+  },
+  privacyText: {
+    fontSize: 18,
+    lineHeight: 28,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  privacyHighlight: {
+    color: theme.colors.brand.primary,
+    fontWeight: '700',
+  },
+  checkbox: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: theme.space.sm,
-    paddingVertical: theme.space.xl,
+    alignItems: 'flex-start',
+    padding: theme.spacing.md,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.surface.chip,
-  },
-  dotActive: {
+  checkboxBox: {
     width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: theme.colors.border.light,
+    marginRight: theme.spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxBoxChecked: {
     backgroundColor: theme.colors.brand.primary,
+    borderColor: theme.colors.brand.primary,
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 24,
+    color: theme.colors.text.primary,
+  },
+  topicsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  topicChip: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 2,
+    borderColor: theme.colors.border.light,
+  },
+  topicChipSelected: {
+    backgroundColor: theme.colors.brand.primary,
+    borderColor: theme.colors.brand.primary,
+  },
+  topicText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme.colors.text.primary,
+  },
+  topicTextSelected: {
+    color: '#fff',
   },
   footer: {
-    paddingHorizontal: theme.space.xl,
-    paddingBottom: theme.space.xl,
+    padding: theme.spacing.lg,
+  },
+  button: {
+    backgroundColor: theme.colors.brand.primary,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  buttonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: theme.colors.border.light,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  buttonTextSecondary: {
+    color: theme.colors.text.primary,
+  },
+  buttonLink: {
+    padding: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  buttonLinkText: {
+    fontSize: 16,
+    color: theme.colors.text.tertiary,
   },
 });
-
-export default OnboardingScreen;
-
-/**
- * Helper function to check if onboarding is complete
- */
-export async function isOnboardingComplete(): Promise<boolean> {
-  try {
-    const value = await AsyncStorage.getItem(ONBOARDING_KEY);
-    return value === 'true';
-  } catch {
-    return false;
-  }
-}
-
