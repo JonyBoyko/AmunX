@@ -100,6 +100,23 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           child: _FeedHeader(onProfileTap: () => context.push('/profile')),
         ),
         SliverToBoxAdapter(
+          child: _FormatSwitchBar(
+            selected: filters.format,
+            onSelected: coverageNotifier.setFormat,
+          ),
+        ),
+        if (liveEpisodes.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _LiveNowStrip(
+              episodes: liveEpisodes,
+              authors: authors,
+              onEpisodeTap: _openEpisode,
+              onFollowToggle: (authorId) => ref
+                  .read(authorDirectoryProvider.notifier)
+                  .toggleFollow(authorId),
+            ),
+          ),
+        SliverToBoxAdapter(
           child: _FilterPanel(
             filters: filters,
             tags: tags,
@@ -127,11 +144,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               final region = deriveRegion(episode);
               final format = classifyFormat(episode);
               final author = authors[episode.authorId];
+              final liveListeners = liveAudienceEstimate(episode);
               return EpisodeCard(
                 episode: episode,
                 regionLabel: region.label,
                 formatLabel: format.label,
                 author: author,
+                liveListeners: liveListeners > 0 ? liveListeners : null,
                 onFollowToggle: author == null
                     ? null
                     : () => ref
@@ -278,6 +297,186 @@ class _RecordFab extends StatelessWidget {
         ),
         child: const Icon(Icons.mic, color: AppTheme.textInverse),
       ),
+    );
+  }
+}
+
+class _FormatSwitchBar extends StatelessWidget {
+  final ContentFormat selected;
+  final ValueChanged<ContentFormat> onSelected;
+
+  const _FormatSwitchBar({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spaceLg,
+        vertical: AppTheme.spaceMd,
+      ),
+      child: SegmentedButton<ContentFormat>(
+        segments: ContentFormat.values
+            .map(
+              (format) => ButtonSegment(
+                value: format,
+                label: Text(format.label),
+              ),
+            )
+            .toList(),
+        selected: {selected},
+        style: const ButtonStyle(
+          backgroundColor: MaterialStatePropertyAll(AppTheme.bgRaised),
+          foregroundColor: MaterialStatePropertyAll(AppTheme.textPrimary),
+        ),
+        onSelectionChanged: (value) {
+          if (value.isNotEmpty) {
+            onSelected(value.first);
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _LiveNowStrip extends StatelessWidget {
+  final List<Episode> episodes;
+  final Map<String, AuthorProfile> authors;
+  final ValueChanged<Episode> onEpisodeTap;
+  final ValueChanged<String> onFollowToggle;
+
+  const _LiveNowStrip({
+    required this.episodes,
+    required this.authors,
+    required this.onEpisodeTap,
+    required this.onFollowToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (episodes.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.spaceLg,
+            vertical: AppTheme.spaceSm,
+          ),
+          child: Row(
+            children: const [
+              Text(
+                'Прямо зараз',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(width: 6),
+              Icon(Icons.podcasts_rounded,
+                  color: AppTheme.stateDanger, size: 16),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 150,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spaceLg),
+            scrollDirection: Axis.horizontal,
+            itemCount: episodes.length,
+            separatorBuilder: (_, __) =>
+                const SizedBox(width: AppTheme.spaceMd),
+            itemBuilder: (context, index) {
+              final episode = episodes[index];
+              final author = authors[episode.authorId];
+              final listeners = liveAudienceEstimate(episode);
+
+              return GestureDetector(
+                onTap: () => onEpisodeTap(episode),
+                child: Container(
+                  width: 220,
+                  padding: const EdgeInsets.all(AppTheme.spaceMd),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4C1D95), Color(0xFFBE185D)],
+                    ),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Colors.white24,
+                            child: Text(author?.avatarEmoji ?? '🎙️'),
+                          ),
+                          const SizedBox(width: AppTheme.spaceSm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  author?.displayName ?? 'LIVE Автор',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  author?.handle ?? '@live_now',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (author != null)
+                            IconButton(
+                              icon: Icon(
+                                author.isFollowed
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: Colors.white,
+                              ),
+                              onPressed: () => onFollowToggle(author.id),
+                            ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        episode.summary ?? episode.title ?? 'Live room',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppTheme.spaceSm),
+                      Text(
+                        'LIVE • $listeners слухачів',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: AppTheme.spaceLg),
+      ],
     );
   }
 }

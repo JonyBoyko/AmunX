@@ -111,3 +111,11 @@ int recommendationScore(Episode episode) {
   final randomBoost = Random(episode.id.hashCode).nextInt(60);
   return base + liveBoost + tagBonus + randomBoost;
 }
+
+int liveAudienceEstimate(Episode episode) {
+  if (!episode.isLive) return 0;
+  final base = 120 + (episode.durationSec ?? 45);
+  final sentiment = (episode.keywords?.length ?? 1) * 15;
+  final random = (episode.id.hashCode.abs() % 120);
+  return base + sentiment + random;
+}

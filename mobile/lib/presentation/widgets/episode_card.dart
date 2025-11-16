@@ -17,6 +17,7 @@ class EpisodeCard extends StatelessWidget {
   final String? formatLabel;
   final AuthorProfile? author;
   final VoidCallback? onFollowToggle;
+  final int? liveListeners;
 
   const EpisodeCard({
     super.key,
@@ -27,6 +28,7 @@ class EpisodeCard extends StatelessWidget {
     this.formatLabel,
     this.author,
     this.onFollowToggle,
+    this.liveListeners,
   });
 
   @override
@@ -129,6 +131,19 @@ class EpisodeCard extends StatelessWidget {
                                             ),
                                           )
                                           .toList(),
+                                    ),
+                                  ),
+                                if ((author?.isLive ?? isLive) &&
+                                    (liveListeners ?? 0) > 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      'LIVE • ${(liveListeners ?? 0)} слухачів',
+                                      style: const TextStyle(
+                                        color: AppTheme.stateDanger,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                               ],

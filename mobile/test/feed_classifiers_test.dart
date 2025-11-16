@@ -69,4 +69,12 @@ void main() {
 
     expect(recommendationScore(live), greaterThan(recommendationScore(short)));
   });
+
+  test('liveAudienceEstimate stable per episode', () {
+    final liveEpisode = _episode(id: 'live-user', duration: 80, isLive: true);
+    final first = liveAudienceEstimate(liveEpisode);
+    final second = liveAudienceEstimate(liveEpisode);
+    expect(first, equals(second));
+    expect(first, greaterThan(0));
+  });
 }
