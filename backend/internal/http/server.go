@@ -64,7 +64,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 
 	router.Route("/v1", func(r chi.Router) {
 		registerAuthRoutes(r, deps, logger)
-		registerPublicEpisodeRoutes(r, deps)
+		registerPublicEpisodeRoutes(r, deps, logger)
 		registerPublicTopicRoutes(r, deps)
 		registerPublicCommentRoutes(r, deps)
 		registerPublicLiveRoutes(r, deps)
@@ -113,4 +113,3 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func itoa(v int) string {
 	return fmt.Sprintf("%d", v)
 }
-

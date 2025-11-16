@@ -7,6 +7,7 @@ import '../filters/feed_filters.dart';
 import '../utils/feed_classifiers.dart';
 import 'feed_filter_provider.dart';
 import 'session_provider.dart';
+import 'reaction_provider.dart';
 
 final feedProvider = FutureProvider<List<Episode>>((ref) async {
   final feedRepository = ref.watch(feedRepositoryProvider);
@@ -24,6 +25,7 @@ final feedProvider = FutureProvider<List<Episode>>((ref) async {
       token: sessionState.token,
       queryParameters: filterState.toQueryParameters(),
     );
+    ref.read(reactionProvider.notifier).syncFromEpisodes(episodes);
     final filtered = _applyLocalFilters(episodes, filterState);
     AppLogger.info(
       'Fetched ${episodes.length} episodes → ${filtered.length} after filters',

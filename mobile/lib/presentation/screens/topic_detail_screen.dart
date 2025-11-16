@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../../data/models/episode.dart';
 import '../widgets/episode_card.dart';
+import '../models/reaction_state.dart';
 
 class TopicDetailScreen extends StatelessWidget {
   final String topicId;
@@ -40,7 +41,8 @@ class TopicDetailScreen extends StatelessWidget {
               pinned: true,
               backgroundColor: AppTheme.bgBase,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
+                icon: const Icon(Icons.arrow_back_ios_new,
+                    color: AppTheme.textPrimary),
                 onPressed: () => context.pop(),
               ),
               title: Text(
@@ -112,10 +114,11 @@ class TopicDetailScreen extends StatelessWidget {
               ),
               itemBuilder: (context, index) {
                 final episode = episodes[index];
-            return EpisodeCard(
-              episode: episode,
-              onTap: () => context.push('/episode/${episode.id}'),
-            );
+                return EpisodeCard(
+                  episode: episode,
+                  onTap: () => context.push('/episode/${episode.id}'),
+                  reactionSnapshot: ReactionSnapshot.initial(),
+                );
               },
             ),
           ],

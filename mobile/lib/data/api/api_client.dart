@@ -75,6 +75,27 @@ class ApiClient {
     return response.data;
   }
 
+  // Reactions
+  Future<Map<String, dynamic>> reactToEpisode({
+    required String episodeId,
+    required String type,
+    required bool remove,
+  }) async {
+    final response = await _dio.post(
+      '/v1/episodes/$episodeId/react',
+      data: {
+        'type': type,
+        'remove': remove,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> getSelfReactions(String episodeId) async {
+    final response = await _dio.get('/v1/episodes/$episodeId/reactions/self');
+    return (response.data as Map<String, dynamic>)['self'] as List<dynamic>;
+  }
+
   Future<void> uploadDevEpisode({
     required String filePath,
     required int durationSeconds,

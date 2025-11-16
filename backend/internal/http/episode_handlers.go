@@ -19,8 +19,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/rs/zerolog"
 
 	"github.com/amunx/backend/internal/app"
+	mw "github.com/amunx/backend/internal/http/middleware"
 	"github.com/amunx/backend/internal/httpctx"
 	"github.com/amunx/backend/internal/queue"
 	"github.com/amunx/backend/internal/storage"
@@ -54,23 +56,26 @@ var (
 )
 
 type episodeSummary struct {
-	ID          string         `json:"id"`
-	AuthorID    string         `json:"author_id"`
-	AuthorPlan  string         `json:"-"` // internal use (quota/expiry)
-	TopicID     *string        `json:"topic_id,omitempty"`
-	Title       *string        `json:"title,omitempty"`
-	Visibility  string         `json:"visibility"`
-	Status      string         `json:"status"`
-	DurationSec *int           `json:"duration_sec,omitempty"`
-	AudioURL    *string        `json:"audio_url,omitempty"`
-	Mask        string         `json:"mask"`
-	Quality     string         `json:"quality"`
-	IsLive      bool           `json:"is_live"`
-	PublishedAt *time.Time     `json:"published_at,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	Summary     *string        `json:"summary,omitempty"`
-	Keywords    []string       `json:"keywords,omitempty"`
-	Mood        map[string]any `json:"mood,omitempty"`
+	ID            string          `json:"id"`
+	AuthorID      string          `json:"author_id"`
+	AuthorPlan    string          `json:"-"` // internal use (quota/expiry)
+	TopicID       *string         `json:"topic_id,omitempty"`
+	Title         *string         `json:"title,omitempty"`
+	Visibility    string          `json:"visibility"`
+	Status        string          `json:"status"`
+	DurationSec   *int            `json:"duration_sec,omitempty"`
+	AudioURL      *string         `json:"audio_url,omitempty"`
+	Mask          string          `json:"mask"`
+	Quality       string          `json:"quality"`
+	IsLive        bool            `json:"is_live"`
+	PublishedAt   *time.Time      `json:"published_at,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
+	Summary       *string         `json:"summary,omitempty"`
+	Keywords      []string        `json:"keywords,omitempty"`
+	Mood          map[string]any  `json:"mood,omitempty"`
+	Reactions     []reactionCount `json:"reactions,omitempty"`
+	SelfReactions []string        `json:"self_reactions,omitempty"`
+	ReactionBadge *reactionBadge  `json:"reaction_badge,omitempty"`
 }
 
 func registerEpisodeRoutes(r chi.Router, deps *app.App) {
@@ -394,8 +399,10 @@ func ensureTopicAccessible(ctx context.Context, db *sql.DB, topicID uuid.UUID, u
 	return nil
 }
 
-func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
-	r.Get("/episodes", func(w http.ResponseWriter, req *http.Request) {
+func registerPublicEpisodeRoutes(r chi.Router, deps *app.App, logger zerolog.Logger) {
+	withOptionalAuth := r.With(mw.TryAuth(deps, logger))
+
+	withOptionalAuth.Get("/episodes", func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 
 		limit := parseLimit(req.URL.Query().Get("limit"), 20, 50)
@@ -443,6 +450,18 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
 			return
 		}
 
+		if err := appendReactionMetadata(ctx, deps.DB, items); err != nil {
+			WriteError(w, http.StatusInternalServerError, "reactions_fetch_failed", err.Error())
+			return
+		}
+
+		if user, ok := httpctx.UserFromContext(ctx); ok {
+			if err := appendSelfReactions(ctx, deps.DB, user.ID, items); err != nil {
+				WriteError(w, http.StatusInternalServerError, "self_reactions_fetch_failed", err.Error())
+				return
+			}
+		}
+
 		filters := parseFeedFilterParams(req)
 		filtered := applyFeedFilters(items, filters)
 
@@ -451,7 +470,7 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
 		})
 	})
 
-	r.Get("/episodes/{id}", func(w http.ResponseWriter, req *http.Request) {
+	withOptionalAuth.Get("/episodes/{id}", func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
 		if err != nil {
@@ -468,6 +487,20 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
 			WriteError(w, http.StatusInternalServerError, "episode_fetch_failed", err.Error())
 			return
 		}
+
+		single := []episodeSummary{episode}
+		if err := appendReactionMetadata(ctx, deps.DB, single); err != nil {
+			WriteError(w, http.StatusInternalServerError, "reactions_fetch_failed", err.Error())
+			return
+		}
+
+		if user, ok := httpctx.UserFromContext(ctx); ok {
+			if err := appendSelfReactions(ctx, deps.DB, user.ID, single); err != nil {
+				WriteError(w, http.StatusInternalServerError, "self_reactions_fetch_failed", err.Error())
+				return
+			}
+		}
+		episode = single[0]
 
 		if isStoryExpired(episode.AuthorPlan, episode.DurationSec, episode.CreatedAt) {
 			WriteError(w, http.StatusNotFound, "expired", "episode is no longer available")

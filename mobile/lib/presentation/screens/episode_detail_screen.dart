@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../core/config/app_config.dart';
 import '../../data/models/episode.dart';
+import '../models/reaction_state.dart';
 import '../providers/feed_provider.dart';
 import '../providers/session_provider.dart';
+import '../providers/reaction_provider.dart';
 import '../widgets/mini_waveform.dart';
+import '../widgets/reaction_strip.dart';
 
 class EpisodeDetailScreen extends ConsumerWidget {
   final String episodeId;
@@ -34,13 +38,13 @@ class EpisodeDetailScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Не вдалося завантажити епізод',
+                'РќРµ РІРґР°Р»РѕСЃСЏ Р·Р°РІР°РЅС‚Р°Р¶РёС‚Рё РµРїС–Р·РѕРґ',
                 style: TextStyle(color: AppTheme.stateDanger),
               ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => ref.refresh(episodeDetailProvider(episodeId)),
-                child: const Text('Спробувати ще раз'),
+                child: const Text('РЎРїСЂРѕР±СѓРІР°С‚Рё С‰Рµ СЂР°Р·'),
               ),
             ],
           ),
@@ -50,7 +54,7 @@ class EpisodeDetailScreen extends ConsumerWidget {
   }
 }
 
-class _EpisodeDetailBody extends StatefulWidget {
+class _EpisodeDetailBody extends ConsumerStatefulWidget {
   final Episode episode;
   final bool isPro;
 
@@ -60,31 +64,73 @@ class _EpisodeDetailBody extends StatefulWidget {
   });
 
   @override
-  State<_EpisodeDetailBody> createState() => _EpisodeDetailBodyState();
+  ConsumerState<_EpisodeDetailBody> createState() => _EpisodeDetailBodyState();
 }
 
-class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
+class _EpisodeDetailBodyState extends ConsumerState<_EpisodeDetailBody>
     with SingleTickerProviderStateMixin {
   bool _isPlaying = false;
   int _currentTime = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(reactionProvider.notifier).syncFromEpisodes([widget.episode]);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _EpisodeDetailBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.episode.id != widget.episode.id) {
+      ref.read(reactionProvider.notifier).syncFromEpisodes([widget.episode]);
+    }
+  }
+
+  Future<void> _handleReactionTap(
+    BuildContext context,
+    String type,
+  ) async {
+    try {
+      await ref.read(reactionProvider.notifier).toggleReaction(
+            widget.episode.id,
+            type,
+          );
+    } on StateError {
+      _showSnack(
+          context, 'РЈРІС–Р№РґС–С‚СЊ, С‰РѕР± СЃС‚Р°РІРёС‚Рё СЂРµР°РєС†С–С—');
+    } catch (_) {
+      _showSnack(context, 'РќРµ РІРґР°Р»РѕСЃСЏ РѕРЅРѕРІРёС‚Рё СЂРµР°РєС†С–СЋ');
+    }
+  }
+
+  void _showSnack(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final chapters = [
-      {'title': 'Вступ', 'time': 0},
-      {'title': 'Головна ідея', 'time': 18},
-      {'title': 'Висновки', 'time': 42},
+      {'title': 'Р’СЃС‚СѓРї', 'time': 0},
+      {'title': 'Р“РѕР»РѕРІРЅР° С–РґРµСЏ', 'time': 18},
+      {'title': 'Р’РёСЃРЅРѕРІРєРё', 'time': 42},
     ];
     final transcript = [
-      'Привіт! Сьогодні хочу поділитися думками про нову AI-модель від OpenAI.',
-      'Це дійсно цікавий розвиток подій, який може суттєво вплинути на розробку.',
-      'Я вважаю, що нам варто підготуватися до цих змін та зрозуміти, як це вплине на нашу роботу.',
-      'Давайте подивимось на головні можливості цієї моделі.',
-      'Вона може генерувати код, аналізувати великі обсяги даних, і навіть створювати контент.',
-      'Але найважливіше - це розуміння контексту та здатність до аналізу.',
-      'Це відкриває нові можливості для автоматизації багатьох процесів.',
-      'Підсумовуючи, це великий крок вперед для всієї індустрії.',
+      'РџСЂРёРІС–С‚! РЎСЊРѕРіРѕРґРЅС– С…РѕС‡Сѓ РїРѕРґС–Р»РёС‚РёСЃСЏ РґСѓРјРєР°РјРё РїСЂРѕ РЅРѕРІСѓ AI-РјРѕРґРµР»СЊ РІС–Рґ OpenAI.',
+      'Р¦Рµ РґС–Р№СЃРЅРѕ С†С–РєР°РІРёР№ СЂРѕР·РІРёС‚РѕРє РїРѕРґС–Р№, СЏРєРёР№ РјРѕР¶Рµ СЃСѓС‚С‚С”РІРѕ РІРїР»РёРЅСѓС‚Рё РЅР° СЂРѕР·СЂРѕР±РєСѓ.',
+      'РЇ РІРІР°Р¶Р°СЋ, С‰Рѕ РЅР°Рј РІР°СЂС‚Рѕ РїС–РґРіРѕС‚СѓРІР°С‚РёСЃСЏ РґРѕ С†РёС… Р·РјС–РЅ С‚Р° Р·СЂРѕР·СѓРјС–С‚Рё, СЏРє С†Рµ РІРїР»РёРЅРµ РЅР° РЅР°С€Сѓ СЂРѕР±РѕС‚Сѓ.',
+      'Р”Р°РІР°Р№С‚Рµ РїРѕРґРёРІРёРјРѕСЃСЊ РЅР° РіРѕР»РѕРІРЅС– РјРѕР¶Р»РёРІРѕСЃС‚С– С†С–С”С— РјРѕРґРµР»С–.',
+      'Р’РѕРЅР° РјРѕР¶Рµ РіРµРЅРµСЂСѓРІР°С‚Рё РєРѕРґ, Р°РЅР°Р»С–Р·СѓРІР°С‚Рё РІРµР»РёРєС– РѕР±СЃСЏРіРё РґР°РЅРёС…, С– РЅР°РІС–С‚СЊ СЃС‚РІРѕСЂСЋРІР°С‚Рё РєРѕРЅС‚РµРЅС‚.',
+      'РђР»Рµ РЅР°Р№РІР°Р¶Р»РёРІС–С€Рµ - С†Рµ СЂРѕР·СѓРјС–РЅРЅСЏ РєРѕРЅС‚РµРєСЃС‚Сѓ С‚Р° Р·РґР°С‚РЅС–СЃС‚СЊ РґРѕ Р°РЅР°Р»С–Р·Сѓ.',
+      'Р¦Рµ РІС–РґРєСЂРёРІР°С” РЅРѕРІС– РјРѕР¶Р»РёРІРѕСЃС‚С– РґР»СЏ Р°РІС‚РѕРјР°С‚РёР·Р°С†С–С— Р±Р°РіР°С‚СЊРѕС… РїСЂРѕС†РµСЃС–РІ.',
+      'РџС–РґСЃСѓРјРѕРІСѓСЋС‡Рё, С†Рµ РІРµР»РёРєРёР№ РєСЂРѕРє РІРїРµСЂРµРґ РґР»СЏ РІСЃС–С”С— С–РЅРґСѓСЃС‚СЂС–С—.',
     ];
+
+    final reactionSnapshot =
+        ref.watch(reactionSnapshotProvider(widget.episode.id));
 
     return Stack(
       children: [
@@ -108,17 +154,25 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
               ),
               const SizedBox(height: AppTheme.spaceLg),
               _buildTldr(),
+              if (AppConfig.reactionsEnabled &&
+                  reactionSnapshot.badge != null) ...[
+                const SizedBox(height: AppTheme.spaceSm),
+                ReactionBadgeChip(badge: reactionSnapshot.badge!),
+              ],
               const SizedBox(height: AppTheme.spaceLg),
               _buildTabs(chapters, transcript),
             ],
           ),
         ),
         _StickyActions(
-          episode: widget.episode,
+          reactionSnapshot: reactionSnapshot,
           onComments: () => context.push(
             '/episode/${widget.episode.id}/comments',
             extra: {'title': widget.episode.title},
           ),
+          onReactionTap: AppConfig.reactionsEnabled
+              ? (type) => _handleReactionTap(context, type)
+              : null,
         ),
       ],
     );
@@ -129,7 +183,8 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
       children: [
         IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
+          icon:
+              const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
         ),
         const Spacer(),
         IconButton(
@@ -159,7 +214,9 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
           ),
           const SizedBox(height: 8),
           Text(
-            widget.episode.summary ?? widget.episode.title ?? 'Короткий опис епізоду',
+            widget.episode.summary ??
+                widget.episode.title ??
+                'РљРѕСЂРѕС‚РєРёР№ РѕРїРёСЃ РµРїС–Р·РѕРґСѓ',
             style: const TextStyle(
               color: AppTheme.textPrimary,
               height: 1.5,
@@ -170,7 +227,8 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
     );
   }
 
-  Widget _buildTabs(List<Map<String, Object>> chapters, List<String> transcript) {
+  Widget _buildTabs(
+      List<Map<String, Object>> chapters, List<String> transcript) {
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -183,8 +241,8 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
             child: const TabBar(
               indicatorColor: AppTheme.brandPrimary,
               tabs: [
-                Tab(text: 'Розділи'),
-                Tab(text: 'Транскрипт'),
+                Tab(text: 'Р РѕР·РґС–Р»Рё'),
+                Tab(text: 'РўСЂР°РЅСЃРєСЂРёРїС‚'),
               ],
             ),
           ),
@@ -250,14 +308,16 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
                         padding: const EdgeInsets.all(AppTheme.spaceXl),
                         decoration: BoxDecoration(
                           color: AppTheme.bgRaised,
-                          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusXl),
                         ),
                         child: Column(
                           children: [
-                            const Icon(Icons.lock_outline, color: AppTheme.textSecondary),
+                            const Icon(Icons.lock_outline,
+                                color: AppTheme.textSecondary),
                             const SizedBox(height: 12),
                             const Text(
-                              'Транскрипти доступні у Pro',
+                              'РўСЂР°РЅСЃРєСЂРёРїС‚Рё РґРѕСЃС‚СѓРїРЅС– Сѓ Pro',
                               style: TextStyle(
                                 color: AppTheme.textPrimary,
                                 fontWeight: FontWeight.w600,
@@ -266,7 +326,7 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Отримайте повний текст епізоду та швидкі розділи.',
+                              'РћС‚СЂРёРјР°Р№С‚Рµ РїРѕРІРЅРёР№ С‚РµРєСЃС‚ РµРїС–Р·РѕРґСѓ С‚Р° С€РІРёРґРєС– СЂРѕР·РґС–Р»Рё.',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
                               ),
@@ -275,7 +335,7 @@ class _EpisodeDetailBodyState extends State<_EpisodeDetailBody>
                             const SizedBox(height: 16),
                             FilledButton(
                               onPressed: () => context.push('/paywall'),
-                              child: const Text('Оновити до Pro'),
+                              child: const Text('РћРЅРѕРІРёС‚Рё РґРѕ Pro'),
                             ),
                           ],
                         ),
@@ -335,7 +395,7 @@ class _PlayerCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      episode.title ?? 'Епізод',
+                      episode.title ?? 'Р•РїС–Р·РѕРґ',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -414,12 +474,14 @@ class _PlayerCard extends StatelessWidget {
 }
 
 class _StickyActions extends StatelessWidget {
-  final Episode episode;
   final VoidCallback onComments;
+  final ReactionSnapshot reactionSnapshot;
+  final ValueChanged<String>? onReactionTap;
 
   const _StickyActions({
-    required this.episode,
     required this.onComments,
+    required this.reactionSnapshot,
+    this.onReactionTap,
   });
 
   @override
@@ -439,15 +501,15 @@ class _StickyActions extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Wrap(
-              spacing: 8,
-              children: const [
-                _ReactionButton(label: '👍'),
-                _ReactionButton(label: '🔥'),
-                _ReactionButton(label: '💡'),
-              ],
-            ),
-            const Spacer(),
+            if (AppConfig.reactionsEnabled) ...[
+              Expanded(
+                child: ReactionStrip(
+                  snapshot: reactionSnapshot,
+                  onTap: onReactionTap,
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
             FilledButton.tonal(
               onPressed: onComments,
               child: const Icon(Icons.chat_bubble_outline),
@@ -460,26 +522,6 @@ class _StickyActions extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ReactionButton extends StatelessWidget {
-  final String label;
-
-  const _ReactionButton({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceChip,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-      ),
-      alignment: Alignment.center,
-      child: Text(label),
     );
   }
 }

@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
+import '../../core/config/app_config.dart';
 import '../../data/models/episode.dart';
 import '../models/author_profile.dart';
+import '../models/reaction_state.dart';
 import 'follow_button.dart';
 import 'mini_waveform.dart';
+import 'reaction_strip.dart';
 
 class EpisodeCard extends StatelessWidget {
   final Episode episode;
@@ -18,6 +21,8 @@ class EpisodeCard extends StatelessWidget {
   final AuthorProfile? author;
   final VoidCallback? onFollowToggle;
   final int? liveListeners;
+  final ReactionSnapshot reactionSnapshot;
+  final ValueChanged<String>? onReactionTap;
 
   const EpisodeCard({
     super.key,
@@ -29,6 +34,8 @@ class EpisodeCard extends StatelessWidget {
     this.author,
     this.onFollowToggle,
     this.liveListeners,
+    required this.reactionSnapshot,
+    this.onReactionTap,
   });
 
   @override
@@ -38,7 +45,8 @@ class EpisodeCard extends StatelessWidget {
     final topicLabel = episode.keywords?.first ?? 'General';
     final maskLabel = episode.mask;
     final qualityLabel = episode.quality;
-    final summary = episode.summary ?? episode.title ?? 'Новий епізод';
+    final summary =
+        episode.summary ?? episode.title ?? 'РќРѕРІРёР№ РµРїС–Р·РѕРґ';
     final timestamp = DateFormat('HH:mm').format(episode.createdAt);
     final isLive = episode.isLive;
     final avatarLabel = author?.avatarEmoji ??
@@ -86,7 +94,7 @@ class EpisodeCard extends StatelessWidget {
                                 Text(
                                   author?.displayName ??
                                       episode.title ??
-                                      'Автор',
+                                      'РђРІС‚РѕСЂ',
                                   style: const TextStyle(
                                     color: AppTheme.textPrimary,
                                     fontWeight: FontWeight.w600,
@@ -138,7 +146,7 @@ class EpisodeCard extends StatelessWidget {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 6),
                                     child: Text(
-                                      'LIVE • ${(liveListeners ?? 0)} слухачів',
+                                      'LIVE вЂў ${(liveListeners ?? 0)} СЃР»СѓС…Р°С‡С–РІ',
                                       style: const TextStyle(
                                         color: AppTheme.stateDanger,
                                         fontSize: 12,
@@ -189,14 +197,14 @@ class EpisodeCard extends StatelessWidget {
                             _Chip(label: 'Mask: ${_capital(maskLabel)}'),
                           if (formattedDuration != null)
                             Text(
-                              '• $formattedDuration',
+                              'вЂў $formattedDuration',
                               style: const TextStyle(
                                 color: AppTheme.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
                           Text(
-                            '• $timestamp',
+                            'вЂў $timestamp',
                             style: const TextStyle(
                               color: AppTheme.textSecondary,
                               fontSize: 12,
@@ -221,14 +229,21 @@ class EpisodeCard extends StatelessWidget {
               const SizedBox(height: AppTheme.spaceMd),
               MiniWaveform(progress: rngValue),
             ],
+            if (AppConfig.reactionsEnabled) ...[
+              if (reactionSnapshot.badge != null) ...[
+                const SizedBox(height: AppTheme.spaceSm),
+                ReactionBadgeChip(badge: reactionSnapshot.badge!),
+              ],
+              const SizedBox(height: AppTheme.spaceSm),
+              ReactionStrip(
+                snapshot: reactionSnapshot,
+                onTap: onReactionTap,
+              ),
+            ],
             const SizedBox(height: AppTheme.spaceMd),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Wrap(
-                  spacing: AppTheme.spaceSm,
-                  children: _buildReactionChips(),
-                ),
                 Row(
                   children: [
                     Icon(
@@ -244,13 +259,12 @@ class EpisodeCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
-                    const SizedBox(width: AppTheme.spaceLg),
-                    const Icon(
-                      Icons.share_outlined,
-                      size: 18,
-                      color: AppTheme.textSecondary,
-                    ),
                   ],
+                ),
+                const Icon(
+                  Icons.share_outlined,
+                  size: 18,
+                  color: AppTheme.textSecondary,
                 ),
               ],
             ),
@@ -260,40 +274,10 @@ class EpisodeCard extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildReactionChips() {
-    final reactions = [
-      {'emoji': '👍', 'count': (episode.id.hashCode % 30) + 2},
-      {'emoji': '🔥', 'count': (episode.id.hashCode % 20) + 1},
-      {'emoji': '💡', 'count': (episode.id.hashCode % 15)},
-    ];
-
-    return reactions
-        .map(
-          (reaction) => Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceChip,
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            ),
-            child: Text(
-              '${reaction['emoji']} ${reaction['count']}',
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        )
-        .toList();
-  }
-
   String _formatDuration(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
-    return '${minutes}хв ${remainingSeconds}с';
+    return '${minutes}С…РІ ${remainingSeconds}СЃ';
   }
 
   String _capital(String value) {

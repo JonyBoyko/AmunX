@@ -13,6 +13,7 @@ import '../providers/feed_filter_provider.dart';
 import '../providers/feed_provider.dart';
 import '../providers/live_rooms_provider.dart';
 import '../providers/tag_provider.dart';
+import '../providers/reaction_provider.dart';
 import '../services/live_notification_service.dart';
 import '../utils/feed_classifiers.dart';
 import '../widgets/episode_card.dart';
@@ -36,6 +37,30 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   void _openTopic(Episode episode) {
     final topic = episode.keywords?.first ?? 'general';
     context.push('/topic/${Uri.encodeComponent(topic)}');
+  }
+
+  Future<void> _handleReactionTap(
+    BuildContext context,
+    Episode episode,
+    String type,
+  ) async {
+    try {
+      await ref.read(reactionProvider.notifier).toggleReaction(
+            episode.id,
+            type,
+          );
+    } on StateError {
+      _showSnack(context, 'Увійдіть, щоб ставити реакції');
+    } catch (_) {
+      _showSnack(context, 'Не вдалося оновити реакцію');
+    }
+  }
+
+  void _showSnack(BuildContext context, String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -158,6 +183,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               final format = classifyFormat(episode);
               final author = authors[episode.authorId];
               final liveListeners = liveAudienceEstimate(episode);
+              final reactionSnapshot =
+                  ref.watch(reactionSnapshotProvider(episode.id));
               return EpisodeCard(
                 episode: episode,
                 regionLabel: region.label,
@@ -171,6 +198,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                         .toggleFollow(author.id),
                 onTap: () => _openEpisode(episode),
                 onTopicTap: () => _openTopic(episode),
+                reactionSnapshot: reactionSnapshot,
+                onReactionTap: (type) =>
+                    _handleReactionTap(context, episode, type),
               );
             },
           ),
