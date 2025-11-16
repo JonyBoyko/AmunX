@@ -7,6 +7,7 @@ import '../../core/logging/app_logger.dart';
 import '../../data/models/episode.dart';
 import '../filters/feed_filters.dart';
 import '../models/feed_tag.dart';
+import '../providers/author_directory_provider.dart';
 import '../providers/feed_filter_provider.dart';
 import '../providers/feed_provider.dart';
 import '../providers/tag_provider.dart';
@@ -89,6 +90,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   ) {
     final coverageNotifier = ref.read(feedFilterProvider.notifier);
     final tagsNotifier = ref.read(trendingTagsProvider.notifier);
+    ref.read(authorDirectoryProvider.notifier).syncWithEpisodes(episodes);
+    final authors = ref.watch(authorDirectoryProvider);
 
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -123,11 +126,17 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               final episode = episodes[index];
               final region = deriveRegion(episode);
               final format = classifyFormat(episode);
+              final author = authors[episode.authorId];
               return EpisodeCard(
                 episode: episode,
                 regionLabel: region.label,
                 formatLabel: format.label,
-                isSubscribedAuthor: matchesSubscriptions(episode),
+                author: author,
+                onFollowToggle: author == null
+                    ? null
+                    : () => ref
+                        .read(authorDirectoryProvider.notifier)
+                        .toggleFollow(author.id),
                 onTap: () => _openEpisode(episode),
                 onTopicTap: () => _openTopic(episode),
               );

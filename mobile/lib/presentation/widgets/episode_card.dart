@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
 import '../../data/models/episode.dart';
+import '../models/author_profile.dart';
+import 'follow_button.dart';
 import 'mini_waveform.dart';
 
 class EpisodeCard extends StatelessWidget {
@@ -13,7 +15,8 @@ class EpisodeCard extends StatelessWidget {
   final VoidCallback? onTopicTap;
   final String? regionLabel;
   final String? formatLabel;
-  final bool isSubscribedAuthor;
+  final AuthorProfile? author;
+  final VoidCallback? onFollowToggle;
 
   const EpisodeCard({
     super.key,
@@ -22,7 +25,8 @@ class EpisodeCard extends StatelessWidget {
     this.onTopicTap,
     this.regionLabel,
     this.formatLabel,
-    this.isSubscribedAuthor = false,
+    this.author,
+    this.onFollowToggle,
   });
 
   @override
@@ -35,7 +39,9 @@ class EpisodeCard extends StatelessWidget {
     final summary = episode.summary ?? episode.title ?? 'Новий епізод';
     final timestamp = DateFormat('HH:mm').format(episode.createdAt);
     final isLive = episode.isLive;
-    final avatarInitial = episode.title?.characters.first.toUpperCase() ?? 'A';
+    final avatarLabel = author?.avatarEmoji ??
+        episode.title?.characters.first.toUpperCase() ??
+        'A';
     final comments =
         (episode.mood?['comments'] as int?) ?? (episode.id.hashCode % 12) + 3;
     final rngValue = Random(episode.id.hashCode).nextDouble();
@@ -59,45 +65,80 @@ class EpisodeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _AvatarProgress(
-                  initial: avatarInitial,
+                  label: avatarLabel,
                   progress: rngValue,
-                  isLive: isLive,
+                  isLive: author?.isLive ?? isLive,
                 ),
                 const SizedBox(width: AppTheme.spaceMd),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        spacing: AppTheme.spaceSm,
-                        runSpacing: AppTheme.spaceSm,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            episode.title ?? 'Епізод',
-                            style: const TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.w600,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  author?.displayName ??
+                                      episode.title ??
+                                      'Автор',
+                                  style: const TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  author?.handle ?? '@voice.creator',
+                                  style: const TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (author?.badges.isNotEmpty ?? false)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.only(top: 4, right: 4),
+                                    child: Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: author!.badges
+                                          .map(
+                                            (badge) => Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.surfaceChip,
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        AppTheme.radiusSm),
+                                              ),
+                                              child: Text(
+                                                badge,
+                                                style: const TextStyle(
+                                                  color: AppTheme.textSecondary,
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          if (isLive)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.stateDanger,
-                                borderRadius: BorderRadius.circular(
-                                  AppTheme.radiusXs,
-                                ),
-                              ),
-                              child: const Text(
-                                'LIVE',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textInverse,
-                                ),
-                              ),
+                          if (onFollowToggle != null && author != null)
+                            FollowButton(
+                              dense: true,
+                              isFollowing: author!.isFollowed,
+                              onPressed: onFollowToggle!,
                             ),
                         ],
                       ),
@@ -131,15 +172,6 @@ class EpisodeCard extends StatelessWidget {
                           _Chip(label: qualityLabel),
                           if (maskLabel.toLowerCase() != 'off')
                             _Chip(label: 'Mask: ${_capital(maskLabel)}'),
-                          if (isSubscribedAuthor)
-                            _Chip(
-                              label: 'Ви підписані',
-                              leading: const Icon(
-                                Icons.check_circle,
-                                size: 14,
-                                color: AppTheme.stateSuccess,
-                              ),
-                            ),
                           if (formattedDuration != null)
                             Text(
                               '• $formattedDuration',
@@ -304,12 +336,12 @@ class _Chip extends StatelessWidget {
 }
 
 class _AvatarProgress extends StatelessWidget {
-  final String initial;
+  final String label;
   final double progress;
   final bool isLive;
 
   const _AvatarProgress({
-    required this.initial,
+    required this.label,
     required this.progress,
     required this.isLive,
   });
@@ -334,23 +366,34 @@ class _AvatarProgress extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceCard,
-              borderRadius: BorderRadius.circular(21),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          _AvatarLabel(label: label),
         ],
+      ),
+    );
+  }
+}
+
+class _AvatarLabel extends StatelessWidget {
+  final String label;
+
+  const _AvatarLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(21),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
