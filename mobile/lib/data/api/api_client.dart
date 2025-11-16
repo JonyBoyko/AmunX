@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart' as p;
 
 import '../../core/config/app_config.dart';
 import '../../core/logging/app_logger.dart';
@@ -14,14 +16,33 @@ class ApiClient {
     await _dio.post('/v1/auth/magiclink', data: body);
   }
 
-  Future<Map<String, dynamic>> verifyMagicLink(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> verifyMagicLink(
+      Map<String, dynamic> body) async {
     final response = await _dio.post('/v1/auth/magiclink/verify', data: body);
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> devLogin(String email) async {
+    final response = await _dio.post(
+      '/v1/auth/dev-login',
+      data: {'email': email},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getCurrentUserProfile() async {
+    final response = await _dio.get('/v1/me');
+    return response.data as Map<String, dynamic>;
+  }
+
   // Episodes
-  Future<FeedResponse> getEpisodes() async {
-    final response = await _dio.get('/v1/episodes');
+  Future<FeedResponse> getEpisodes({
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final response = await _dio.get(
+      '/v1/episodes',
+      queryParameters: queryParameters,
+    );
     return FeedResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
@@ -36,8 +57,10 @@ class ApiClient {
     return response.data as List<dynamic>;
   }
 
-  Future<dynamic> createComment(String episodeId, Map<String, dynamic> body) async {
-    final response = await _dio.post('/v1/episodes/$episodeId/comments', data: body);
+  Future<dynamic> createComment(
+      String episodeId, Map<String, dynamic> body) async {
+    final response =
+        await _dio.post('/v1/episodes/$episodeId/comments', data: body);
     return response.data;
   }
 
@@ -50,6 +73,29 @@ class ApiClient {
   Future<dynamic> getTopicById(String topicId) async {
     final response = await _dio.get('/v1/topics/$topicId');
     return response.data;
+  }
+
+  Future<void> uploadDevEpisode({
+    required String filePath,
+    required int durationSeconds,
+    String? title,
+    String? topicId,
+  }) async {
+    final ext = p.extension(filePath).replaceFirst('.', '');
+    final mediaSubtype = ext.isEmpty ? 'm4a' : ext;
+
+    final formData = FormData.fromMap({
+      if (title != null && title.isNotEmpty) 'title': title,
+      'duration': durationSeconds.toString(),
+      if (topicId != null) 'topic_id': topicId,
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: p.basename(filePath),
+        contentType: MediaType('audio', mediaSubtype),
+      ),
+    });
+
+    await _dio.post('/v1/episodes/dev', data: formData);
   }
 }
 
@@ -95,4 +141,3 @@ ApiClient createApiClient({String? token}) {
 
   return ApiClient(dio);
 }
-

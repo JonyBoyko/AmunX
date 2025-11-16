@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -62,173 +64,173 @@ type episodeSummary struct {
 
 func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 	r.Post("/episodes", func(w http.ResponseWriter, req *http.Request) {
-			currentUser, ok := httpctx.UserFromContext(req.Context())
-			if !ok {
-				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
-				return
-			}
-			if currentUser.Shadowbanned {
-				WriteError(w, http.StatusForbidden, "account_restricted", "publishing is disabled for this account")
-				return
-			}
+		currentUser, ok := httpctx.UserFromContext(req.Context())
+		if !ok {
+			WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+			return
+		}
+		if currentUser.Shadowbanned {
+			WriteError(w, http.StatusForbidden, "account_restricted", "publishing is disabled for this account")
+			return
+		}
 
-			if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:episodes:user:"+currentUser.ID.String(), episodeUserRateLimit, episodeUserRateWindow); !allowed {
+		if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:episodes:user:"+currentUser.ID.String(), episodeUserRateLimit, episodeUserRateWindow); !allowed {
+			if retry > 0 {
+				w.Header().Set("Retry-After", strconv.FormatInt(int64((retry+time.Second-1)/time.Second), 10))
+			}
+			WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many episodes created recently")
+			return
+		}
+		if ip := clientIP(req); ip != "" {
+			if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:episodes:ip:"+ip, episodeIPRateLimit, episodeIPRateWindow); !allowed {
 				if retry > 0 {
 					w.Header().Set("Retry-After", strconv.FormatInt(int64((retry+time.Second-1)/time.Second), 10))
 				}
-				WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many episodes created recently")
+				WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many episodes from this network")
 				return
 			}
-			if ip := clientIP(req); ip != "" {
-				if allowed, retry := allowRate(req.Context(), deps.Redis, "rl:episodes:ip:"+ip, episodeIPRateLimit, episodeIPRateWindow); !allowed {
-					if retry > 0 {
-						w.Header().Set("Retry-After", strconv.FormatInt(int64((retry+time.Second-1)/time.Second), 10))
-					}
-					WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many episodes from this network")
-					return
-				}
-			}
+		}
 
-			var payload struct {
-				Visibility  string  `json:"visibility"`
-				TopicID     *string `json:"topic_id"`
-				Mask        string  `json:"mask"`
-				Quality     string  `json:"quality"`
-				DurationSec *int    `json:"duration_sec"`
-				ContentType string  `json:"content_type"`
-			}
-			if err := decodeJSON(req, &payload); err != nil {
-				WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
-				return
-			}
+		var payload struct {
+			Visibility  string  `json:"visibility"`
+			TopicID     *string `json:"topic_id"`
+			Mask        string  `json:"mask"`
+			Quality     string  `json:"quality"`
+			DurationSec *int    `json:"duration_sec"`
+			ContentType string  `json:"content_type"`
+		}
+		if err := decodeJSON(req, &payload); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
 
-			var topicID *uuid.UUID
-			if payload.TopicID != nil {
-				parsed, err := uuid.Parse(*payload.TopicID)
-				if err != nil {
-					WriteError(w, http.StatusBadRequest, "invalid_topic_id", "topic_id must be a valid UUID")
-					return
-				}
-				topicID = &parsed
-			}
-
-			episodeID := uuid.New()
-			key := "episodes/" + episodeID.String() + "/original"
-
-			upload, err := deps.Storage.PresignUpload(req.Context(), key, 15*time.Minute, coalesceContentType(payload.ContentType))
+		var topicID *uuid.UUID
+		if payload.TopicID != nil {
+			parsed, err := uuid.Parse(*payload.TopicID)
 			if err != nil {
-				if errors.Is(err, storage.ErrNotImplemented) {
-					WriteError(w, http.StatusServiceUnavailable, "storage_disabled", "object storage not configured")
+				WriteError(w, http.StatusBadRequest, "invalid_topic_id", "topic_id must be a valid UUID")
+				return
+			}
+			topicID = &parsed
+		}
+
+		episodeID := uuid.New()
+		key := "episodes/" + episodeID.String() + "/original"
+
+		upload, err := deps.Storage.PresignUpload(req.Context(), key, 15*time.Minute, coalesceContentType(payload.ContentType))
+		if err != nil {
+			if errors.Is(err, storage.ErrNotImplemented) {
+				WriteError(w, http.StatusServiceUnavailable, "storage_disabled", "object storage not configured")
+				return
+			}
+			WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
+			return
+		}
+
+		if topicID != nil {
+			if err := ensureTopicAccessible(req.Context(), deps.DB, *topicID, currentUser.ID); err != nil {
+				switch {
+				case errors.Is(err, sql.ErrNoRows):
+					WriteError(w, http.StatusNotFound, "topic_not_found", "topic does not exist")
+					return
+				case errors.Is(err, errTopicNotAccessible):
+					WriteError(w, http.StatusForbidden, "topic_not_accessible", err.Error())
+					return
+				default:
+					WriteError(w, http.StatusInternalServerError, "topic_validation_failed", err.Error())
 					return
 				}
-				WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
-				return
 			}
+		}
 
-			if topicID != nil {
-				if err := ensureTopicAccessible(req.Context(), deps.DB, *topicID, currentUser.ID); err != nil {
-					switch {
-					case errors.Is(err, sql.ErrNoRows):
-						WriteError(w, http.StatusNotFound, "topic_not_found", "topic does not exist")
-						return
-					case errors.Is(err, errTopicNotAccessible):
-						WriteError(w, http.StatusForbidden, "topic_not_accessible", err.Error())
-						return
-					default:
-						WriteError(w, http.StatusInternalServerError, "topic_validation_failed", err.Error())
-						return
-					}
-				}
+		if err := createEpisode(req.Context(), deps.DB, createEpisodeParams{
+			ID:          episodeID,
+			AuthorID:    currentUser.ID,
+			Visibility:  normalizeVisibility(payload.Visibility, deps.Config),
+			TopicID:     topicID,
+			Mask:        normalizeMask(payload.Mask),
+			Quality:     normalizeQuality(payload.Quality),
+			DurationSec: payload.DurationSec,
+			StorageKey:  key,
+		}); err != nil {
+			WriteError(w, http.StatusInternalServerError, "episode_create_failed", err.Error())
+			return
+		}
+
+		headers := map[string]string{}
+		for k, values := range upload.Headers {
+			if len(values) > 0 {
+				headers[k] = values[0]
 			}
+		}
 
-			if err := createEpisode(req.Context(), deps.DB, createEpisodeParams{
-				ID:          episodeID,
-				AuthorID:    currentUser.ID,
-				Visibility:  normalizeVisibility(payload.Visibility, deps.Config),
-				TopicID:     topicID,
-				Mask:        normalizeMask(payload.Mask),
-				Quality:     normalizeQuality(payload.Quality),
-				DurationSec: payload.DurationSec,
-				StorageKey:  key,
-			}); err != nil {
-				WriteError(w, http.StatusInternalServerError, "episode_create_failed", err.Error())
-				return
-			}
-
-			headers := map[string]string{}
-			for k, values := range upload.Headers {
-				if len(values) > 0 {
-					headers[k] = values[0]
-				}
-			}
-
-			WriteJSON(w, http.StatusCreated, episodeResponse{
-				ID:            episodeID.String(),
-				Status:        "pending_upload",
-				UploadURL:     upload.URL,
+		WriteJSON(w, http.StatusCreated, episodeResponse{
+			ID:            episodeID.String(),
+			Status:        "pending_upload",
+			UploadURL:     upload.URL,
 			UploadHeaders: headers,
 		})
 	})
 
 	r.Post("/episodes/{id}/finalize", func(w http.ResponseWriter, req *http.Request) {
-			currentUser, ok := httpctx.UserFromContext(req.Context())
-			if !ok {
-				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+		currentUser, ok := httpctx.UserFromContext(req.Context())
+		if !ok {
+			WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+			return
+		}
+
+		episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
+			return
+		}
+
+		if err := setEpisodeStatus(req.Context(), deps.DB, episodeID, currentUser.ID, "pending_public"); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				WriteError(w, http.StatusNotFound, "not_found", "episode not found")
 				return
 			}
+			WriteError(w, http.StatusInternalServerError, "episode_finalize_failed", err.Error())
+			return
+		}
 
-			episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
-			if err != nil {
-				WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
-				return
-			}
+		if err := deps.Queue.Enqueue(req.Context(), queue.TopicProcessAudio, map[string]any{
+			"episode_id": episodeID.String(),
+			"attempt":    0,
+		}); err != nil {
+			WriteError(w, http.StatusInternalServerError, "enqueue_failed", err.Error())
+			return
+		}
 
-			if err := setEpisodeStatus(req.Context(), deps.DB, episodeID, currentUser.ID, "pending_public"); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					WriteError(w, http.StatusNotFound, "not_found", "episode not found")
-					return
-				}
-				WriteError(w, http.StatusInternalServerError, "episode_finalize_failed", err.Error())
-				return
-			}
-
-			if err := deps.Queue.Enqueue(req.Context(), queue.TopicProcessAudio, map[string]any{
-				"episode_id": episodeID.String(),
-				"attempt":    0,
-			}); err != nil {
-				WriteError(w, http.StatusInternalServerError, "enqueue_failed", err.Error())
-				return
-			}
-
-			WriteJSON(w, http.StatusOK, map[string]any{
+		WriteJSON(w, http.StatusOK, map[string]any{
 			"status": "queued",
 		})
 	})
 
 	r.Post("/episodes/{id}/undo", func(w http.ResponseWriter, req *http.Request) {
-			currentUser, ok := httpctx.UserFromContext(req.Context())
-			if !ok {
-				WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
-				return
-			}
+		currentUser, ok := httpctx.UserFromContext(req.Context())
+		if !ok {
+			WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+			return
+		}
 
-			episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
-			if err != nil {
-				WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
-				return
-			}
+		episodeID, err := uuidFromParam(chi.URLParam(req, "id"))
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
+			return
+		}
 
-			okUndo, err := undoEpisode(req.Context(), deps.DB, episodeID, currentUser.ID, deps.Config.UndoSeconds)
-			if err != nil {
-				WriteError(w, http.StatusInternalServerError, "undo_failed", err.Error())
-				return
-			}
-			if !okUndo {
-				WriteError(w, http.StatusForbidden, "undo_window_elapsed", "undo window has expired or episode not pending")
-				return
-			}
+		okUndo, err := undoEpisode(req.Context(), deps.DB, episodeID, currentUser.ID, deps.Config.UndoSeconds)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "undo_failed", err.Error())
+			return
+		}
+		if !okUndo {
+			WriteError(w, http.StatusForbidden, "undo_window_elapsed", "undo window has expired or episode not pending")
+			return
+		}
 
-			WriteJSON(w, http.StatusOK, map[string]any{"status": "undone"})
+		WriteJSON(w, http.StatusOK, map[string]any{"status": "undone"})
 	})
 
 	r.Post("/episodes/dev", handleDevEpisodeUpload(deps))
@@ -419,8 +421,11 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
 			return
 		}
 
+		filters := parseFeedFilterParams(req)
+		filtered := applyFeedFilters(items, filters)
+
 		WriteJSON(w, http.StatusOK, map[string]any{
-			"items": items,
+			"items": filtered,
 		})
 	})
 
@@ -614,6 +619,221 @@ func handleServeDevAudio(deps *app.App) http.HandlerFunc {
 
 		http.ServeFile(w, req, path)
 	}
+}
+
+type feedFilterParams struct {
+	Tab    string
+	Format string
+	Region string
+	Tags   map[string]struct{}
+}
+
+func parseFeedFilterParams(r *http.Request) feedFilterParams {
+	q := r.URL.Query()
+	filters := feedFilterParams{
+		Tab:    strings.ToLower(q.Get("feed_tab")),
+		Format: strings.ToLower(q.Get("format")),
+		Region: strings.ToLower(q.Get("region")),
+		Tags:   make(map[string]struct{}),
+	}
+
+	if filters.Tab == "" {
+		filters.Tab = "all"
+	}
+	if filters.Tab == "trending_nearby" {
+		filters.Region = "nearby"
+	}
+	if filters.Region == "" {
+		filters.Region = "global"
+	}
+
+	if rawTags := q.Get("tags"); rawTags != "" {
+		for _, tag := range strings.Split(rawTags, ",") {
+			normalized := normalizeTag(tag)
+			if normalized != "" {
+				filters.Tags[normalized] = struct{}{}
+			}
+		}
+	}
+
+	return filters
+}
+
+func applyFeedFilters(items []episodeSummary, filters feedFilterParams) []episodeSummary {
+	working := make([]episodeSummary, 0, len(items))
+
+	for _, item := range items {
+		if !regionMatches(item, filters.Region) {
+			continue
+		}
+		if !formatMatches(item, filters.Format) {
+			continue
+		}
+		if len(filters.Tags) > 0 && !tagsMatch(item, filters.Tags) {
+			continue
+		}
+		working = append(working, item)
+	}
+
+	switch filters.Tab {
+	case "subscriptions":
+		filtered := make([]episodeSummary, 0, len(working))
+		for _, item := range working {
+			if matchesSubscriptions(item) {
+				filtered = append(filtered, item)
+			}
+		}
+		working = filtered
+	case "recommended":
+		sort.SliceStable(working, func(i, j int) bool {
+			return recommendationScore(working[i]) > recommendationScore(working[j])
+		})
+		limit := (len(working) + 1) / 2
+		if limit > 12 {
+			limit = 12
+		}
+		if limit > 0 && limit < len(working) {
+			working = append([]episodeSummary(nil), working[:limit]...)
+		}
+	case "trending_nearby":
+		filtered := make([]episodeSummary, 0, len(working))
+		for _, item := range working {
+			if regionMatches(item, "nearby") {
+				filtered = append(filtered, item)
+			}
+		}
+		working = filtered
+	}
+
+	return working
+}
+
+func formatMatches(item episodeSummary, filter string) bool {
+	if filter == "" || filter == "all" {
+		return true
+	}
+
+	switch filter {
+	case "live":
+		return item.IsLive
+	case "shorts":
+		return classifyEpisodeFormat(item) == "shorts"
+	case "podcasts":
+		return classifyEpisodeFormat(item) == "podcasts"
+	default:
+		return true
+	}
+}
+
+func regionMatches(item episodeSummary, filter string) bool {
+	if filter == "" || filter == "global" {
+		return true
+	}
+
+	region := deriveEpisodeRegion(item)
+	switch filter {
+	case "nearby":
+		return region == regionKyiv
+	case "eu", "europe":
+		return region == regionKyiv || region == regionLviv || region == regionWarsaw || region == regionBerlin
+	case "na", "north_america":
+		return region == regionNewYork
+	default:
+		return true
+	}
+}
+
+func tagsMatch(item episodeSummary, selected map[string]struct{}) bool {
+	if len(selected) == 0 {
+		return true
+	}
+
+	for _, keyword := range item.Keywords {
+		tag := normalizeTag(keyword)
+		if _, ok := selected[tag]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeTag(value string) string {
+	tag := strings.TrimSpace(strings.ToLower(value))
+	if tag == "" {
+		return ""
+	}
+	if !strings.HasPrefix(tag, "#") {
+		tag = "#" + tag
+	}
+	return tag
+}
+
+func matchesSubscriptions(item episodeSummary) bool {
+	hash := hashString(item.AuthorID)
+	return hash%3 == 0
+}
+
+func recommendationScore(item episodeSummary) int {
+	duration := 90
+	if item.DurationSec != nil && *item.DurationSec > 0 {
+		duration = *item.DurationSec
+	}
+	score := duration
+	if item.IsLive {
+		score += 120
+	}
+	if len(item.Keywords) > 0 {
+		score += len(item.Keywords) * 20
+	}
+	if item.Summary != nil {
+		score += len(*item.Summary) % 40
+	}
+	score += int(hashString(item.ID) % 60)
+	return score
+}
+
+func classifyEpisodeFormat(item episodeSummary) string {
+	if item.IsLive {
+		return "live"
+	}
+	duration := 0
+	if item.DurationSec != nil {
+		duration = *item.DurationSec
+	}
+	if duration == 0 || duration <= 120 {
+		return "shorts"
+	}
+	return "podcasts"
+}
+
+type episodeRegion int
+
+const (
+	regionKyiv episodeRegion = iota
+	regionLviv
+	regionWarsaw
+	regionBerlin
+	regionNewYork
+)
+
+var regionRotation = [...]episodeRegion{
+	regionKyiv,
+	regionLviv,
+	regionWarsaw,
+	regionBerlin,
+	regionNewYork,
+}
+
+func deriveEpisodeRegion(item episodeSummary) episodeRegion {
+	hash := hashString(item.ID)
+	idx := int(hash % uint32(len(regionRotation)))
+	return regionRotation[idx]
+}
+
+func hashString(value string) uint32 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(value))
+	return h.Sum32()
 }
 
 type listEpisodesParams struct {
@@ -811,4 +1031,3 @@ WHERE e.id = $1`
 	}
 	return rec, nil
 }
-

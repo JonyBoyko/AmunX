@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
@@ -113,3 +114,83 @@ RETURNING id;
 	}
 }
 
+func TestApplyFeedFiltersFormat(t *testing.T) {
+	shortDur := 60
+	longDur := 360
+	episodes := []episodeSummary{
+		{ID: "short", AuthorID: uuid.New().String(), DurationSec: &shortDur},
+		{ID: "long", AuthorID: uuid.New().String(), DurationSec: &longDur},
+	}
+
+	filters := feedFilterParams{
+		Format: "podcasts",
+		Region: "global",
+		Tags:   map[string]struct{}{},
+		Tab:    "all",
+	}
+
+	result := applyFeedFilters(episodes, filters)
+	if len(result) != 1 || result[0].ID != "long" {
+		t.Fatalf("expected only long episode, got %#v", result)
+	}
+}
+
+func TestApplyFeedFiltersTags(t *testing.T) {
+	episodes := []episodeSummary{
+		{
+			ID:        "ai",
+			AuthorID:  uuid.New().String(),
+			Keywords:  []string{"#AI"},
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:        "wellness",
+			AuthorID:  uuid.New().String(),
+			Keywords:  []string{"#Wellness"},
+			CreatedAt: time.Now(),
+		},
+	}
+
+	filters := feedFilterParams{
+		Region: "global",
+		Tags: map[string]struct{}{
+			"#ai": {},
+		},
+		Tab: "all",
+	}
+
+	result := applyFeedFilters(episodes, filters)
+	if len(result) != 1 || result[0].ID != "ai" {
+		t.Fatalf("expected AI episode only, got %#v", result)
+	}
+}
+
+func TestApplyFeedFiltersRecommendedSort(t *testing.T) {
+	shortDur := 45
+	longDur := 200
+	episodes := []episodeSummary{
+		{
+			ID:          "short",
+			AuthorID:    uuid.New().String(),
+			DurationSec: &shortDur,
+			Keywords:    []string{"#ai"},
+		},
+		{
+			ID:          "long",
+			AuthorID:    uuid.New().String(),
+			DurationSec: &longDur,
+			Keywords:    []string{"#ai", "#news"},
+		},
+	}
+
+	filters := feedFilterParams{
+		Region: "global",
+		Tab:    "recommended",
+		Tags:   map[string]struct{}{},
+	}
+
+	result := applyFeedFilters(episodes, filters)
+	if len(result) == 0 || result[0].ID != "long" {
+		t.Fatalf("expected long episode to rank first, got %#v", result)
+	}
+}

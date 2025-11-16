@@ -22,6 +22,7 @@ final feedProvider = FutureProvider<List<Episode>>((ref) async {
   try {
     final episodes = await feedRepository.getEpisodes(
       token: sessionState.token,
+      queryParameters: filterState.toQueryParameters(),
     );
     final filtered = _applyLocalFilters(episodes, filterState);
     AppLogger.info(
