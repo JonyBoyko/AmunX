@@ -41,11 +41,22 @@ var (
 	episodeUserRateWindow       = 5 * time.Minute
 	episodeIPRateLimit    int64 = 20
 	episodeIPRateWindow         = 10 * time.Minute
+
+	podcastDurationThreshold    = 180 // seconds
+	shortStoryDurationThreshold = 120
+	freeWeeklyPodcastLimit      = 3
+	proWeeklyPodcastLimit       = 7
+	freeStoryTTL                = 24 * time.Hour
+)
+
+var (
+	errPodcastLimit = errors.New("weekly podcast limit reached")
 )
 
 type episodeSummary struct {
 	ID          string         `json:"id"`
 	AuthorID    string         `json:"author_id"`
+	AuthorPlan  string         `json:"-"` // internal use (quota/expiry)
 	TopicID     *string        `json:"topic_id,omitempty"`
 	Title       *string        `json:"title,omitempty"`
 	Visibility  string         `json:"visibility"`
@@ -102,6 +113,17 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 		if err := decodeJSON(req, &payload); err != nil {
 			WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
 			return
+		}
+
+		if requiresPodcastQuota(payload.DurationSec) {
+			if err := enforcePodcastQuota(req.Context(), deps.DB, currentUser); err != nil {
+				if errors.Is(err, errPodcastLimit) {
+					WriteError(w, http.StatusForbidden, "podcast_limit_reached", podcastLimitMessage(currentUser.Plan))
+					return
+				}
+				WriteError(w, http.StatusInternalServerError, "podcast_limit_check_failed", err.Error())
+				return
+			}
 		}
 
 		var topicID *uuid.UUID
@@ -447,6 +469,11 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
 			return
 		}
 
+		if isStoryExpired(episode.AuthorPlan, episode.DurationSec, episode.CreatedAt) {
+			WriteError(w, http.StatusNotFound, "expired", "episode is no longer available")
+			return
+		}
+
 		currentUser, ok := httpctx.UserFromContext(ctx)
 		if episode.Status != "public" && (!ok || currentUser.ID.String() != episode.AuthorID) {
 			WriteError(w, http.StatusForbidden, "forbidden", "episode not available")
@@ -524,6 +551,17 @@ func handleDevEpisodeUpload(deps *app.App) http.HandlerFunc {
 		if d := strings.TrimSpace(req.FormValue("duration")); d != "" {
 			if seconds, err := strconv.Atoi(d); err == nil {
 				duration = &seconds
+			}
+		}
+
+		if requiresPodcastQuota(duration) {
+			if err := enforcePodcastQuota(req.Context(), deps.DB, currentUser); err != nil {
+				if errors.Is(err, errPodcastLimit) {
+					WriteError(w, http.StatusForbidden, "podcast_limit_reached", podcastLimitMessage(currentUser.Plan))
+					return
+				}
+				WriteError(w, http.StatusInternalServerError, "podcast_limit_check_failed", err.Error())
+				return
 			}
 		}
 
@@ -858,10 +896,12 @@ func parseLimit(raw string, def, max int) int {
 }
 
 func listPublicEpisodes(ctx context.Context, db *sql.DB, params listEpisodesParams) ([]episodeSummary, error) {
-	query := `SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood
+	query := fmt.Sprintf(`SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood, u.plan
 FROM episodes e
+JOIN users u ON u.id = e.author_id
 LEFT JOIN summaries s ON s.episode_id = e.id
-WHERE e.status = 'public'`
+WHERE e.status = 'public'
+  AND NOT (u.plan = 'free' AND COALESCE(e.duration_sec, 0) <= %d AND e.created_at < NOW() - INTERVAL '24 hours')`, shortStoryDurationThreshold)
 	var (
 		args   []any
 		cursor = 1
@@ -905,6 +945,7 @@ WHERE e.status = 'public'`
 			tldr        sql.NullString
 			keywordsArr pq.StringArray
 			moodJSON    sql.NullString
+			authorPlan  string
 		)
 		if err := rows.Scan(
 			&rec.ID,
@@ -923,10 +964,12 @@ WHERE e.status = 'public'`
 			&tldr,
 			&keywordsArr,
 			&moodJSON,
+			&authorPlan,
 		); err != nil {
 			return nil, err
 		}
 		rec.AuthorID = authorUUID.String()
+		rec.AuthorPlan = authorPlan
 		if topicID.Valid {
 			rec.TopicID = &topicID.String
 		}
@@ -962,8 +1005,9 @@ WHERE e.status = 'public'`
 }
 
 func getEpisodeByID(ctx context.Context, db *sql.DB, id uuid.UUID) (episodeSummary, error) {
-	const query = `SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood
+	const query = `SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood, u.plan
 FROM episodes e
+JOIN users u ON u.id = e.author_id
 LEFT JOIN summaries s ON s.episode_id = e.id
 WHERE e.id = $1`
 	var (
@@ -977,6 +1021,7 @@ WHERE e.id = $1`
 		tldr        sql.NullString
 		keywordsArr pq.StringArray
 		moodJSON    sql.NullString
+		authorPlan  string
 	)
 	err := db.QueryRowContext(ctx, query, id).Scan(
 		&rec.ID,
@@ -995,11 +1040,13 @@ WHERE e.id = $1`
 		&tldr,
 		&keywordsArr,
 		&moodJSON,
+		&authorPlan,
 	)
 	if err != nil {
 		return episodeSummary{}, err
 	}
 	rec.AuthorID = authorUUID.String()
+	rec.AuthorPlan = authorPlan
 	if topicID.Valid {
 		rec.TopicID = &topicID.String
 	}
@@ -1030,4 +1077,71 @@ WHERE e.id = $1`
 		}
 	}
 	return rec, nil
+}
+
+func requiresPodcastQuota(duration *int) bool {
+	if duration == nil {
+		return false
+	}
+	return *duration >= podcastDurationThreshold
+}
+
+func enforcePodcastQuota(ctx context.Context, db *sql.DB, user httpctx.User) error {
+	limit := podcastLimitForPlan(user.Plan)
+	if limit == 0 {
+		return nil
+	}
+
+	count, err := countUserPodcasts(ctx, db, user.ID)
+	if err != nil {
+		return err
+	}
+	if count >= limit {
+		return errPodcastLimit
+	}
+	return nil
+}
+
+func podcastLimitForPlan(plan string) int {
+	switch strings.ToLower(strings.TrimSpace(plan)) {
+	case "free", "":
+		return freeWeeklyPodcastLimit
+	case "pro":
+		return proWeeklyPodcastLimit
+	default:
+		return 0
+	}
+}
+
+func podcastLimitMessage(plan string) string {
+	switch strings.ToLower(strings.TrimSpace(plan)) {
+	case "pro":
+		return fmt.Sprintf("Pro план дозволяє до %d подкастів на тиждень.", proWeeklyPodcastLimit)
+	default:
+		return fmt.Sprintf("Free план дозволяє до %d подкастів на тиждень. Оновіть до Pro, щоб публікувати більше.", freeWeeklyPodcastLimit)
+	}
+}
+
+func countUserPodcasts(ctx context.Context, db *sql.DB, userID uuid.UUID) (int, error) {
+	const stmt = `
+SELECT COUNT(*) FROM episodes
+WHERE author_id = $1
+  AND COALESCE(duration_sec, 0) >= $2
+  AND created_at >= NOW() - INTERVAL '7 days'
+  AND status != 'deleted'`
+	var count int
+	if err := db.QueryRowContext(ctx, stmt, userID, podcastDurationThreshold).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func isStoryExpired(plan string, duration *int, createdAt time.Time) bool {
+	if strings.ToLower(strings.TrimSpace(plan)) != "free" {
+		return false
+	}
+	if duration != nil && *duration > shortStoryDurationThreshold {
+		return false
+	}
+	return time.Since(createdAt) > freeStoryTTL
 }

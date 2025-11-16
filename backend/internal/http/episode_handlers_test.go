@@ -3,12 +3,15 @@ package http
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"regexp"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
+
+	"github.com/amunx/backend/internal/httpctx"
 )
 
 func TestUndoEpisodeWithinWindow(t *testing.T) {
@@ -192,5 +195,100 @@ func TestApplyFeedFiltersRecommendedSort(t *testing.T) {
 	result := applyFeedFilters(episodes, filters)
 	if len(result) == 0 || result[0].ID != "long" {
 		t.Fatalf("expected long episode to rank first, got %#v", result)
+	}
+}
+
+func TestRequiresPodcastQuota(t *testing.T) {
+	var (
+		short = 60
+		long  = 300
+	)
+	if requiresPodcastQuota(&short) {
+		t.Fatalf("short duration should not require quota")
+	}
+	if !requiresPodcastQuota(&long) {
+		t.Fatalf("long duration should require quota")
+	}
+	if requiresPodcastQuota(nil) {
+		t.Fatalf("nil duration should not require quota")
+	}
+}
+
+func TestEnforcePodcastQuotaFreeExceeded(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock setup failed: %v", err)
+	}
+	defer db.Close()
+
+	user := httpctx.User{
+		ID:   uuid.New(),
+		Plan: "free",
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT COUNT(*) FROM episodes
+WHERE author_id = $1
+  AND COALESCE(duration_sec, 0) >= $2
+  AND created_at >= NOW() - INTERVAL '7 days'
+  AND status != 'deleted'`)).
+		WithArgs(user.ID, podcastDurationThreshold).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(freeWeeklyPodcastLimit))
+
+	err = enforcePodcastQuota(context.Background(), db, user)
+	if !errors.Is(err, errPodcastLimit) {
+		t.Fatalf("expected podcast limit error, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations not met: %v", err)
+	}
+}
+
+func TestEnforcePodcastQuotaProAllowed(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock setup failed: %v", err)
+	}
+	defer db.Close()
+
+	user := httpctx.User{
+		ID:   uuid.New(),
+		Plan: "pro",
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT COUNT(*) FROM episodes
+WHERE author_id = $1
+  AND COALESCE(duration_sec, 0) >= $2
+  AND created_at >= NOW() - INTERVAL '7 days'
+  AND status != 'deleted'`)).
+		WithArgs(user.ID, podcastDurationThreshold).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	if err := enforcePodcastQuota(context.Background(), db, user); err != nil {
+		t.Fatalf("expected quota check to pass: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations not met: %v", err)
+	}
+}
+
+func TestIsStoryExpired(t *testing.T) {
+	short := 60
+	long := 400
+	oldTime := time.Now().Add(-25 * time.Hour)
+	recent := time.Now().Add(-2 * time.Hour)
+
+	if !isStoryExpired("free", &short, oldTime) {
+		t.Fatalf("expected free short audio older than TTL to expire")
+	}
+	if isStoryExpired("free", &short, recent) {
+		t.Fatalf("recent short audio should remain")
+	}
+	if isStoryExpired("pro", &short, oldTime) {
+		t.Fatalf("pro stories should not expire")
+	}
+	if isStoryExpired("free", &long, oldTime) {
+		t.Fatalf("long format should not expire even for free")
 	}
 }
