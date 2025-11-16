@@ -28,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen> {
             CircularProgressIndicator(),
             SizedBox(height: 20),
             Text(
-              'AmunX Loading...',
+              'Moweton завантажується…',
               style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
           ],

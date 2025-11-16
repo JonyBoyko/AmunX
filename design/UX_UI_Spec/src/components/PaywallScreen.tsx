@@ -61,7 +61,7 @@ export function PaywallScreen({ onUpgrade, onBack }: PaywallScreenProps) {
               Оновіться до Pro
             </h1>
             <p className="text-zinc-400">
-              Отримайте всі можливості WalkCast
+              Отримайте всі можливості Moweton
             </p>
           </div>
         </div>

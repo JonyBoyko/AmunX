@@ -37,10 +37,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: AppTheme.spaceXl),
               _buildActions(context),
               const SizedBox(height: AppTheme.spaceXl),
-              const Text(
-                'WalkCast v1.0.0',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
+          const Text(
+            'Moweton v1.0.0',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
             ],
           ),
         ),

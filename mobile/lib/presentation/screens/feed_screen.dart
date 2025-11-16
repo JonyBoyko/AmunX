@@ -155,7 +155,7 @@ class _FeedHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
               Text(
-                'WalkCast',
+                'Moweton',
                 style: TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 22,
@@ -164,7 +164,7 @@ class _FeedHeader extends StatelessWidget {
               ),
               SizedBox(height: 4),
               Text(
-                'Голосовий щоденник & Live Journal',
+                'Голосові щоденники & Live-кімнати',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
               ),
             ],

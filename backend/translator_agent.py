@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LiveKit Translator Agent for AmunX
+LiveKit Translator Agent for Moweton
 Real-time ASR → MT → TTS pipeline with <2-3s e2e latency
 """
 
@@ -242,7 +242,7 @@ async def entrypoint(ctx: JobContext):
     print(f"Agent starting for room: {ctx.room.name}")
 
     agent = TranslatorAgent(ctx)
-    agent.session_id = ctx.room.name.replace("amunx_", "")
+    agent.session_id = ctx.room.name.replace("moweton_", "")
 
     # Connect to room
     agent.room = await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)

@@ -74,7 +74,7 @@ export function FeedScreen({ isPro, onEpisodeClick, onRecordClick, onProfileClic
       {/* Header */}
       <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-lg border-b border-zinc-900 p-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-white">WalkCast</h1>
+          <h1 className="text-white">Moweton</h1>
           <div className="flex gap-2">
             {isPro && (
               <Badge className="bg-gradient-to-r from-purple-600 to-pink-600">

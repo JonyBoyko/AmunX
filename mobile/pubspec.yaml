@@ -1,5 +1,5 @@
-name: amunx_flutter
-description: AmunX - Voice Journal & Livecast mobile app built with Flutter
+name: moweton_flutter
+description: Moweton — voice journals, shortcasts & live pods built with Flutter
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -21,6 +21,9 @@ dependencies:
   
   # Local Storage
   shared_preferences: ^2.2.2
+  path_provider: ^2.1.3
+  path: ^1.9.0
+  record: ^5.0.2
   
   # UI Components
   cupertino_icons: ^1.0.6
@@ -37,6 +40,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^3.0.1
   
   # Code Generation
@@ -50,3 +55,6 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+
+dependency_overrides:
+  record_linux: 1.2.1

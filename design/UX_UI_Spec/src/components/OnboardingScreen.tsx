@@ -32,7 +32,7 @@ export function OnboardingScreen({ onLogin }: OnboardingScreenProps) {
 
         {/* Pitch */}
         <div className="text-center space-y-3">
-          <h1 className="text-white">WalkCast</h1>
+          <h1 className="text-white">Moweton</h1>
           <p className="text-zinc-400">
             Ваш голосовий щоденник і walk-подкасти. Записуй 1-хв думки на ходу.
           </p>

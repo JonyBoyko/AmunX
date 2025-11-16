@@ -1,5 +1,6 @@
-package com.amunx.amunx_flutter
+package com.moweton.app
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

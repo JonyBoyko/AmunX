@@ -134,7 +134,7 @@ func CreateAudioItem(w http.ResponseWriter, r *http.Request, deps *app.App) {
 		Kind:             req.Kind,
 		DurationSec:      req.DurationSec,
 		S3Key:            req.S3Key,
-		AudioURL:         "https://cdn.amunx.com/" + req.S3Key, // TODO: Use CDN base from config
+		AudioURL:         "https://cdn.moweton.com/" + req.S3Key, // TODO: Use CDN base from config
 		Tags:             req.Tags,
 		ShareToCircleIDs: req.ShareToCircleIDs,
 		CreatedAt:        "2025-01-06T12:00:00Z",
@@ -173,7 +173,7 @@ func GetAudioItem(w http.ResponseWriter, r *http.Request, deps *app.App) {
 		Description: "This is a sample audio item",
 		Kind:        "micro",
 		DurationSec: 45,
-		AudioURL:    "https://cdn.amunx.com/sample.mp3",
+		AudioURL:    "https://cdn.moweton.com/sample.mp3",
 		Tags:        []string{"technology", "startup"},
 		Stats: &AudioStatsResponse{
 			Likes: 42,
@@ -253,7 +253,7 @@ func UpdateAudioItem(w http.ResponseWriter, r *http.Request, deps *app.App) {
 		Description: "Updated description",
 		Kind:        "micro",
 		DurationSec: 45,
-		AudioURL:    "https://cdn.amunx.com/sample.mp3",
+		AudioURL:    "https://cdn.moweton.com/sample.mp3",
 		Tags:        req.Tags,
 		CreatedAt:   "2025-01-06T12:00:00Z",
 		UpdatedAt:   "2025-01-06T12:05:00Z",

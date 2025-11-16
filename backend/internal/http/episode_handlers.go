@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -227,6 +230,8 @@ func registerEpisodeRoutes(r chi.Router, deps *app.App) {
 
 			WriteJSON(w, http.StatusOK, map[string]any{"status": "undone"})
 	})
+
+	r.Post("/episodes/dev", handleDevEpisodeUpload(deps))
 }
 
 func normalizeVisibility(v string, cfg app.Config) string {
@@ -445,6 +450,170 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App) {
 
 		WriteJSON(w, http.StatusOK, episode)
 	})
+
+	r.Get("/dev/audio/{episodeID}", handleServeDevAudio(deps))
+}
+
+type devEpisodeParams struct {
+	ID          uuid.UUID
+	AuthorID    uuid.UUID
+	TopicID     *uuid.UUID
+	Title       string
+	DurationSec *int
+	StorageKey  string
+	AudioURL    string
+}
+
+func insertDevEpisode(ctx context.Context, db *sql.DB, params devEpisodeParams) error {
+	const stmt = `
+INSERT INTO episodes (id, author_id, topic_id, visibility, status, title, duration_sec, storage_key, audio_url, mask, quality, published_at, created_at, updated_at)
+VALUES ($1, $2, $3, 'public', 'public', $4, $5, $6, $7, 'none', 'clean', NOW(), NOW(), NOW());
+`
+	var topic interface{}
+	if params.TopicID != nil {
+		topic = *params.TopicID
+	}
+	var duration interface{}
+	if params.DurationSec != nil {
+		duration = *params.DurationSec
+	}
+
+	_, err := db.ExecContext(ctx, stmt,
+		params.ID,
+		params.AuthorID,
+		topic,
+		params.Title,
+		duration,
+		params.StorageKey,
+		params.AudioURL,
+	)
+	return err
+}
+
+func handleDevEpisodeUpload(deps *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		currentUser, ok := httpctx.UserFromContext(req.Context())
+		if !ok {
+			WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+			return
+		}
+
+		if err := req.ParseMultipartForm(64 << 20); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_request", "unable to parse form")
+			return
+		}
+
+		file, header, err := req.FormFile("file")
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_file", "audio file is required")
+			return
+		}
+		defer file.Close()
+
+		title := strings.TrimSpace(req.FormValue("title"))
+		if title == "" {
+			title = "Moweton Entry"
+		}
+
+		var duration *int
+		if d := strings.TrimSpace(req.FormValue("duration")); d != "" {
+			if seconds, err := strconv.Atoi(d); err == nil {
+				duration = &seconds
+			}
+		}
+
+		var topicID *uuid.UUID
+		if topicStr := strings.TrimSpace(req.FormValue("topic_id")); topicStr != "" {
+			parsed, err := uuid.Parse(topicStr)
+			if err != nil {
+				WriteError(w, http.StatusBadRequest, "invalid_topic_id", "topic_id must be a valid UUID")
+				return
+			}
+			if err := ensureTopicAccessible(req.Context(), deps.DB, parsed, currentUser.ID); err != nil {
+				WriteError(w, http.StatusForbidden, "topic_not_accessible", err.Error())
+				return
+			}
+			topicID = &parsed
+		}
+
+		episodeID := uuid.New()
+		ext := strings.ToLower(filepath.Ext(header.Filename))
+		if ext == "" {
+			ext = ".m4a"
+		}
+		storageKey := filepath.Join("dev", episodeID.String()+ext)
+		absPath := filepath.Join(deps.Config.LocalMediaPath, storageKey)
+
+		if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
+			WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
+			return
+		}
+
+		dst, err := os.Create(absPath)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, file); err != nil {
+			WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
+			return
+		}
+
+		audioURL := fmt.Sprintf("/v1/dev/audio/%s", episodeID.String())
+		if err := insertDevEpisode(req.Context(), deps.DB, devEpisodeParams{
+			ID:          episodeID,
+			AuthorID:    currentUser.ID,
+			TopicID:     topicID,
+			Title:       title,
+			DurationSec: duration,
+			StorageKey:  storageKey,
+			AudioURL:    audioURL,
+		}); err != nil {
+			WriteError(w, http.StatusInternalServerError, "episode_create_failed", err.Error())
+			return
+		}
+
+		WriteJSON(w, http.StatusCreated, map[string]any{
+			"id":        episodeID.String(),
+			"audio_url": audioURL,
+			"status":    "public",
+		})
+	}
+}
+
+func handleServeDevAudio(deps *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		episodeID, err := uuidFromParam(chi.URLParam(req, "episodeID"))
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_episode_id", err.Error())
+			return
+		}
+
+		const query = `SELECT storage_key FROM episodes WHERE id = $1`
+		var storageKey sql.NullString
+		if err := deps.DB.QueryRowContext(req.Context(), query, episodeID).Scan(&storageKey); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				WriteError(w, http.StatusNotFound, "not_found", "episode not found")
+				return
+			}
+			WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
+			return
+		}
+		if !storageKey.Valid || !strings.HasPrefix(storageKey.String, "dev/") {
+			WriteError(w, http.StatusNotFound, "not_found", "dev audio not found")
+			return
+		}
+
+		path := filepath.Join(deps.Config.LocalMediaPath, storageKey.String)
+		if _, err := os.Stat(path); err != nil {
+			WriteError(w, http.StatusNotFound, "not_found", "audio file missing")
+			return
+		}
+
+		http.ServeFile(w, req, path)
+	}
 }
 
 type listEpisodesParams struct {

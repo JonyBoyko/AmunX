@@ -134,7 +134,7 @@ export function ProfileScreen({ isPro, onBack, onUpgrade }: ProfileScreenProps) 
 
         {/* Version */}
         <p className="text-center text-xs text-zinc-600">
-          WalkCast v1.0.0
+          Moweton v1.0.0
         </p>
       </div>
     </div>

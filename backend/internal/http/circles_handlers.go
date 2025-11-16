@@ -311,7 +311,7 @@ func ReplyToCirclePost(w http.ResponseWriter, r *http.Request, deps *app.App) {
 		Kind:          "micro",
 		DurationSec:   req.DurationSec,
 		S3Key:         req.S3Key,
-		AudioURL:      "https://cdn.amunx.com/" + req.S3Key,
+		AudioURL:      "https://cdn.moweton.com/" + req.S3Key,
 		ParentAudioID: &req.ParentAudioID,
 		CreatedAt:     "2025-01-06T12:10:00Z",
 	}

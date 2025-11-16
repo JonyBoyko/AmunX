@@ -69,26 +69,26 @@ func GetPodcastRSS(w http.ResponseWriter, r *http.Request, deps *app.App) {
 		Channel: Channel{
 			Title:       "My Awesome Podcast",
 			Description: "Weekly discussions about tech",
-			Link:        "https://amunx.com/podcasts/" + slug,
+			Link:        "https://moweton.com/podcasts/" + slug,
 			Language:    "en-us",
-			Copyright:   "© 2025 AmunX",
+			Copyright:   "© 2025 Moweton",
 			Image: Image{
-				URL:   "https://cdn.amunx.com/podcasts/" + slug + "/cover.jpg",
+				URL:   "https://cdn.moweton.com/podcasts/" + slug + "/cover.jpg",
 				Title: "My Awesome Podcast",
-				Link:  "https://amunx.com/podcasts/" + slug,
+				Link:  "https://moweton.com/podcasts/" + slug,
 			},
-			ITunesImage: "https://cdn.amunx.com/podcasts/" + slug + "/cover.jpg",
+			ITunesImage: "https://cdn.moweton.com/podcasts/" + slug + "/cover.jpg",
 			Items: []Item{
 				{
 					Title:       "Episode 1: Getting Started",
 					Description: "In this episode, we discuss how to get started with podcasting.",
 					PubDate:     time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC1123Z),
 					Enclosure: Enclosure{
-						URL:    "https://cdn.amunx.com/audio/episode1.mp3",
+						URL:    "https://cdn.moweton.com/audio/episode1.mp3",
 						Type:   "audio/mpeg",
 						Length: 15000000,
 					},
-					GUID:     "https://amunx.com/audio/episode1",
+					GUID:     "https://moweton.com/audio/episode1",
 					Duration: "25:30",
 				},
 			},

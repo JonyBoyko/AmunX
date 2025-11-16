@@ -55,7 +55,7 @@ class PaywallScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Отримайте всі можливості WalkCast',
+                    'Отримайте всі можливості Moweton',
                     style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 ],

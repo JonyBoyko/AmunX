@@ -9,7 +9,7 @@ enum LogLevel {
 }
 
 class AppLogger {
-  static const String _tag = '[AmunX]';
+  static const String _tag = '[Moweton]';
   static final List<String> _logs = [];
   static const int _maxLogs = 1000;
 

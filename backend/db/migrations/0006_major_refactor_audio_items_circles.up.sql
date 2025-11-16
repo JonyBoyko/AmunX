@@ -1,5 +1,5 @@
 -- Major refactor: episodes → audio_items, add Smart Circles, Clips, Embeddings, Feed Events
--- This migration implements the new AmunX architecture from the specification
+-- This migration implements the new Moweton architecture from the specification
 
 -- Enable pgvector extension for embeddings
 CREATE EXTENSION IF NOT EXISTS vector;

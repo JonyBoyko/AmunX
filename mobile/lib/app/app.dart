@@ -7,18 +7,18 @@ import 'theme.dart';
 import '../core/i18n/app_localizations.dart';
 import '../core/logging/app_logger.dart';
 
-class AmunXApp extends ConsumerWidget {
-  const AmunXApp({super.key});
+class MowetonApp extends ConsumerWidget {
+  const MowetonApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    AppLogger.info('Building AmunXApp', tag: 'App');
+    AppLogger.info('Building MowetonApp', tag: 'App');
     
     final router = ref.watch(routerProvider);
     AppLogger.info('Router initialized', tag: 'App');
 
     return MaterialApp.router(
-      title: 'AmunX',
+      title: 'Moweton',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       routerConfig: router,

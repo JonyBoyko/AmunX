@@ -1,15 +1,15 @@
-# AmunX
+# Moweton
 
 Voice-first journal & livecast platform.  
-Mobile is now a Flutter app that talks to a Go backend (API + worker) running on a Docker Compose stack (Postgres, Redis, LiveKit, Loki/Grafana).
+Mobile is a Flutter client that talks to a Go backend (API + worker) running on a Docker Compose stack (Postgres, Redis, LiveKit, Loki/Grafana).
 
 ## Status (November 2025)
 
 - ✅ Flutter UI implemented for onboarding, auth, feed, episode detail, comments, recorder/publish, profile, topics, live host/listener.
 - ✅ Custom logging (`AppLogger`) wired through navigation, providers and API client.
 - ✅ Backend integration tests run against Docker stack (`docker-compose.test.yml`).
-- ⚠️ Recording is still mocked: audio capture/upload + magic-link auth must be wired to real backend before release.
-- ⚠️ Mobile integration tests are missing; only backend has automated coverage.
+- ✅ Recording uses the native microphone via `record`, uploads to `/v1/episodes/dev`, and the Go API serves audio from `LOCAL_MEDIA_PATH`.
+- ✅ Flutter integration smoke test (`integration_test/app_test.dart`) exercises onboarding → auth → feed and is wired into `scripts/test.*`.
 
 ## Repository layout
 
@@ -51,7 +51,8 @@ docker compose up -d        # Postgres, Redis, LiveKit, Loki/Grafana, API, worke
 ./scripts/test.ps1          # (Windows)
 ```
 
-The API is exposed at `http://localhost:8080/v1`. Seed data can be inserted via `docker exec amunx-postgres-1 psql ...`.
+Locally the API is exposed at `http://localhost:8080/v1` (production: `https://api.moweton.com/v1`).  
+Seed data example: `docker compose exec postgres psql -U postgres -d postgres`.
 
 ## Mobile (Flutter)
 
@@ -80,9 +81,9 @@ Notes:
 
 ## Open tasks before production
 
-- **Audio pipeline**: swap the mocked recorder for `record`/`audio_service`, upload audio to `/v1/episodes` + `/finalize`, and expose playback URLs in feed.
-- **Authentication**: current auth screen bypasses backend (dev token). Hook up real magic-link verification and session refresh.
-- **Mobile integration tests**: add `integration_test/` suite that covers login → record → publish → feed/comment flows, and wire it into CI.
+- **Audio pipeline hardening**: dev uploader stores files locally; wire into the finalized `/v1/episodes` + `/finalize` flow, S3 storage, worker processing, and playback stats.
+- **Authentication**: dev login endpoint skips e-mail verification/refresh tokens; finish real magic-link emails + refresh rotation and remove the `/dev-login` shortcut.
+- **Mobile integration coverage**: expand `integration_test/` to cover recording/upload, comments, and profile settings (current test is a smoke path only).
 - **Live features**: connect Live Host/Listener screens to LiveKit events (currently UI-only).
 - **Content moderation & analytics**: ensure backend configs (Loki/Grafana) match production requirements once telemetry is finalized.
 

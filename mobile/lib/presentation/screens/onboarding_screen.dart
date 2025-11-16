@@ -39,7 +39,7 @@ class OnboardingScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppTheme.spaceXl),
                 const Text(
-                  'WalkCast',
+                  'Moweton',
                   style: TextStyle(
                     color: AppTheme.textPrimary,
                     fontSize: 32,
@@ -48,7 +48,7 @@ class OnboardingScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppTheme.spaceSm),
                 const Text(
-                  'Ваш голосовий щоденник і walk-подкасти.',
+                  'Платформа коротких голосових історій та live-подкастів.',
                   style: TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 16,
@@ -57,7 +57,7 @@ class OnboardingScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppTheme.spaceXl),
                 const Text(
-                  'Записуйте 1-хв думки на ходу. Діліться live,\nотримуйте реакції і будуйте аудиторію.',
+                  'Записуйте 1-хвилинні думки, виходьте в лайв,\nотримуйте реакції та будуйте комʼюніті.',
                   style: TextStyle(
                     color: AppTheme.textSecondary,
                     height: 1.5,
