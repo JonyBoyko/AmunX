@@ -11,12 +11,18 @@ class EpisodeCard extends StatelessWidget {
   final Episode episode;
   final VoidCallback onTap;
   final VoidCallback? onTopicTap;
+  final String? regionLabel;
+  final String? formatLabel;
+  final bool isSubscribedAuthor;
 
   const EpisodeCard({
     super.key,
     required this.episode,
     required this.onTap,
     this.onTopicTap,
+    this.regionLabel,
+    this.formatLabel,
+    this.isSubscribedAuthor = false,
   });
 
   @override
@@ -30,7 +36,8 @@ class EpisodeCard extends StatelessWidget {
     final timestamp = DateFormat('HH:mm').format(episode.createdAt);
     final isLive = episode.isLive;
     final avatarInitial = episode.title?.characters.first.toUpperCase() ?? 'A';
-    final comments = (episode.mood?['comments'] as int?) ?? (episode.id.hashCode % 12) + 3;
+    final comments =
+        (episode.mood?['comments'] as int?) ?? (episode.id.hashCode % 12) + 3;
     final rngValue = Random(episode.id.hashCode).nextDouble();
 
     return InkWell(
@@ -103,9 +110,36 @@ class EpisodeCard extends StatelessWidget {
                             label: topicLabel,
                             onTap: onTopicTap,
                           ),
+                          if (formatLabel != null)
+                            _Chip(
+                              label: formatLabel!,
+                              leading: const Icon(
+                                Icons.play_circle_outline,
+                                size: 14,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          if (regionLabel != null)
+                            _Chip(
+                              label: regionLabel!,
+                              leading: const Icon(
+                                Icons.place_outlined,
+                                size: 14,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
                           _Chip(label: qualityLabel),
                           if (maskLabel.toLowerCase() != 'off')
                             _Chip(label: 'Mask: ${_capital(maskLabel)}'),
+                          if (isSubscribedAuthor)
+                            _Chip(
+                              label: 'Ви підписані',
+                              leading: const Icon(
+                                Icons.check_circle,
+                                size: 14,
+                                color: AppTheme.stateSuccess,
+                              ),
+                            ),
                           if (formattedDuration != null)
                             Text(
                               '• $formattedDuration',
@@ -224,10 +258,12 @@ class EpisodeCard extends StatelessWidget {
 class _Chip extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
+  final Widget? leading;
 
   const _Chip({
     required this.label,
     this.onTap,
+    this.leading,
   });
 
   @override
@@ -241,12 +277,21 @@ class _Chip extends StatelessWidget {
         color: AppTheme.surfaceChip,
         borderRadius: BorderRadius.circular(AppTheme.radiusSm),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppTheme.textSecondary,
-          fontSize: 12,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (leading != null) ...[
+            leading!,
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
 
