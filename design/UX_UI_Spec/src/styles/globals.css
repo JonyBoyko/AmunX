@@ -1,0 +1,232 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Dark neutrals */
+  --neutral-900: #0B0D10;
+  --neutral-800: #111318;
+  --neutral-700: #161A20;
+  --neutral-600: #1C222B;
+  
+  /* Accent colors */
+  --accent-primary: #6AA6FF;
+  --accent-gradient-start: #6AA6FF;
+  --accent-gradient-end: #7AF0C1;
+  
+  /* Border */
+  --border-alpha: rgba(255, 255, 255, 0.06);
+  
+  /* Radius */
+  --radius-card: 12px;
+  --radius-modal: 16px;
+  --radius-fab: 28px;
+  --radius-chip: 10px;
+  
+  /* Typography sizes */
+  --text-h1: 28px;
+  --text-h1-line: 34px;
+  --text-h2: 22px;
+  --text-h2-line: 28px;
+  --text-body: 16px;
+  --text-body-line: 22px;
+  --text-caption: 13px;
+  --text-caption-line: 18px;
+  
+  /* Font weights */
+  --font-weight-bold: 700;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  
+  /* Base font size */
+  --font-size: 16px;
+  
+  /* Color mappings for components */
+  --background: #0B0D10;
+  --foreground: rgba(255, 255, 255, 0.95);
+  --card: #111318;
+  --card-foreground: rgba(255, 255, 255, 0.95);
+  --popover: #161A20;
+  --popover-foreground: rgba(255, 255, 255, 0.95);
+  --primary: #6AA6FF;
+  --primary-foreground: #0B0D10;
+  --secondary: #1C222B;
+  --secondary-foreground: rgba(255, 255, 255, 0.8);
+  --muted: #161A20;
+  --muted-foreground: rgba(255, 255, 255, 0.6);
+  --accent: #6AA6FF;
+  --accent-foreground: #0B0D10;
+  --destructive: #FF4757;
+  --destructive-foreground: rgba(255, 255, 255, 0.95);
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.06);
+  --input-background: #161A20;
+  --switch-background: #1C222B;
+  --ring: #6AA6FF;
+  
+  /* Charts */
+  --chart-1: #6AA6FF;
+  --chart-2: #7AF0C1;
+  --chart-3: #FF6B9D;
+  --chart-4: #FFA94D;
+  --chart-5: #B794F6;
+  
+  /* Default radius */
+  --radius: 12px;
+  
+  /* Sidebar */
+  --sidebar: #111318;
+  --sidebar-foreground: rgba(255, 255, 255, 0.95);
+  --sidebar-primary: #6AA6FF;
+  --sidebar-primary-foreground: #0B0D10;
+  --sidebar-accent: #161A20;
+  --sidebar-accent-foreground: rgba(255, 255, 255, 0.95);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: #6AA6FF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: var(--radius-chip);
+  --radius-md: var(--radius-card);
+  --radius-lg: var(--radius-modal);
+  --radius-xl: var(--radius-fab);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'cv05', 'cv11';
+  }
+}
+
+/**
+ * Base typography with Inter Variable
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: var(--text-h1);
+      line-height: var(--text-h1-line);
+      font-weight: var(--font-weight-bold);
+    }
+
+    h2 {
+      font-size: var(--text-h2);
+      line-height: var(--text-h2-line);
+      font-weight: var(--font-weight-bold);
+    }
+
+    h3 {
+      font-size: var(--text-body);
+      line-height: var(--text-body-line);
+      font-weight: var(--font-weight-bold);
+    }
+
+    h4 {
+      font-size: var(--text-body);
+      line-height: var(--text-body-line);
+      font-weight: var(--font-weight-medium);
+    }
+
+    p {
+      font-size: var(--text-body);
+      line-height: var(--text-body-line);
+      font-weight: var(--font-weight-medium);
+    }
+
+    label {
+      font-size: var(--text-body);
+      line-height: var(--text-body-line);
+      font-weight: var(--font-weight-medium);
+    }
+
+    button {
+      font-size: var(--text-body);
+      line-height: var(--text-body-line);
+      font-weight: var(--font-weight-medium);
+    }
+
+    input,
+    textarea {
+      font-size: var(--text-body);
+      line-height: var(--text-body-line);
+      font-weight: var(--font-weight-normal);
+    }
+    
+    small,
+    .caption {
+      font-size: var(--text-caption);
+      line-height: var(--text-caption-line);
+      font-weight: var(--font-weight-medium);
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* Gradient utilities */
+@layer utilities {
+  .gradient-accent {
+    background: linear-gradient(135deg, var(--accent-gradient-start) 0%, var(--accent-gradient-end) 100%);
+  }
+  
+  .gradient-accent-subtle {
+    background: linear-gradient(135deg, 
+      color-mix(in srgb, var(--accent-gradient-start) 8%, transparent) 0%, 
+      color-mix(in srgb, var(--accent-gradient-end) 8%, transparent) 100%
+    );
+  }
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

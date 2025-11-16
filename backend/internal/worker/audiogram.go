@@ -123,7 +123,7 @@ func (w *AudiogramWorker) ProcessJob(ctx context.Context, job *AudiogramJob) err
 // generateWithSubtitles generates audiogram with burnt-in subtitles
 func (w *AudiogramWorker) generateWithSubtitles(ctx context.Context, job *AudiogramJob, audioPath, transcriptPath, outputPath string) error {
 	// Generate SRT subtitle file from transcript
-	srtPath := filepath.Join(filepath.Dir(outputPath), "subtitles.srt")
+	_ = filepath.Join(filepath.Dir(outputPath), "subtitles.srt")  // srtPath - TODO: use when SRT generation implemented
 	// TODO: Parse transcript JSON and generate SRT
 
 	// FFmpeg command to create 1080x1920 video with waveform and subtitles
@@ -242,4 +242,5 @@ func GetAudiogramJobStatus(ctx context.Context, redisClient interface{}, jobID s
 		Status: "queued",
 	}, nil
 }
+
 

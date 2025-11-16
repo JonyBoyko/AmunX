@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -174,6 +175,12 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 			"sessionId": sessionID.String(),
 		})
 	})
+
+	// Enable translation (Pro only)
+	r.Post("/live/translate/enable", handleEnableTranslation(deps))
+
+	// Disable translation
+	r.Post("/live/translate/disable/{sessionID}", handleDisableTranslation(deps))
 }
 
 func registerPublicLiveRoutes(r chi.Router, deps *app.App) {
@@ -224,6 +231,9 @@ func registerPublicLiveRoutes(r chi.Router, deps *app.App) {
 			"url":     deps.Config.LiveKitURL,
 		})
 	})
+
+	// Get translation status (for agent polling)
+	r.Get("/live/sessions/{sessionID}/translate/status", handleGetTranslationStatus(deps))
 }
 
 func createLiveSession(ctx context.Context, db *sql.DB, id, hostID uuid.UUID, topicID *uuid.UUID, room string, title string, mask string, started time.Time) error {
@@ -343,5 +353,99 @@ func generateLiveToken(cfg app.Config, roomName, userID, role string, expiry tim
 		AddGrant(videoGrant)
 
 	return token.ToJWT()
+}
+
+// Translation handlers
+func handleEnableTranslation(deps *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		_, ok := httpctx.UserFromContext(req.Context())
+		if !ok {
+			WriteError(w, http.StatusInternalServerError, "user_context_missing", "failed to resolve user")
+			return
+		}
+
+		// TODO: Check if user has Pro plan
+		// For now, allow all authenticated users
+		var payload struct {
+			SessionID    string   `json:"session_id"`
+			TargetLangs  []string `json:"target_langs"`
+			SourceLang   string   `json:"source_lang"`
+		}
+		if err := decodeJSON(req, &payload); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+
+		if len(payload.TargetLangs) > 2 {
+			WriteError(w, http.StatusBadRequest, "too_many_languages", "maximum 2 target languages allowed")
+			return
+		}
+
+		// Store in Redis (24h TTL)
+		key := fmt.Sprintf("live:translate:%s", payload.SessionID)
+		config := map[string]interface{}{
+			"source_lang":  payload.SourceLang,
+			"target_langs": payload.TargetLangs,
+			"enabled":      true,
+			"session_id":   payload.SessionID,
+		}
+
+		data, _ := json.Marshal(config)
+		if err := deps.Redis.Set(req.Context(), key, data, 24*time.Hour).Err(); err != nil {
+			WriteError(w, http.StatusInternalServerError, "redis_error", err.Error())
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, map[string]interface{}{
+			"status": "enabled",
+			"config": config,
+		})
+	}
+}
+
+func handleDisableTranslation(deps *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		sessionID := chi.URLParam(req, "sessionID")
+		if sessionID == "" {
+			WriteError(w, http.StatusBadRequest, "missing_session_id", "session_id required")
+			return
+		}
+
+		key := fmt.Sprintf("live:translate:%s", sessionID)
+		if err := deps.Redis.Del(req.Context(), key).Err(); err != nil {
+			WriteError(w, http.StatusInternalServerError, "redis_error", err.Error())
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, map[string]interface{}{
+			"status": "disabled",
+		})
+	}
+}
+
+func handleGetTranslationStatus(deps *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		sessionID := chi.URLParam(req, "sessionID")
+		if sessionID == "" {
+			WriteError(w, http.StatusBadRequest, "missing_session_id", "session_id required")
+			return
+		}
+
+		key := fmt.Sprintf("live:translate:%s", sessionID)
+		val, err := deps.Redis.Get(req.Context(), key).Result()
+		if err != nil {
+			// Not enabled
+			WriteJSON(w, http.StatusOK, map[string]interface{}{
+				"enabled": false,
+			})
+			return
+		}
+
+		var config map[string]interface{}
+		json.Unmarshal([]byte(val), &config)
+		config["enabled"] = true
+
+		WriteJSON(w, http.StatusOK, config)
+	}
 }
 

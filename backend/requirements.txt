@@ -1,0 +1,25 @@
+# LiveKit Translator Agent dependencies
+livekit-agents==0.11.0
+livekit==0.11.0
+
+# ASR providers (choose one or more)
+livekit-plugins-azure==0.6.0        # Azure Cognitive Services
+livekit-plugins-deepgram==0.7.0     # Deepgram
+# livekit-plugins-google==0.5.0     # Google Cloud Speech
+
+# TTS providers (choose one or more)
+# livekit-plugins-elevenlabs==0.6.0 # ElevenLabs
+
+# HTTP client for API calls
+httpx==0.28.1
+
+# Optional: OpenAI for MT
+openai==1.69.0
+
+
+
+
+
+
+
+

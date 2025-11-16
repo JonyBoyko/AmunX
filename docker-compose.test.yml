@@ -1,0 +1,78 @@
+version: "3.8"
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: amunx_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  api-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: test
+      DATABASE_URL: postgres://test:test@postgres-test:5432/amunx_test?sslmode=disable
+      REDIS_ADDRESS: redis-test:6379
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
+      JWT_ACCESS_SECRET: test-secret-key-change-in-production
+      JWT_REFRESH_SECRET: test-refresh-secret
+      MAGIC_LINK_TOKEN_SECRET: test-magic-link-secret
+      LIVEKIT_URL: http://livekit-test:7880
+      LIVEKIT_API_KEY: test-key
+      LIVEKIT_API_SECRET: test-secret
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    command: >
+      sh -c "
+        sleep 5 &&
+        /app/api migrate up &&
+        /app/api test
+      "
+
+  livekit-test:
+    image: livekit/livekit-server:latest
+    command: "--dev --config /etc/livekit.yaml"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7882:7880"
+      - "7883:7881"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:7880/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  default:
+    name: amunx_test
+
+
