@@ -18,6 +18,7 @@ import '../presentation/screens/settings_screen.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/screens/live_host_screen.dart';
 import '../presentation/screens/live_listener_screen.dart';
+import '../presentation/models/live_room.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final sessionState = ref.watch(sessionProvider);
@@ -127,7 +128,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/live/listener',
-        builder: (context, state) => const LiveListenerScreen(),
+        builder: (context, state) {
+          final room = state.extra is LiveRoom ? state.extra as LiveRoom : null;
+          return LiveListenerScreen(room: room);
+        },
       ),
     ],
   );

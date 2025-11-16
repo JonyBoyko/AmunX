@@ -7,10 +7,13 @@ import '../../core/logging/app_logger.dart';
 import '../../data/models/episode.dart';
 import '../filters/feed_filters.dart';
 import '../models/feed_tag.dart';
+import '../models/live_room.dart';
 import '../providers/author_directory_provider.dart';
 import '../providers/feed_filter_provider.dart';
 import '../providers/feed_provider.dart';
+import '../providers/live_rooms_provider.dart';
 import '../providers/tag_provider.dart';
+import '../services/live_notification_service.dart';
 import '../utils/feed_classifiers.dart';
 import '../widgets/episode_card.dart';
 import '../widgets/mini_player_bar.dart';
@@ -41,12 +44,21 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     final feedAsync = ref.watch(feedProvider);
     final filterState = ref.watch(feedFilterProvider);
     final tags = ref.watch(trendingTagsProvider);
+    final liveRooms = ref.watch(liveRoomsProvider);
+    final liveNotification = ref.watch(liveNotificationProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
       body: SafeArea(
         child: Stack(
           children: [
+            if (liveNotification != null)
+              Positioned(
+                top: 16,
+                left: 16,
+                right: 16,
+                child: _LiveNotificationBanner(notification: liveNotification),
+              ),
             RefreshIndicator(
               onRefresh: () => ref.refresh(feedProvider.future),
               color: AppTheme.brandPrimary,
@@ -56,6 +68,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   episodes,
                   filterState,
                   tags,
+                  liveRooms,
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stack) => _buildError(context),
@@ -87,6 +100,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     List<Episode> episodes,
     FeedFilterState filters,
     List<FeedTag> tags,
+    List<LiveRoom> liveRooms,
   ) {
     final coverageNotifier = ref.read(feedFilterProvider.notifier);
     final tagsNotifier = ref.read(trendingTagsProvider.notifier);
@@ -105,15 +119,14 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             onSelected: coverageNotifier.setFormat,
           ),
         ),
-        if (liveEpisodes.isNotEmpty)
+        if (liveRooms.isNotEmpty)
           SliverToBoxAdapter(
             child: _LiveNowStrip(
-              episodes: liveEpisodes,
-              authors: authors,
-              onEpisodeTap: _openEpisode,
-              onFollowToggle: (authorId) => ref
+              rooms: liveRooms,
+              onRoomTap: (room) => context.push('/live/listener', extra: room),
+              onFollowToggle: (room) => ref
                   .read(authorDirectoryProvider.notifier)
-                  .toggleFollow(authorId),
+                  .toggleFollow(room.hostId),
             ),
           ),
         SliverToBoxAdapter(
@@ -342,21 +355,19 @@ class _FormatSwitchBar extends StatelessWidget {
 }
 
 class _LiveNowStrip extends StatelessWidget {
-  final List<Episode> episodes;
-  final Map<String, AuthorProfile> authors;
-  final ValueChanged<Episode> onEpisodeTap;
-  final ValueChanged<String> onFollowToggle;
+  final List<LiveRoom> rooms;
+  final ValueChanged<LiveRoom> onRoomTap;
+  final ValueChanged<LiveRoom> onFollowToggle;
 
   const _LiveNowStrip({
-    required this.episodes,
-    required this.authors,
-    required this.onEpisodeTap,
+    required this.rooms,
+    required this.onRoomTap,
     required this.onFollowToggle,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (episodes.isEmpty) return const SizedBox.shrink();
+    if (rooms.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -385,16 +396,13 @@ class _LiveNowStrip extends StatelessWidget {
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: AppTheme.spaceLg),
             scrollDirection: Axis.horizontal,
-            itemCount: episodes.length,
+            itemCount: rooms.length,
             separatorBuilder: (_, __) =>
                 const SizedBox(width: AppTheme.spaceMd),
             itemBuilder: (context, index) {
-              final episode = episodes[index];
-              final author = authors[episode.authorId];
-              final listeners = liveAudienceEstimate(episode);
-
+              final room = rooms[index];
               return GestureDetector(
-                onTap: () => onEpisodeTap(episode),
+                onTap: () => onRoomTap(room),
                 child: Container(
                   width: 220,
                   padding: const EdgeInsets.all(AppTheme.spaceMd),
@@ -411,7 +419,7 @@ class _LiveNowStrip extends StatelessWidget {
                         children: [
                           CircleAvatar(
                             backgroundColor: Colors.white24,
-                            child: Text(author?.avatarEmoji ?? '🎙️'),
+                            child: Text(room.emoji),
                           ),
                           const SizedBox(width: AppTheme.spaceSm),
                           Expanded(
@@ -419,7 +427,7 @@ class _LiveNowStrip extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  author?.displayName ?? 'LIVE Автор',
+                                  room.hostName,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -428,7 +436,7 @@ class _LiveNowStrip extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(
-                                  author?.handle ?? '@live_now',
+                                  room.handle,
                                   style: const TextStyle(
                                     color: Colors.white70,
                                     fontSize: 12,
@@ -437,21 +445,20 @@ class _LiveNowStrip extends StatelessWidget {
                               ],
                             ),
                           ),
-                          if (author != null)
-                            IconButton(
-                              icon: Icon(
-                                author.isFollowed
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: Colors.white,
-                              ),
-                              onPressed: () => onFollowToggle(author.id),
+                          IconButton(
+                            icon: Icon(
+                              room.isFollowedHost
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: Colors.white,
                             ),
+                            onPressed: () => onFollowToggle(room),
+                          ),
                         ],
                       ),
                       const Spacer(),
                       Text(
-                        episode.summary ?? episode.title ?? 'Live room',
+                        room.topic,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 13,
@@ -462,7 +469,7 @@ class _LiveNowStrip extends StatelessWidget {
                       ),
                       const SizedBox(height: AppTheme.spaceSm),
                       Text(
-                        'LIVE • $listeners слухачів',
+                        'LIVE • ${room.listeners} слухачів',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -717,6 +724,53 @@ class _TagSelector extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+class _LiveNotificationBanner extends StatelessWidget {
+  final LiveNotification notification;
+
+  const _LiveNotificationBanner({
+    required this.notification,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spaceLg,
+        vertical: AppTheme.spaceMd,
+      ),
+      decoration: BoxDecoration(
+        color: AppTheme.bgRaised,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        border: Border.all(color: AppTheme.surfaceBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_active, color: AppTheme.brandAccent),
+          const SizedBox(width: AppTheme.spaceSm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notification.title,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  notification.subtitle,
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

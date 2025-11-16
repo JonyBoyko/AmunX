@@ -3,18 +3,21 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../models/live_room.dart';
+import '../providers/live_rooms_provider.dart';
 
-class LiveHostScreen extends StatefulWidget {
+class LiveHostScreen extends ConsumerStatefulWidget {
   const LiveHostScreen({super.key});
 
   @override
-  State<LiveHostScreen> createState() => _LiveHostScreenState();
+  ConsumerState<LiveHostScreen> createState() => _LiveHostScreenState();
 }
 
-class _LiveHostScreenState extends State<LiveHostScreen> {
+class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
   int _duration = 0;
   int _listeners = 12;
   bool _isMuted = false;
@@ -24,6 +27,7 @@ class _LiveHostScreenState extends State<LiveHostScreen> {
   @override
   void initState() {
     super.initState();
+    _registerLiveRoom();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
         _duration++;
@@ -46,7 +50,28 @@ class _LiveHostScreenState extends State<LiveHostScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    ref.read(liveRoomsProvider.notifier).stopHosting(_hostRoom.id);
     super.dispose();
+  }
+
+  LiveRoom get _hostRoom {
+    return LiveRoom(
+      id: 'host-local-room',
+      hostId: 'creator-host',
+      hostName: 'Ваш Live',
+      handle: '@you',
+      topic: 'Спонтанний live',
+      emoji: '🎤',
+      listeners: _listeners,
+      city: 'Київ',
+      isFollowedHost: false,
+      startedAt: DateTime.now().subtract(Duration(seconds: _duration)),
+      tags: const ['live'],
+    );
+  }
+
+  void _registerLiveRoom() {
+    ref.read(liveRoomsProvider.notifier).startHosting(_hostRoom);
   }
 
   @override
@@ -92,7 +117,8 @@ class _LiveHostScreenState extends State<LiveHostScreen> {
           const SizedBox(width: AppTheme.spaceSm),
           const Text(
             'LIVE',
-            style: TextStyle(color: AppTheme.stateDanger, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: AppTheme.stateDanger, fontWeight: FontWeight.bold),
           ),
           const Spacer(),
           Text(
@@ -142,9 +168,11 @@ class _LiveHostScreenState extends State<LiveHostScreen> {
               children: const [
                 Text('Чат', style: TextStyle(color: AppTheme.textSecondary)),
                 SizedBox(height: AppTheme.spaceSm),
-                Text('Марія: Чудова тема! 👏', style: TextStyle(color: AppTheme.textPrimary)),
+                Text('Марія: Чудова тема! 👏',
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 SizedBox(height: 4),
-                Text('Олексій: Питання про AI?', style: TextStyle(color: AppTheme.textPrimary)),
+                Text('Олексій: Питання про AI?',
+                    style: TextStyle(color: AppTheme.textPrimary)),
               ],
             ),
           ),
@@ -155,7 +183,8 @@ class _LiveHostScreenState extends State<LiveHostScreen> {
               FilledButton(
                 style: FilledButton.styleFrom(
                   shape: const CircleBorder(),
-                  backgroundColor: _isMuted ? AppTheme.stateDanger : AppTheme.surfaceChip,
+                  backgroundColor:
+                      _isMuted ? AppTheme.stateDanger : AppTheme.surfaceChip,
                 ),
                 onPressed: () => setState(() => _isMuted = !_isMuted),
                 child: Icon(
@@ -235,4 +264,3 @@ class _ReactionBubbleState extends State<_ReactionBubble>
     super.dispose();
   }
 }
-

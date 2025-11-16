@@ -1,15 +1,47 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../models/live_room.dart';
+import '../providers/live_rooms_provider.dart';
 
-class LiveListenerScreen extends StatelessWidget {
-  const LiveListenerScreen({super.key});
+class LiveListenerScreen extends ConsumerWidget {
+  final LiveRoom? room;
+
+  const LiveListenerScreen({super.key, this.room});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rooms = ref.watch(liveRoomsProvider);
+    final activeRoom = room ?? (rooms.isNotEmpty ? rooms.first : null);
+
+    if (activeRoom == null) {
+      return Scaffold(
+        backgroundColor: AppTheme.bgBase,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Немає live-трансляцій',
+                  style: TextStyle(color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: AppTheme.spaceMd),
+                FilledButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('Назад'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
       body: SafeArea(
@@ -21,9 +53,9 @@ class LiveListenerScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(AppTheme.spaceXl),
                 child: Column(
                   children: [
-                    _buildHostCard(),
+                    _buildHostCard(activeRoom),
                     const SizedBox(height: AppTheme.spaceXl),
-                    _buildTranscriptPreview(),
+                    _buildTranscriptPreview(activeRoom),
                     const SizedBox(height: AppTheme.spaceXl),
                     _buildReactions(),
                   ],
@@ -48,7 +80,8 @@ class LiveListenerScreen extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () => context.pop(),
-            icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: AppTheme.textPrimary),
           ),
           const Spacer(),
           Container(
@@ -59,7 +92,8 @@ class LiveListenerScreen extends StatelessWidget {
             ),
             child: const Text(
               'LIVE',
-              style: TextStyle(color: AppTheme.textInverse, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: AppTheme.textInverse, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -67,7 +101,7 @@ class LiveListenerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHostCard() {
+  Widget _buildHostCard(LiveRoom room) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceXl),
       decoration: BoxDecoration(
@@ -78,28 +112,34 @@ class LiveListenerScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 36,
             backgroundColor: Colors.white24,
-            child: Text('О', style: TextStyle(color: Colors.white, fontSize: 24)),
+            child: Text(room.emoji,
+                style: const TextStyle(color: Colors.white, fontSize: 24)),
           ),
           const SizedBox(width: AppTheme.spaceLg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Олексій в ефірі',
-                  style: TextStyle(
+                  room.hostName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Live про AI та розробку',
-                  style: TextStyle(color: Colors.white70),
+                  room.topic,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${room.listeners} слухачів • ${room.city}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
@@ -109,7 +149,7 @@ class LiveListenerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTranscriptPreview() {
+  Widget _buildTranscriptPreview(LiveRoom room) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: BoxDecoration(
@@ -118,21 +158,21 @@ class LiveListenerScreen extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Text(
             'Live Translate',
-            style: TextStyle(color: AppTheme.textSecondary),
+            style: const TextStyle(color: AppTheme.textSecondary),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            'Привіт! Сьогодні говоримо про останні оновлення...',
-            style: TextStyle(color: AppTheme.textPrimary, height: 1.4),
+            '🔴 ${room.topic}\n${room.tags.join(' • ')}',
+            style: const TextStyle(color: AppTheme.textPrimary, height: 1.4),
           ),
-          SizedBox(height: 12),
-          Divider(color: AppTheme.surfaceBorder),
-          SizedBox(height: 12),
-          Text(
-            'Hello! Today we\'re talking about the latest updates...',
+          const SizedBox(height: 12),
+          const Divider(color: AppTheme.surfaceBorder),
+          const SizedBox(height: 12),
+          const Text(
+            'Переклад доступний у записі (stub).',
             style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
           ),
         ],
@@ -174,4 +214,3 @@ class LiveListenerScreen extends StatelessWidget {
     );
   }
 }
-
