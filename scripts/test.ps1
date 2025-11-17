@@ -17,6 +17,11 @@ Write-Host "🔄 Checking database..." -ForegroundColor Yellow
 Write-Host "🧪 Running tests..." -ForegroundColor Yellow
 docker-compose -f docker-compose.test.yml run --rm api-test go test -v ./internal/http/... -tags=integration
 
+Write-Host "📱 Running Flutter integration tests..." -ForegroundColor Yellow
+Push-Location mobile
+flutter test integration_test
+Pop-Location
+
 # Cleanup
 Write-Host "🧹 Cleaning up..." -ForegroundColor Yellow
 docker-compose -f docker-compose.test.yml down -v

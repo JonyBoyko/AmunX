@@ -6,6 +6,7 @@ import 'router.dart';
 import 'theme.dart';
 import '../core/i18n/app_localizations.dart';
 import '../core/logging/app_logger.dart';
+import '../presentation/services/push_service.dart';
 
 class MowetonApp extends ConsumerWidget {
   const MowetonApp({super.key});
@@ -15,6 +16,7 @@ class MowetonApp extends ConsumerWidget {
     AppLogger.info('Building MowetonApp', tag: 'App');
     
     final router = ref.watch(routerProvider);
+    ref.watch(pushBootstrapProvider);
     AppLogger.info('Router initialized', tag: 'App');
 
     return MaterialApp.router(

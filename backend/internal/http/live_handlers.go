@@ -19,6 +19,7 @@ import (
 
 	"github.com/amunx/backend/internal/app"
 	"github.com/amunx/backend/internal/httpctx"
+	"github.com/amunx/backend/internal/push"
 	"github.com/amunx/backend/internal/queue"
 )
 
@@ -106,6 +107,8 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 			"token": token,
 			"url":   deps.Config.LiveKitURL,
 		})
+
+		go dispatchLiveStartPush(req.Context(), deps, user, sessionID, title)
 	})
 
 	r.Post("/live/sessions/{id}/end", func(w http.ResponseWriter, req *http.Request) {
@@ -367,9 +370,9 @@ func handleEnableTranslation(deps *app.App) http.HandlerFunc {
 		// TODO: Check if user has Pro plan
 		// For now, allow all authenticated users
 		var payload struct {
-			SessionID    string   `json:"session_id"`
-			TargetLangs  []string `json:"target_langs"`
-			SourceLang   string   `json:"source_lang"`
+			SessionID   string   `json:"session_id"`
+			TargetLangs []string `json:"target_langs"`
+			SourceLang  string   `json:"source_lang"`
 		}
 		if err := decodeJSON(req, &payload); err != nil {
 			WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -449,3 +452,40 @@ func handleGetTranslationStatus(deps *app.App) http.HandlerFunc {
 	}
 }
 
+func dispatchLiveStartPush(ctx context.Context, deps *app.App, host httpctx.User, sessionID uuid.UUID, title string) {
+	if deps.Push == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	tokens, err := fetchFollowerPushTokens(ctx, deps.DB, host.ID)
+	if err != nil || len(tokens) == 0 {
+		return
+	}
+
+	displayName := host.Email
+	if host.DisplayName != nil && strings.TrimSpace(*host.DisplayName) != "" {
+		displayName = strings.TrimSpace(*host.DisplayName)
+	}
+	body := strings.TrimSpace(title)
+	if body == "" {
+		body = "Tap to join the room"
+	}
+
+	for _, token := range tokens {
+		msg := push.Message{
+			Token: token,
+			Title: fmt.Sprintf("%s is live", displayName),
+			Body:  body,
+			Data: map[string]string{
+				"type":       "live_start",
+				"session_id": sessionID.String(),
+				"host_id":    host.ID.String(),
+				"host_name":  displayName,
+			},
+		}
+		_ = deps.Push.Send(ctx, msg)
+	}
+}

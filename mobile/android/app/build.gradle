@@ -61,3 +61,8 @@ flutter {
 
 dependencies {}
 
+if (file("${project.projectDir}/google-services.json").exists()) {
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    logger.warn("google-services.json not found. Firebase push will be disabled until it is added.")
+}

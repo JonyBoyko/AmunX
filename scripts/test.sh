@@ -19,6 +19,11 @@ docker-compose -f docker-compose.test.yml exec -T postgres-test psql -U test -d 
 echo "🧪 Running tests..."
 docker-compose -f docker-compose.test.yml run --rm api-test go test -v ./internal/http/... -tags=integration
 
+echo "📱 Running Flutter integration tests..."
+pushd mobile >/dev/null
+flutter test integration_test
+popd >/dev/null
+
 # Cleanup
 echo "🧹 Cleaning up..."
 docker-compose -f docker-compose.test.yml down -v

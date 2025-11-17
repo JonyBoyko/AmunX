@@ -13,6 +13,7 @@ class LiveRoom {
   final bool isFollowedHost;
   final DateTime startedAt;
   final List<String> tags;
+  final bool isSimulated;
 
   const LiveRoom({
     required this.id,
@@ -26,6 +27,7 @@ class LiveRoom {
     required this.isFollowedHost,
     required this.startedAt,
     required this.tags,
+    this.isSimulated = false,
   });
 
   LiveRoom copyWith({
@@ -38,6 +40,7 @@ class LiveRoom {
     bool? isFollowedHost,
     DateTime? startedAt,
     List<String>? tags,
+    bool? isSimulated,
   }) {
     return LiveRoom(
       id: id,
@@ -51,6 +54,7 @@ class LiveRoom {
       isFollowedHost: isFollowedHost ?? this.isFollowedHost,
       startedAt: startedAt ?? this.startedAt,
       tags: tags ?? this.tags,
+      isSimulated: isSimulated ?? this.isSimulated,
     );
   }
 }

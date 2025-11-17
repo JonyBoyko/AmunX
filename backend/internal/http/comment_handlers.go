@@ -17,11 +17,14 @@ import (
 )
 
 type commentResponse struct {
-	ID        string    `json:"id"`
-	EpisodeID string    `json:"episode_id"`
-	AuthorID  string    `json:"author_id"`
-	Text      string    `json:"text"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	EpisodeID    string    `json:"episode_id"`
+	AuthorID     string    `json:"author_id"`
+	AuthorName   string    `json:"author_name"`
+	AuthorHandle string    `json:"author_handle"`
+	AuthorAvatar *string   `json:"author_avatar,omitempty"`
+	Text         string    `json:"text"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func registerCommentRoutes(r chi.Router, deps *app.App) {
@@ -175,14 +178,41 @@ func createComment(ctx context.Context, db *sql.DB, episodeID, userID uuid.UUID,
 
 	flagged := containsBannedWord(clean)
 
-	var res commentResponse
+	var (
+		res    commentResponse
+		avatar sql.NullString
+	)
 	err := db.QueryRowContext(ctx, `
-INSERT INTO comments (episode_id, author_id, text)
-VALUES ($1, $2, $3)
-RETURNING id, episode_id, author_id, text, created_at;
-`, episodeID, userID, clean).Scan(&res.ID, &res.EpisodeID, &res.AuthorID, &res.Text, &res.CreatedAt)
+WITH inserted AS (
+	INSERT INTO comments (episode_id, author_id, text)
+	VALUES ($1, $2, $3)
+	RETURNING id, episode_id, author_id, text, created_at
+)
+SELECT i.id,
+	   i.episode_id,
+	   i.author_id,
+	   i.text,
+	   i.created_at,
+	   COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1)) AS author_name,
+	   COALESCE(NULLIF(u.handle, ''), '@' || split_part(u.email, '@', 1)) AS author_handle,
+	   NULLIF(u.avatar, '') AS author_avatar
+FROM inserted i
+JOIN users u ON u.id = i.author_id;
+`, episodeID, userID, clean).Scan(
+		&res.ID,
+		&res.EpisodeID,
+		&res.AuthorID,
+		&res.Text,
+		&res.CreatedAt,
+		&res.AuthorName,
+		&res.AuthorHandle,
+		&avatar,
+	)
 	if err != nil {
 		return commentResponse{}, false, err
+	}
+	if avatar.Valid {
+		res.AuthorAvatar = &avatar.String
 	}
 
 	if flagged {
@@ -193,14 +223,25 @@ RETURNING id, episode_id, author_id, text, created_at;
 }
 
 func listEpisodeComments(ctx context.Context, db *sql.DB, episodeID uuid.UUID, limit int, after *time.Time) ([]commentResponse, error) {
-	query := `SELECT id, episode_id, author_id, text, created_at FROM comments WHERE episode_id = $1`
+	query := `
+SELECT c.id,
+       c.episode_id,
+	   c.author_id,
+	   c.text,
+	   c.created_at,
+	   COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1)) AS author_name,
+	   COALESCE(NULLIF(u.handle, ''), '@' || split_part(u.email, '@', 1)) AS author_handle,
+	   NULLIF(u.avatar, '') AS author_avatar
+  FROM comments c
+  JOIN users u ON u.id = c.author_id
+ WHERE c.episode_id = $1`
 	args := []any{episodeID}
 	if after != nil {
-		query += " AND created_at < $2"
+		query += " AND c.created_at < $2"
 		args = append(args, *after)
 	}
 	placeholder := len(args) + 1
-	query += " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(placeholder)
+	query += " ORDER BY c.created_at DESC LIMIT $" + strconv.Itoa(placeholder)
 	args = append(args, limit)
 
 	rows, err := db.QueryContext(ctx, query, args...)
@@ -211,9 +252,24 @@ func listEpisodeComments(ctx context.Context, db *sql.DB, episodeID uuid.UUID, l
 
 	var result []commentResponse
 	for rows.Next() {
-		var rec commentResponse
-		if err := rows.Scan(&rec.ID, &rec.EpisodeID, &rec.AuthorID, &rec.Text, &rec.CreatedAt); err != nil {
+		var (
+			rec    commentResponse
+			avatar sql.NullString
+		)
+		if err := rows.Scan(
+			&rec.ID,
+			&rec.EpisodeID,
+			&rec.AuthorID,
+			&rec.Text,
+			&rec.CreatedAt,
+			&rec.AuthorName,
+			&rec.AuthorHandle,
+			&avatar,
+		); err != nil {
 			return nil, err
+		}
+		if avatar.Valid {
+			rec.AuthorAvatar = &avatar.String
 		}
 		result = append(result, rec)
 	}
@@ -243,4 +299,3 @@ ON CONFLICT DO NOTHING;
 `, objectRef, severity, details)
 	return err
 }
-

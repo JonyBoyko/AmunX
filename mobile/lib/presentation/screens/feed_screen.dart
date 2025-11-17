@@ -136,7 +136,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverToBoxAdapter(
-          child: _FeedHeader(onProfileTap: () => context.push('/profile')),
+          child: _FeedHeader(
+            onProfileTap: () => context.push('/profile'),
+            onExploreTap: () => context.push('/explore'),
+            onSearchTap: () => context.push('/search'),
+          ),
         ),
         SliverToBoxAdapter(
           child: _FormatSwitchBar(
@@ -265,9 +269,13 @@ class _EmptyFeed extends StatelessWidget {
 
 class _FeedHeader extends StatelessWidget {
   final VoidCallback onProfileTap;
+  final VoidCallback onExploreTap;
+  final VoidCallback onSearchTap;
 
   const _FeedHeader({
     required this.onProfileTap,
+    required this.onExploreTap,
+    required this.onSearchTap,
   });
 
   @override
@@ -304,8 +312,21 @@ class _FeedHeader extends StatelessWidget {
           ),
           const Spacer(),
           IconButton(
+            tooltip: 'Explore',
+            onPressed: onExploreTap,
+            icon: const Icon(Icons.travel_explore_outlined,
+                color: AppTheme.textPrimary),
+          ),
+          IconButton(
+            tooltip: 'Search',
+            onPressed: onSearchTap,
+            icon: const Icon(Icons.search, color: AppTheme.textPrimary),
+          ),
+          IconButton(
+            tooltip: 'Profile',
             onPressed: onProfileTap,
-            icon: const Icon(Icons.person_outline, color: AppTheme.textPrimary),
+            icon:
+                const Icon(Icons.person_outline, color: AppTheme.textPrimary),
           ),
         ],
       ),

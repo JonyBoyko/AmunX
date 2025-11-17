@@ -11,13 +11,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
   final AuthRepository _authRepository;
   final SessionNotifier _sessionNotifier;
 
-  Future<void> requestMagicLink(String email) async {
+  Future<String?> requestMagicLink(String email) async {
     state = const AsyncValue.loading();
     try {
       AppLogger.info('requestMagicLink start for $email', tag: 'AuthProvider');
-      await _authRepository.requestMagicLink(email);
-      AppLogger.info('requestMagicLink success for $email', tag: 'AuthProvider');
+      final tokenHint = await _authRepository.requestMagicLink(email);
       state = const AsyncValue.data(null);
+      return tokenHint;
     } catch (e, stackTrace) {
       AppLogger.error(
         'requestMagicLink failed for $email',
@@ -34,9 +34,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       AppLogger.info('verifyMagicLink start', tag: 'AuthProvider');
-      final authToken = await _authRepository.verifyMagicLink(token);
-      AppLogger.info('verifyMagicLink success, storing token', tag: 'AuthProvider');
-      await _sessionNotifier.setToken(authToken);
+      final response = await _authRepository.verifyMagicLink(token);
+      final accessToken = response['access_token'] as String;
+      await _sessionNotifier.setToken(accessToken);
       state = const AsyncValue.data(null);
     } catch (e, stackTrace) {
       AppLogger.error(
@@ -58,4 +58,3 @@ final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<void>>(
     return AuthNotifier(authRepository, sessionNotifier);
   },
 );
-

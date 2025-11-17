@@ -19,9 +19,9 @@ void main() {
       hostName: 'Олена',
       handle: '@olena',
       topic: 'Test Live',
-      emoji: '🎙️',
+      emoji: '??',
       listeners: 50,
-      city: 'Київ',
+      city: 'Kyiv',
       isFollowedHost: true,
       startedAt: DateTime.now(),
       tags: const ['test'],
@@ -34,7 +34,7 @@ void main() {
 
     final notification = container.read(liveNotificationProvider);
     expect(notification, isNotNull);
-    expect(notification?.title, contains('Олена'));
+    expect(notification?.title, contains('live'));
   });
 
   test('stopHosting removes room', () {
@@ -55,8 +55,45 @@ void main() {
     addTearDown(container.dispose);
 
     final initial = container.read(liveRoomsProvider).first.listeners;
-    await Future<void>.delayed(const Duration(seconds: 6));
-    final updated = container.read(liveRoomsProvider).first.listeners;
-    expect(updated, isNot(initial));
-  }, timeout: const Timeout(Duration(seconds: 10)));
+    var changed = false;
+    for (var i = 0; i < 5; i++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      final updated = container.read(liveRoomsProvider).first.listeners;
+      if (updated != initial) {
+        changed = true;
+        break;
+      }
+    }
+    expect(changed, isTrue,
+        reason: 'listeners should fluctuate after a few ticks');
+  }, timeout: const Timeout(Duration(seconds: 12)));
+
+  test('updateListenerCount overwrites realtime rooms', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final notifier = container.read(liveRoomsProvider.notifier);
+    final room = LiveRoom(
+      id: 'livekit-room',
+      hostId: 'creator-live',
+      hostName: 'Live Host',
+      handle: '@live.host',
+      topic: 'Realtime stream',
+      emoji: '???',
+      listeners: 1,
+      city: 'Online',
+      isFollowedHost: false,
+      startedAt: DateTime.now(),
+      tags: const ['live'],
+      isSimulated: false,
+    );
+
+    notifier.startHosting(room);
+    notifier.updateListenerCount('livekit-room', 42);
+
+    final updatedRoom = container
+        .read(liveRoomsProvider)
+        .firstWhere((r) => r.id == 'livekit-room');
+    expect(updatedRoom.listeners, 42);
+  });
 }

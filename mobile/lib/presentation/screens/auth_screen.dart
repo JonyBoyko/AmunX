@@ -5,9 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
-import '../../core/logging/app_logger.dart';
 import '../providers/auth_provider.dart';
-import '../providers/session_provider.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -18,52 +16,75 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _emailController = TextEditingController();
-  bool _isLoading = false;
+  final _tokenController = TextEditingController();
+  bool _isRequesting = false;
+  bool _isVerifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tokenController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
+    _tokenController.dispose();
     super.dispose();
   }
 
   Future<void> _requestMagicLink() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) return;
-
-    final normalizedEmail = email.toLowerCase();
-
-    setState(() => _isLoading = true);
-    AppLogger.info('Auth request started for $normalizedEmail', tag: 'AuthUI');
-
-    unawaited(
-      ref.read(authProvider.notifier).requestMagicLink(email).catchError(
-        (e, stackTrace) {
-          AppLogger.error(
-            'Magic link request failed for $normalizedEmail',
-            tag: 'AuthUI',
-            error: e,
-            stackTrace: stackTrace,
-          );
-        },
-      ),
-    );
-
-    await _completeLogin(normalizedEmail);
+    setState(() => _isRequesting = true);
+    try {
+      final tokenHint =
+          await ref.read(authProvider.notifier).requestMagicLink(email);
+      if (!mounted) return;
+      _showSnack('Ми надіслали посилання на ');
+      if (tokenHint != null) {
+        _tokenController.text = tokenHint;
+        _showSnack('Токен для дев-режиму автозаповнено');
+      }
+    } catch (e) {
+      _showSnack('Помилка: ', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isRequesting = false);
+      }
+    }
   }
 
-  Future<void> _completeLogin(String normalizedEmail) async {
-    AppLogger.warning('Auto-login enabled for $normalizedEmail', tag: 'AuthUI');
-    await ref.read(sessionProvider.notifier).setToken('dev-token-$normalizedEmail');
-    if (mounted) {
-      context.go('/feed');
-      setState(() => _isLoading = false);
+  Future<void> _verifyToken() async {
+    final token = _tokenController.text.trim();
+    if (token.isEmpty) return;
+    setState(() => _isVerifying = true);
+    try {
+      await ref.read(authProvider.notifier).verifyMagicLink(token);
+      if (mounted) {
+        context.go('/feed');
+      }
+    } catch (e) {
+      _showSnack('Помилка входу: ', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifying = false);
+      }
     }
+  }
+
+  void _showSnack(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppTheme.stateDanger : null,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    AppLogger.debug('Building AuthScreen', tag: 'AuthUI');
-
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -79,11 +100,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               children: [
                 IconButton(
                   onPressed: () => context.pop(),
-                  icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
+                  icon: const Icon(Icons.arrow_back_ios_new,
+                      color: AppTheme.textPrimary),
                 ),
                 const Spacer(),
                 const Text(
-                  'Вкажіть email',
+                  'Укажи email',
                   style: TextStyle(
                     color: AppTheme.textPrimary,
                     fontSize: 28,
@@ -92,7 +114,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Ми надішлемо Magic Link для входу.',
+                  'Ми надішлемо Magic Link на твою пошту.',
                   style: TextStyle(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: AppTheme.spaceXl),
@@ -109,17 +131,52 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  enabled: !_isLoading,
+                  enabled: !_isRequesting,
                 ),
                 const SizedBox(height: AppTheme.spaceLg),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: FilledButton(
-                    onPressed: _isLoading ? null : _requestMagicLink,
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: AppTheme.textInverse)
-                        : const Text('Надіслати лінк'),
+                    onPressed: _isRequesting ? null : _requestMagicLink,
+                    child: _isRequesting
+                        ? const CircularProgressIndicator(
+                            color: AppTheme.textInverse)
+                        : const Text('Надіслати посилання'),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spaceXl),
+                const Text(
+                  'Вже маєш токен?',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: AppTheme.spaceSm),
+                TextField(
+                  controller: _tokenController,
+                  style: const TextStyle(color: AppTheme.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Встав token=... із листа',
+                    filled: true,
+                    fillColor: AppTheme.bgRaised,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  enabled: !_isVerifying,
+                ),
+                const SizedBox(height: AppTheme.spaceSm),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton.tonal(
+                    onPressed:
+                        (_tokenController.text.trim().isEmpty || _isVerifying)
+                            ? null
+                            : _verifyToken,
+                    child: _isVerifying
+                        ? const CircularProgressIndicator()
+                        : const Text('Підтвердити токен'),
                   ),
                 ),
                 const Spacer(),
@@ -131,4 +188,3 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     );
   }
 }
-

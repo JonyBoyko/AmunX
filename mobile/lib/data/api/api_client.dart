@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import '../../core/config/app_config.dart';
 import '../../core/logging/app_logger.dart';
 import '../models/episode.dart';
+import '../models/explore.dart';
+import '../models/search.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -12,8 +14,10 @@ class ApiClient {
   ApiClient(this._dio);
 
   // Auth
-  Future<void> requestMagicLink(Map<String, dynamic> body) async {
-    await _dio.post('/v1/auth/magiclink', data: body);
+  Future<Map<String, dynamic>> requestMagicLink(
+      Map<String, dynamic> body) async {
+    final response = await _dio.post('/v1/auth/magiclink', data: body);
+    return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> verifyMagicLink(
@@ -35,6 +39,15 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> createEpisode(Map<String, dynamic> body) async {
+    final response = await _dio.post('/v1/episodes', data: body);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> finalizeEpisode(String episodeId) async {
+    await _dio.post('/v1/episodes/$episodeId/finalize');
+  }
+
   // Episodes
   Future<FeedResponse> getEpisodes({
     Map<String, dynamic>? queryParameters,
@@ -51,17 +64,65 @@ class ApiClient {
     return Episode.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<ExploreFeedPage> getExploreFeed({
+    int? limit,
+    String? cursor,
+    List<String>? tags,
+    List<String>? topicIds,
+    int? minLength,
+    int? maxLength,
+  }) async {
+    final queryParameters = <String, dynamic>{};
+    if (limit != null) queryParameters['limit'] = limit;
+    if (cursor != null) queryParameters['cursor'] = cursor;
+    if (tags != null && tags.isNotEmpty) {
+      queryParameters['tags'] = tags.join(',');
+    }
+    if (topicIds != null && topicIds.isNotEmpty) {
+      queryParameters['topic_ids'] = topicIds.join(',');
+    }
+    final min = minLength ?? 0;
+    final max = maxLength ?? 0;
+    if (min > 0 || max > 0) {
+      queryParameters['len'] = '$min..$max';
+    }
+    final response = await _dio.get(
+      '/v1/explore',
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    );
+    return ExploreFeedPage.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<SearchResponseModel> searchAudio({
+    required String query,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final response = await _dio.get(
+      '/v1/search',
+      queryParameters: {
+        'q': query,
+        'limit': limit,
+        'offset': offset,
+      },
+    );
+    return SearchResponseModel.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
   // Comments
   Future<List<dynamic>> getComments(String episodeId) async {
     final response = await _dio.get('/v1/episodes/$episodeId/comments');
-    return response.data as List<dynamic>;
+    final data = response.data as Map<String, dynamic>;
+    return data['items'] as List<dynamic>;
   }
 
-  Future<dynamic> createComment(
+  Future<Map<String, dynamic>> createComment(
       String episodeId, Map<String, dynamic> body) async {
     final response =
         await _dio.post('/v1/episodes/$episodeId/comments', data: body);
-    return response.data;
+    return response.data as Map<String, dynamic>;
   }
 
   // Topics
@@ -73,6 +134,95 @@ class ApiClient {
   Future<dynamic> getTopicById(String topicId) async {
     final response = await _dio.get('/v1/topics/$topicId');
     return response.data;
+  }
+
+  // Users
+  Future<Map<String, dynamic>> followUser(String userId) async {
+    final response = await _dio.post('/v1/users/$userId/follow');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> unfollowUser(String userId) async {
+    final response = await _dio.delete('/v1/users/$userId/follow');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> getAuthorProfiles(List<String> ids) async {
+    final response = await _dio.get(
+      '/v1/users/profiles',
+      queryParameters: {
+        'ids': ids.join(','),
+      },
+    );
+    return (response.data as Map<String, dynamic>)['profiles'] as List<dynamic>;
+  }
+
+  Future<void> registerPushDevice({
+    required String token,
+    required String platform,
+    String? deviceId,
+    String? locale,
+    String? appVersion,
+  }) async {
+    await _dio.post(
+      '/v1/push/devices',
+      data: {
+        'token': token,
+        'platform': platform,
+        if (deviceId != null) 'device_id': deviceId,
+        if (locale != null) 'locale': locale,
+        if (appVersion != null) 'app_version': appVersion,
+      },
+    );
+  }
+
+  Future<void> unregisterPushDevice(String token) async {
+    await _dio.delete('/v1/push/devices/$token');
+  }
+
+  // Live
+  Future<Map<String, dynamic>> createLiveSession({
+    required String title,
+    String? topicId,
+    String mask = 'none',
+  }) async {
+    final response = await _dio.post(
+      '/v1/live/sessions',
+      data: {
+        'title': title,
+        'mask': mask,
+        if (topicId != null) 'topic_id': topicId,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> endLiveSession(
+    String sessionId, {
+    int? durationSec,
+    String? recordingKey,
+  }) async {
+    await _dio.post(
+      '/v1/live/sessions/$sessionId/end',
+      data: {
+        if (durationSec != null) 'duration_sec': durationSec,
+        if (recordingKey != null && recordingKey.isNotEmpty)
+          'recording_key': recordingKey,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> getLiveSession(
+    String sessionId, {
+    String role = 'listener',
+  }) async {
+    final response = await _dio.get(
+      '/v1/live/sessions/$sessionId',
+      queryParameters: {
+        'role': role,
+      },
+    );
+    return response.data as Map<String, dynamic>;
   }
 
   // Reactions

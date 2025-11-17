@@ -8,22 +8,28 @@ class AuthRepository {
 
   final ApiClient _apiClient;
 
-  Future<void> requestMagicLink(String email) async {
-    await _apiClient.requestMagicLink({'email': email});
+  Future<String?> requestMagicLink(String email) async {
+    final response = await _apiClient.requestMagicLink({'email': email});
+    return response['token_hint'] as String?;
   }
 
-  Future<String> verifyMagicLink(String token) async {
+  Future<Map<String, dynamic>> verifyMagicLink(String token) async {
     final response = await _apiClient.verifyMagicLink({'token': token});
-    return response['token'] as String;
+    return response;
+  }
+
+  Future<Map<String, dynamic>> devLogin(String email) async {
+    return _apiClient.devLogin(email);
   }
 
   Future<User> getCurrentUser(String authToken) async {
-    // TODO: Implement get current user endpoint
-    // For now, return mock user
-    return const User(
-      id: '1',
-      email: 'user@amunx.app',
-      isPro: false,
+    final authedClient = createApiClient(token: authToken);
+    final profile = await authedClient.getCurrentUserProfile();
+    final plan = profile['plan'] as String? ?? 'free';
+    return User(
+      id: profile['id'] as String,
+      email: profile['email'] as String,
+      isPro: plan.toLowerCase() == 'pro',
     );
   }
 }
@@ -32,4 +38,3 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final apiClient = createApiClient();
   return AuthRepository(apiClient);
 });
-

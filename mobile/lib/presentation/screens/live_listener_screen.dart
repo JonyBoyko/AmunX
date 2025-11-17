@@ -7,18 +7,58 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../models/live_room.dart';
 import '../providers/live_rooms_provider.dart';
+import '../services/livekit_service.dart';
 
-class LiveListenerScreen extends ConsumerWidget {
+class LiveListenerScreen extends ConsumerStatefulWidget {
   final LiveRoom? room;
 
   const LiveListenerScreen({super.key, this.room});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final rooms = ref.watch(liveRoomsProvider);
-    final activeRoom = room ?? (rooms.isNotEmpty ? rooms.first : null);
+  ConsumerState<LiveListenerScreen> createState() => _LiveListenerScreenState();
+}
 
-    if (activeRoom == null) {
+class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
+  LiveRoom? _resolvedRoom;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _joinRoom());
+  }
+
+  Future<void> _joinRoom() async {
+    final rooms = ref.read(liveRoomsProvider);
+    _resolvedRoom = widget.room ?? (rooms.isNotEmpty ? rooms.first : null);
+    final sessionId = _resolvedRoom?.id;
+    if (sessionId == null) {
+      return;
+    }
+    try {
+      await ref.read(livekitControllerProvider.notifier).joinSession(sessionId);
+      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не вдалося підʼєднатися: $e')),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    ref.read(livekitControllerProvider.notifier).leave();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rooms = ref.watch(liveRoomsProvider);
+    final room =
+        _resolvedRoom ?? widget.room ?? (rooms.isNotEmpty ? rooms.first : null);
+    final sessionState = ref.watch(livekitControllerProvider);
+
+    if (room == null) {
       return Scaffold(
         backgroundColor: AppTheme.bgBase,
         body: SafeArea(
@@ -26,10 +66,8 @@ class LiveListenerScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Немає live-трансляцій',
-                  style: TextStyle(color: AppTheme.textPrimary),
-                ),
+                const Text('Немає активних live-сесій',
+                    style: TextStyle(color: AppTheme.textPrimary)),
                 const SizedBox(height: AppTheme.spaceMd),
                 FilledButton(
                   onPressed: () => context.pop(),
@@ -53,9 +91,9 @@ class LiveListenerScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(AppTheme.spaceXl),
                 child: Column(
                   children: [
-                    _buildHostCard(activeRoom),
+                    _buildHostCard(room, sessionState),
                     const SizedBox(height: AppTheme.spaceXl),
-                    _buildTranscriptPreview(activeRoom),
+                    _buildTranscriptPreview(room, sessionState.status),
                     const SizedBox(height: AppTheme.spaceXl),
                     _buildReactions(),
                   ],
@@ -101,7 +139,7 @@ class LiveListenerScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHostCard(LiveRoom room) {
+  Widget _buildHostCard(LiveRoom room, LivekitSessionState state) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceXl),
       decoration: BoxDecoration(
@@ -138,9 +176,25 @@ class LiveListenerScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${room.listeners} слухачів • ${room.city}',
+                  '${state.listenerCount} слухачів',
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
+                if (state.status == LivekitStatus.error && state.error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      state.error!,
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
+                  )
+                else if (state.status == LivekitStatus.connecting)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Підключення…',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -149,7 +203,7 @@ class LiveListenerScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTranscriptPreview(LiveRoom room) {
+  Widget _buildTranscriptPreview(LiveRoom room, LivekitStatus status) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: BoxDecoration(
@@ -159,21 +213,23 @@ class LiveListenerScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Live Translate',
-            style: const TextStyle(color: AppTheme.textSecondary),
+            style: TextStyle(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 8),
           Text(
-            '🔴 ${room.topic}\n${room.tags.join(' • ')}',
+            room.topic,
             style: const TextStyle(color: AppTheme.textPrimary, height: 1.4),
           ),
           const SizedBox(height: 12),
           const Divider(color: AppTheme.surfaceBorder),
           const SizedBox(height: 12),
-          const Text(
-            'Переклад доступний у записі (stub).',
-            style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
+          Text(
+            status == LivekitStatus.connected
+                ? 'Слухаємо в реальному часі.'
+                : 'Чекаємо на підключення стриму…',
+            style: const TextStyle(color: AppTheme.textSecondary, height: 1.4),
           ),
         ],
       ),
@@ -181,7 +237,7 @@ class LiveListenerScreen extends ConsumerWidget {
   }
 
   Widget _buildReactions() {
-    final reactions = ['👍', '🔥', '💡', '❤️', '👏'];
+    final reactions = ['👍', '🔥', '💡', '🎯', '👏'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

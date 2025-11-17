@@ -439,11 +439,13 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App, logger zerolog.Log
 			after = &ts
 		}
 
+		filters := parseFeedFilterParams(req)
 		items, err := listPublicEpisodes(ctx, deps.DB, listEpisodesParams{
 			Limit:    limit,
 			TopicID:  topicID,
 			AuthorID: authorID,
 			After:    after,
+			Filters:  filters,
 		})
 		if err != nil {
 			WriteError(w, http.StatusInternalServerError, "episodes_list_failed", err.Error())
@@ -462,7 +464,6 @@ func registerPublicEpisodeRoutes(r chi.Router, deps *app.App, logger zerolog.Log
 			}
 		}
 
-		filters := parseFeedFilterParams(req)
 		filtered := applyFeedFilters(items, filters)
 
 		WriteJSON(w, http.StatusOK, map[string]any{
@@ -912,6 +913,7 @@ type listEpisodesParams struct {
 	TopicID  *uuid.UUID
 	AuthorID *uuid.UUID
 	After    *time.Time
+	Filters  feedFilterParams
 }
 
 func parseLimit(raw string, def, max int) int {
@@ -955,7 +957,18 @@ WHERE e.status = 'public'
 		cursor++
 	}
 
-	query += " ORDER BY e.published_at DESC NULLS LAST, e.created_at DESC"
+	query += buildFormatClause(params.Filters, &cursor, &args)
+	if regionClause := buildRegionClause(params.Filters.Region, &cursor, &args); regionClause != "" {
+		query += " AND " + regionClause
+	}
+	if tagClause := buildTagClause(params.Filters.Tags, &cursor, &args); tagClause != "" {
+		query += " AND " + tagClause
+	}
+	if strings.ToLower(params.Filters.Tab) == "subscriptions" {
+		query += " AND MOD(ABS(hashtext(e.author_id::text)), 3) = 0"
+	}
+
+	query += buildFeedOrderClause(params.Filters)
 	query += fmt.Sprintf(" LIMIT $%d", cursor)
 	args = append(args, params.Limit)
 
@@ -1035,6 +1048,88 @@ WHERE e.status = 'public'
 		results = append(results, rec)
 	}
 	return results, rows.Err()
+}
+
+func buildFormatClause(filters feedFilterParams, cursor *int, args *[]any) string {
+	switch strings.ToLower(filters.Format) {
+	case "live":
+		return " AND e.is_live = true"
+	case "shorts":
+		return " AND e.is_live = false AND COALESCE(e.duration_sec, 0) <= 120"
+	case "podcasts":
+		return " AND e.is_live = false AND COALESCE(e.duration_sec, 0) > 120"
+	default:
+		return ""
+	}
+}
+
+func buildRegionClause(region string, cursor *int, args *[]any) string {
+	normalized := strings.ToLower(strings.TrimSpace(region))
+	if normalized == "" || normalized == "global" {
+		return ""
+	}
+	allowed := allowedRegions(normalized)
+	if len(allowed) == 0 {
+		return ""
+	}
+	column := "COALESCE(NULLIF(lower(u.settings_json->>'region'), ''), 'global')"
+	index := *cursor
+	*cursor++
+	*args = append(*args, pq.Array(allowed))
+	return fmt.Sprintf("%s = ANY($%d)", column, index)
+}
+
+func allowedRegions(filter string) []string {
+	switch filter {
+	case "nearby":
+		return []string{"kyiv", "nearby"}
+	case "eu", "europe":
+		return []string{"kyiv", "lviv", "warsaw", "berlin", "eu", "europe"}
+	case "na", "north_america":
+		return []string{"new_york", "los_angeles", "north_america", "na"}
+	default:
+		return []string{filter}
+	}
+}
+
+func buildTagClause(tags map[string]struct{}, cursor *int, args *[]any) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	var normalized []string
+	for tag := range tags {
+		value := strings.TrimPrefix(normalizeTag(tag), "#")
+		if value != "" {
+			normalized = append(normalized, value)
+		}
+	}
+	if len(normalized) == 0 {
+		return ""
+	}
+	index := *cursor
+	*cursor++
+	*args = append(*args, pq.Array(normalized))
+	return fmt.Sprintf(`EXISTS (
+			  SELECT 1
+			    FROM unnest(COALESCE(s.keywords, ARRAY[]::text[])) kw
+			   WHERE lower(regexp_replace(kw, '#', '', 'g')) = ANY($%d)
+			)`, index)
+}
+
+func buildFeedOrderClause(filters feedFilterParams) string {
+	switch strings.ToLower(filters.Tab) {
+	case "recommended":
+		const scoreExpr = `
+(COALESCE(NULLIF(e.duration_sec, 0), 90)) +
+(CASE WHEN e.is_live THEN 120 ELSE 0 END) +
+(COALESCE(cardinality(s.keywords), 0) * 20) +
+(COALESCE(length(s.tldr), 0) % 40)`
+		return " ORDER BY " + scoreExpr + " DESC, e.published_at DESC NULLS LAST, e.created_at DESC"
+	case "trending_nearby":
+		return " ORDER BY e.is_live DESC, e.published_at DESC NULLS LAST, e.created_at DESC"
+	default:
+		return " ORDER BY e.published_at DESC NULLS LAST, e.created_at DESC"
+	}
 }
 
 func getEpisodeByID(ctx context.Context, db *sql.DB, id uuid.UUID) (episodeSummary, error) {

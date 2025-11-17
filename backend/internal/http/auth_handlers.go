@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -48,9 +49,19 @@ func registerAuthRoutes(r chi.Router, deps *app.App, logger zerolog.Logger) {
 				Str("magic_link_token", token).
 				Msg("issued magic link token")
 
-			WriteJSON(w, http.StatusAccepted, map[string]any{
+			link := buildMagicLinkURL(deps.Config.MagicLinkAppURL, token)
+			if err := deps.Email.SendMagicLink(req.Context(), email, link); err != nil {
+				logger.Error().Err(err).Str("email", email).Msg("failed to send magic link email")
+			}
+
+			resp := map[string]any{
 				"status": "sent",
-			})
+			}
+			if deps.Config.Environment == "development" {
+				resp["token_hint"] = token
+			}
+
+			WriteJSON(w, http.StatusAccepted, resp)
 		})
 
 		ar.Post("/magiclink/verify", func(w http.ResponseWriter, req *http.Request) {
@@ -109,6 +120,49 @@ func registerAuthRoutes(r chi.Router, deps *app.App, logger zerolog.Logger) {
 				"plan":          plan,
 			})
 		})
+
+		if deps.Config.Environment == "development" {
+			ar.Post("/dev-login", func(w http.ResponseWriter, req *http.Request) {
+				var payload struct {
+					Email string `json:"email"`
+				}
+				if err := decodeJSON(req, &payload); err != nil {
+					WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
+					return
+				}
+
+				email := normalizeEmail(payload.Email)
+				if email == "" {
+					WriteError(w, http.StatusBadRequest, "invalid_email", "email is required")
+					return
+				}
+
+				userID, plan, err := ensureUser(req.Context(), deps.DB, email)
+				if err != nil {
+					WriteError(w, http.StatusInternalServerError, "internal_error", "could not ensure user")
+					return
+				}
+
+				accessToken, err := deps.JWT.IssueAccess(userID, plan)
+				if err != nil {
+					WriteError(w, http.StatusInternalServerError, "internal_error", "failed to issue access token")
+					return
+				}
+				refreshToken, err := deps.JWT.IssueRefresh(userID)
+				if err != nil {
+					WriteError(w, http.StatusInternalServerError, "internal_error", "failed to issue refresh token")
+					return
+				}
+
+				WriteJSON(w, http.StatusOK, map[string]any{
+					"access_token":  accessToken,
+					"refresh_token": refreshToken,
+					"expires_in":    int(deps.Config.JWTAccessTTL / time.Second),
+					"user_id":       userID,
+					"plan":          plan,
+				})
+			})
+		}
 	})
 }
 
@@ -142,3 +196,13 @@ func magicLinkCacheKey(token string) string {
 	return "magiclink:" + token
 }
 
+func buildMagicLinkURL(base, token string) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "https://moweton.app"
+	}
+	base = strings.TrimRight(base, "/")
+	v := url.Values{}
+	v.Set("token", token)
+	return base + "/auth/callback?" + v.Encode()
+}

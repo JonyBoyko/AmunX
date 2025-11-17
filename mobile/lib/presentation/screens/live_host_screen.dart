@@ -1,5 +1,4 @@
-import 'dart:async';
-import 'dart:math';
+﻿import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -7,8 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
-import '../models/live_room.dart';
-import '../providers/live_rooms_provider.dart';
+import '../services/livekit_service.dart';
 
 class LiveHostScreen extends ConsumerStatefulWidget {
   const LiveHostScreen({super.key});
@@ -19,30 +17,16 @@ class LiveHostScreen extends ConsumerStatefulWidget {
 
 class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
   int _duration = 0;
-  int _listeners = 12;
   bool _isMuted = false;
-  final List<_ReactionBubble> _reactions = [];
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _registerLiveRoom();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() {
-        _duration++;
-        _listeners = max(1, _listeners + Random().nextInt(3) - 1);
-        if (Random().nextBool()) {
-          _reactions.add(
-            _ReactionBubble(
-              emoji: ['👍', '🔥', '💡', '❤️'][Random().nextInt(4)],
-              key: UniqueKey(),
-            ),
-          );
-          if (_reactions.length > 6) {
-            _reactions.removeAt(0);
-          }
-        }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startHosting();
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        setState(() => _duration++);
       });
     });
   }
@@ -50,46 +34,58 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    ref.read(liveRoomsProvider.notifier).stopHosting(_hostRoom.id);
+    ref.read(livekitControllerProvider.notifier).endHosting();
     super.dispose();
   }
 
-  LiveRoom get _hostRoom {
-    return LiveRoom(
-      id: 'host-local-room',
-      hostId: 'creator-host',
-      hostName: 'Ваш Live',
-      handle: '@you',
-      topic: 'Спонтанний live',
-      emoji: '🎤',
-      listeners: _listeners,
-      city: 'Київ',
-      isFollowedHost: false,
-      startedAt: DateTime.now().subtract(Duration(seconds: _duration)),
-      tags: const ['live'],
-    );
+  Future<void> _startHosting() async {
+    try {
+      await ref
+          .read(livekitControllerProvider.notifier)
+          .startHosting(title: 'Live AMA');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не вдалося запустити live: $e')),
+      );
+    }
   }
 
-  void _registerLiveRoom() {
-    ref.read(liveRoomsProvider.notifier).startHosting(_hostRoom);
+  Future<void> _toggleMute(LivekitStatus status) async {
+    if (status != LivekitStatus.connected) return;
+    setState(() => _isMuted = !_isMuted);
+    await ref
+        .read(livekitControllerProvider.notifier)
+        .setMicrophoneEnabled(!_isMuted);
+  }
+
+  Future<void> _endSession() async {
+    await ref.read(livekitControllerProvider.notifier).endHosting();
+    if (mounted) {
+      context.pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final sessionState = ref.watch(livekitControllerProvider);
     final mins = (_duration ~/ 60).toString().padLeft(2, '0');
     final secs = (_duration % 60).toString().padLeft(2, '0');
+    final listeners = sessionState.listenerCount + 1;
+
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                _buildHeader('$mins:$secs'),
-                Expanded(child: _buildContent()),
-              ],
+            _buildHeader('$mins:$secs'),
+            Expanded(
+              child: _buildContent(
+                sessionState.status,
+                sessionState.error,
+                listeners,
+              ),
             ),
-            ..._reactions,
           ],
         ),
       ),
@@ -134,7 +130,11 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(
+    LivekitStatus status,
+    String? error,
+    int listeners,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(AppTheme.spaceXl),
       child: Column(
@@ -150,7 +150,7 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
                 const Icon(Icons.people_alt, color: AppTheme.brandPrimary),
                 const SizedBox(width: AppTheme.spaceSm),
                 Text(
-                  '$_listeners слухачів',
+                  '$listeners слухачів',
                   style: const TextStyle(color: AppTheme.textPrimary),
                 ),
               ],
@@ -165,14 +165,19 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('Чат', style: TextStyle(color: AppTheme.textSecondary)),
-                SizedBox(height: AppTheme.spaceSm),
-                Text('Марія: Чудова тема! 👏',
+              children: [
+                const Text('Тема',
+                    style: TextStyle(color: AppTheme.textSecondary)),
+                const SizedBox(height: AppTheme.spaceSm),
+                const Text('Live AMA: історії з комʼюніті',
                     style: TextStyle(color: AppTheme.textPrimary)),
-                SizedBox(height: 4),
-                Text('Олексій: Питання про AI?',
-                    style: TextStyle(color: AppTheme.textPrimary)),
+                const SizedBox(height: AppTheme.spaceSm),
+                if (status == LivekitStatus.connecting)
+                  const Text('Підключення до LiveKit…',
+                      style: TextStyle(color: AppTheme.textSecondary))
+                else if (status == LivekitStatus.error && error != null)
+                  Text(error,
+                      style: const TextStyle(color: AppTheme.stateDanger)),
               ],
             ),
           ),
@@ -186,7 +191,9 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
                   backgroundColor:
                       _isMuted ? AppTheme.stateDanger : AppTheme.surfaceChip,
                 ),
-                onPressed: () => setState(() => _isMuted = !_isMuted),
+                onPressed: status == LivekitStatus.connected
+                    ? () => _toggleMute(status)
+                    : null,
                 child: Icon(
                   _isMuted ? Icons.mic_off : Icons.mic,
                   color: _isMuted ? AppTheme.textInverse : AppTheme.textPrimary,
@@ -199,68 +206,24 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
                   backgroundColor: AppTheme.stateDanger,
                   padding: const EdgeInsets.all(24),
                 ),
-                onPressed: () => context.pop(),
-                child: const Icon(Icons.call_end, color: AppTheme.textInverse),
+                onPressed: status == LivekitStatus.connecting
+                    ? null
+                    : () => _endSession(),
+                child: status == LivekitStatus.connecting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.textInverse,
+                        ),
+                      )
+                    : const Icon(Icons.call_end, color: AppTheme.textInverse),
               ),
             ],
           ),
         ],
       ),
     );
-  }
-}
-
-class _ReactionBubble extends StatefulWidget {
-  final String emoji;
-
-  const _ReactionBubble({
-    required this.emoji,
-    required super.key,
-  });
-
-  @override
-  State<_ReactionBubble> createState() => _ReactionBubbleState();
-}
-
-class _ReactionBubbleState extends State<_ReactionBubble>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..forward();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final random = Random();
-    final left = random.nextDouble() * MediaQuery.of(context).size.width * 0.8;
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final progress = Curves.easeOut.transform(_controller.value);
-        return Positioned(
-          bottom: 80 + progress * 300,
-          left: left,
-          child: Opacity(
-            opacity: 1 - progress,
-            child: Transform.scale(
-              scale: 1 + progress * 0.5,
-              child: Text(widget.emoji, style: const TextStyle(fontSize: 28)),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 }

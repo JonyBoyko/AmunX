@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 	// Build test app
 	ctx := context.Background()
 	logger := zerolog.Nop()
-	testApp, err = app.Build(ctx, cfg)
+	testApp, err = app.Build(ctx, cfg, logger)
 	if err != nil {
 		// If database is not available, skip tests
 		fmt.Printf("⚠️  Database not available, skipping integration tests: %v\n", err)
@@ -121,4 +121,3 @@ func makeTestRequest(method, path string, body interface{}, token string) (*http
 	testServer.httpServer.Handler.ServeHTTP(w, req)
 	return w, nil
 }
-

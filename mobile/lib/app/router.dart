@@ -7,6 +7,7 @@ import '../presentation/screens/splash_screen.dart';
 import '../presentation/screens/onboarding_screen.dart';
 import '../presentation/screens/auth_screen.dart';
 import '../presentation/screens/feed_screen.dart';
+import '../presentation/screens/explore_screen.dart';
 import '../presentation/screens/recorder_screen.dart';
 import '../presentation/screens/publish_screen.dart';
 import '../presentation/screens/episode_detail_screen.dart';
@@ -16,6 +17,7 @@ import '../presentation/screens/topics_screen.dart';
 import '../presentation/screens/topic_detail_screen.dart';
 import '../presentation/screens/settings_screen.dart';
 import '../presentation/screens/paywall_screen.dart';
+import '../presentation/screens/search_screen.dart';
 import '../presentation/screens/live_host_screen.dart';
 import '../presentation/screens/live_listener_screen.dart';
 import '../presentation/models/live_room.dart';
@@ -68,6 +70,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/feed',
         builder: (context, state) => const FeedScreen(),
+      ),
+      GoRoute(
+        path: '/explore',
+        builder: (context, state) => const ExploreScreen(),
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchScreen(),
       ),
       GoRoute(
         path: '/recorder',

@@ -7,8 +7,11 @@ import (
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 
 	"github.com/amunx/backend/internal/auth"
+	"github.com/amunx/backend/internal/email"
+	"github.com/amunx/backend/internal/push"
 	"github.com/amunx/backend/internal/queue"
 	"github.com/amunx/backend/internal/storage"
 )
@@ -23,6 +26,8 @@ type App struct {
 	JWT         *auth.JWTManager
 	Storage     storage.Client
 	Queue       queue.Stream
+	Email       email.Sender
+	Push        push.Sender
 	ShutdownFns []func(context.Context) error
 }
 
@@ -52,7 +57,7 @@ func (a *App) Close(ctx context.Context) error {
 }
 
 // Build constructs the App with connections according to the supplied config.
-func Build(ctx context.Context, cfg Config) (*App, error) {
+func Build(ctx context.Context, cfg Config, log zerolog.Logger) (*App, error) {
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect database: %w", err)
@@ -105,6 +110,19 @@ func Build(ctx context.Context, cfg Config) (*App, error) {
 
 	queueClient := queue.NewRedisStream(redisClient)
 
+	emailSender := email.NewSender(email.Options{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
+		From:     cfg.EmailFrom,
+	}, log)
+
+	pushSender := push.NewSender(push.Config{
+		ServerKey: cfg.FCMServerKey,
+		Endpoint:  cfg.FCMEndpoint,
+	}, log)
+
 	return &App{
 		Config:     cfg,
 		DB:         db,
@@ -113,5 +131,7 @@ func Build(ctx context.Context, cfg Config) (*App, error) {
 		JWT:        jwtManager,
 		Storage:    store,
 		Queue:      queueClient,
+		Email:      emailSender,
+		Push:       pushSender,
 	}, nil
 }

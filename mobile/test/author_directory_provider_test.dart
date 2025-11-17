@@ -23,12 +23,12 @@ void main() {
     expect(notifier.state.containsKey('author-x'), isTrue);
   });
 
-  test('toggleFollow flips follow state and adjusts followers', () {
+  test('toggleFollow flips follow state and adjusts followers', () async {
     final notifier = AuthorDirectoryNotifier();
     notifier.syncWithEpisodes([_episode('e1', 'author-z')]);
 
     final before = notifier.state['author-z']!;
-    notifier.toggleFollow('author-z');
+    await notifier.toggleFollow('author-z');
     final after = notifier.state['author-z']!;
 
     expect(after.isFollowed, isNot(equals(before.isFollowed)));

@@ -64,18 +64,23 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 
 	router.Route("/v1", func(r chi.Router) {
 		registerAuthRoutes(r, deps, logger)
+		registerPublicUserRoutes(r, deps, logger)
 		registerPublicEpisodeRoutes(r, deps, logger)
 		registerPublicTopicRoutes(r, deps)
 		registerPublicCommentRoutes(r, deps)
 		registerPublicLiveRoutes(r, deps)
+		registerExploreRoutes(r, deps)
+		registerSearchRoutes(r, deps)
 
 		r.Group(func(protected chi.Router) {
 			protected.Use(mw.Auth(deps, logger))
 			registerUserRoutes(protected)
+			registerFollowRoutes(protected, deps)
 			registerEpisodeRoutes(protected, deps)
 			registerTopicRoutes(protected, deps)
 			registerCommentRoutes(protected, deps)
 			registerReactionRoutes(protected, deps)
+			registerPushRoutes(protected, deps)
 			registerReportRoutes(protected, deps)
 			registerLiveRoutes(protected, deps)
 			registerModerationRoutes(protected, deps)

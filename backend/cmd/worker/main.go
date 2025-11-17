@@ -24,7 +24,7 @@ func main() {
 
 	log := logger.New(cfg.Environment).With().Str("component", "worker").Logger()
 
-	deps, err := app.Build(ctx, cfg)
+	deps, err := app.Build(ctx, cfg, log)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to build worker dependencies")
 	}

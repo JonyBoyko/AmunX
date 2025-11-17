@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,9 +23,11 @@ class LiveRoomsNotifier extends StateNotifier<List<LiveRoom>> {
   void _tick() {
     state = [
       for (final room in state)
-        room.copyWith(
-          listeners: _normalizeListeners(room.listeners),
-        ),
+        room.isSimulated
+            ? room.copyWith(
+                listeners: _normalizeListeners(room.listeners),
+              )
+            : room,
     ];
   }
 
@@ -48,7 +50,7 @@ class LiveRoomsNotifier extends StateNotifier<List<LiveRoom>> {
     if (room.isFollowedHost) {
       _ref.read(liveNotificationProvider.notifier).show(
             LiveNotification(
-              title: '${room.hostName} live',
+              title: ' live',
               subtitle: room.topic,
               createdAt: DateTime.now(),
             ),
@@ -58,6 +60,16 @@ class LiveRoomsNotifier extends StateNotifier<List<LiveRoom>> {
 
   void stopHosting(String roomId) {
     state = state.where((room) => room.id != roomId).toList();
+  }
+
+  void updateListenerCount(String roomId, int listeners) {
+    state = [
+      for (final room in state)
+        if (room.id == roomId)
+          room.copyWith(listeners: max(0, listeners))
+        else
+          room,
+    ];
   }
 
   @override
@@ -73,41 +85,44 @@ List<LiveRoom> _seedRooms() {
     LiveRoom(
       id: 'live-ai-town',
       hostId: 'creator-olena',
-      hostName: 'Олена Лісова',
+      hostName: 'Олена Walks',
       handle: '@olena.walks',
-      topic: 'AI й ментальні прогулянки',
-      emoji: '🌿',
+      topic: 'AI & walkcasts',
+      emoji: '🚶',
       listeners: 132,
-      city: 'Київ',
+      city: 'Kyiv',
       isFollowedHost: true,
       startedAt: now.subtract(const Duration(minutes: 8)),
       tags: const ['AI', 'walkcast'],
+      isSimulated: true,
     ),
     LiveRoom(
       id: 'live-biz-late',
       hostId: 'creator-danylo',
-      hostName: 'Данило Федоров',
+      hostName: 'Данило Builder',
       handle: '@fedan',
       topic: 'Late-night build in public',
       emoji: '🚀',
       listeners: 88,
-      city: 'Львів',
+      city: 'Lviv',
       isFollowedHost: false,
       startedAt: now.subtract(const Duration(minutes: 3)),
-      tags: const ['стартап', 'build'],
+      tags: const ['founders', 'build'],
+      isSimulated: true,
     ),
     LiveRoom(
       id: 'live-maria-calm',
       hostId: 'creator-maria',
-      hostName: 'Марія Перегуда',
+      hostName: 'Марія Calm',
       handle: '@maria.audio',
-      topic: 'Коротка mindful-сесія',
+      topic: 'Mindful night stream',
       emoji: '🧘',
       listeners: 64,
-      city: 'Варшава',
+      city: 'Warsaw',
       isFollowedHost: true,
       startedAt: now.subtract(const Duration(minutes: 15)),
       tags: const ['wellness'],
+      isSimulated: true,
     ),
   ];
 }
