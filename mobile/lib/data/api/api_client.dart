@@ -186,6 +186,16 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getLiveSessions({int? limit}) async {
+    final response = await _dio.get(
+      '/v1/live/sessions',
+      queryParameters: {
+        if (limit != null) 'limit': limit,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<void> registerPushDevice({
     required String token,
     required String platform,

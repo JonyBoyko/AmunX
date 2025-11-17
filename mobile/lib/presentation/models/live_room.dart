@@ -30,6 +30,28 @@ class LiveRoom {
     this.isSimulated = false,
   });
 
+  factory LiveRoom.fromJson(Map<String, dynamic> json) {
+    return LiveRoom(
+      id: json['id'] as String,
+      hostId: json['host_id'] as String,
+      hostName: json['host_name'] as String? ?? '',
+      handle: json['host_handle'] as String? ?? '',
+      topic: (json['title'] as String?)?.isNotEmpty == true
+          ? json['title'] as String
+          : 'Live session',
+      emoji: _emojiForMask(json['mask'] as String? ?? 'none'),
+      listeners: json['listeners'] as int? ?? 0,
+      city: json['city'] as String? ?? 'Online',
+      isFollowedHost: json['is_followed_host'] as bool? ?? false,
+      startedAt: DateTime.tryParse(json['started_at'] as String? ?? '') ??
+          DateTime.now(),
+      tags: (json['tags'] as List<dynamic>? ?? const [])
+          .map((tag) => tag.toString())
+          .toList(),
+      isSimulated: false,
+    );
+  }
+
   LiveRoom copyWith({
     String? hostName,
     String? handle,
@@ -56,5 +78,16 @@ class LiveRoom {
       tags: tags ?? this.tags,
       isSimulated: isSimulated ?? this.isSimulated,
     );
+  }
+}
+
+String _emojiForMask(String mask) {
+  switch (mask) {
+    case 'studio':
+      return '🎙️';
+    case 'basic':
+      return '🔊';
+    default:
+      return '🔴';
   }
 }

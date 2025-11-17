@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	livekitauth "github.com/livekit/protocol/auth"
 
 	"github.com/amunx/backend/internal/app"
@@ -187,6 +188,7 @@ func registerLiveRoutes(r chi.Router, deps *app.App) {
 }
 
 func registerPublicLiveRoutes(r chi.Router, deps *app.App) {
+	r.Get("/live/sessions", handleListLiveSessions(deps))
 	r.Get("/live/sessions/{id}", func(w http.ResponseWriter, req *http.Request) {
 		sessionID, err := uuidFromParam(chi.URLParam(req, "id"))
 		if err != nil {
@@ -261,6 +263,22 @@ type liveSessionView struct {
 	Mask      string    `json:"mask"`
 	StartedAt string    `json:"started_at"`
 	EndedAt   *string   `json:"ended_at,omitempty"`
+}
+
+type liveSessionListItem struct {
+	ID             string   `json:"id"`
+	HostID         string   `json:"host_id"`
+	HostName       string   `json:"host_name"`
+	HostHandle     string   `json:"host_handle"`
+	HostAvatar     string   `json:"host_avatar"`
+	Title          string   `json:"title"`
+	Mask           string   `json:"mask"`
+	StartedAt      string   `json:"started_at"`
+	TopicID        *string  `json:"topic_id,omitempty"`
+	City           string   `json:"city"`
+	IsFollowedHost bool     `json:"is_followed_host"`
+	Listeners      int      `json:"listeners"`
+	Tags           []string `json:"tags"`
 }
 
 func getActiveLiveSession(ctx context.Context, db *sql.DB, id uuid.UUID) (liveSessionView, error) {
@@ -406,6 +424,31 @@ func handleEnableTranslation(deps *app.App) http.HandlerFunc {
 	}
 }
 
+func handleListLiveSessions(deps *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		limit := getIntQueryParam(req, "limit", 20)
+		if limit <= 0 {
+			limit = 20
+		}
+		if limit > 100 {
+			limit = 100
+		}
+		var userID *uuid.UUID
+		if user, ok := httpctx.UserFromContext(req.Context()); ok {
+			userID = &user.ID
+		}
+		sessions, err := listActiveLiveSessions(req.Context(), deps.DB, userID, limit)
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "live_sessions_failed", err.Error())
+			return
+		}
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"sessions": sessions,
+			"count":    len(sessions),
+		})
+	}
+}
+
 func handleDisableTranslation(deps *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		sessionID := chi.URLParam(req, "sessionID")
@@ -488,4 +531,96 @@ func dispatchLiveStartPush(ctx context.Context, deps *app.App, host httpctx.User
 		}
 		_ = deps.Push.Send(ctx, msg)
 	}
+}
+
+func listActiveLiveSessions(ctx context.Context, db *sql.DB, userID *uuid.UUID, limit int) ([]liveSessionListItem, error) {
+	const query = `
+SELECT ls.id,
+       ls.host_id,
+       COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1)) AS host_name,
+       COALESCE(NULLIF(u.handle, ''), '') AS host_handle,
+       COALESCE(u.avatar, '') AS host_avatar,
+       COALESCE(ls.title, '') AS title,
+       COALESCE(ls.mask, 'none') AS mask,
+       ls.started_at,
+       ls.topic_id
+  FROM live_sessions ls
+  JOIN users u ON u.id = ls.host_id
+ WHERE ls.ended_at IS NULL
+ ORDER BY ls.started_at DESC
+ LIMIT $1;
+`
+	rows, err := db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []liveSessionListItem
+	var hostIDs []uuid.UUID
+	for rows.Next() {
+		var (
+			id         uuid.UUID
+			hostID     uuid.UUID
+			hostName   string
+			hostHandle string
+			hostAvatar string
+			title      string
+			mask       string
+			startedAt  time.Time
+			topicID    sql.NullString
+		)
+		if err := rows.Scan(&id, &hostID, &hostName, &hostHandle, &hostAvatar, &title, &mask, &startedAt, &topicID); err != nil {
+			return nil, err
+		}
+		var topicPtr *string
+		if topicID.Valid {
+			value := topicID.String
+			topicPtr = &value
+		}
+		sessions = append(sessions, liveSessionListItem{
+			ID:             id.String(),
+			HostID:         hostID.String(),
+			HostName:       hostName,
+			HostHandle:     hostHandle,
+			HostAvatar:     hostAvatar,
+			Title:          title,
+			Mask:           mask,
+			StartedAt:      startedAt.Format(time.RFC3339),
+			TopicID:        topicPtr,
+			City:           "Online",
+			IsFollowedHost: false,
+			Listeners:      0,
+			Tags:           []string{},
+		})
+		hostIDs = append(hostIDs, hostID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if userID != nil && len(hostIDs) > 0 {
+		followed := make(map[string]struct{})
+		followRows, err := db.QueryContext(ctx, `
+SELECT followee_id
+  FROM user_follows
+ WHERE follower_id = $1
+   AND followee_id = ANY($2)`, *userID, pq.Array(hostIDs))
+		if err == nil {
+			for followRows.Next() {
+				var id uuid.UUID
+				if err := followRows.Scan(&id); err == nil {
+					followed[id.String()] = struct{}{}
+				}
+			}
+			_ = followRows.Close()
+		}
+		for i := range sessions {
+			if _, ok := followed[sessions[i].HostID]; ok {
+				sessions[i].IsFollowedHost = true
+			}
+		}
+	}
+
+	return sessions, nil
 }

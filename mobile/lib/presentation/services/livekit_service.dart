@@ -107,7 +107,7 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
               hostName: user?.email ?? 'You',
               handle: user?.email ?? '@you',
               topic: join.session.title ?? 'Live session',
-              emoji: '🎤',
+              emoji: '??',
               listeners: 1,
               city: 'Online',
               isFollowedHost: true,
@@ -152,6 +152,7 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
         );
       }
       _ref.read(liveRoomsProvider.notifier).stopHosting(session.id);
+      unawaited(_ref.read(liveRoomsProvider.notifier).refresh());
     }
   }
 
@@ -263,3 +264,4 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
         .updateListenerCount(session.id, listeners);
   }
 }
+
