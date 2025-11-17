@@ -11,6 +11,7 @@ import (
 
 	"github.com/amunx/backend/internal/auth"
 	"github.com/amunx/backend/internal/email"
+	"github.com/amunx/backend/internal/integrations/monopay"
 	"github.com/amunx/backend/internal/push"
 	"github.com/amunx/backend/internal/queue"
 	"github.com/amunx/backend/internal/storage"
@@ -28,6 +29,7 @@ type App struct {
 	Queue       queue.Stream
 	Email       email.Sender
 	Push        push.Sender
+	MonoPay     *monopay.Client
 	ShutdownFns []func(context.Context) error
 }
 
@@ -123,6 +125,16 @@ func Build(ctx context.Context, cfg Config, log zerolog.Logger) (*App, error) {
 		Endpoint:  cfg.FCMEndpoint,
 	}, log)
 
+	var monoClient *monopay.Client
+	if cfg.MonoPayAPIKey != "" && cfg.MonoPayMerchantID != "" {
+		monoClient = monopay.NewClient(monopay.Config{
+			BaseURL:  cfg.MonoPayAPIBaseURL,
+			APIToken: cfg.MonoPayAPIKey,
+			Merchant: cfg.MonoPayMerchantID,
+			Logger:   log,
+		})
+	}
+
 	return &App{
 		Config:     cfg,
 		DB:         db,
@@ -133,5 +145,6 @@ func Build(ctx context.Context, cfg Config, log zerolog.Logger) (*App, error) {
 		Queue:      queueClient,
 		Email:      emailSender,
 		Push:       pushSender,
+		MonoPay:    monoClient,
 	}, nil
 }

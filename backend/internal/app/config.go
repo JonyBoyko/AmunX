@@ -77,7 +77,11 @@ type Config struct {
 	RevenueCatAPIKey        string `envconfig:"REVENUECAT_API_KEY" default:""`
 	RevenueCatWebhookSecret string `envconfig:"REVENUECAT_WEBHOOK_SECRET" default:""`
 	MonoPayMerchantID       string `envconfig:"MONOPAY_MERCHANT_ID" default:""`
+	MonoPayAPIKey           string `envconfig:"MONOPAY_API_KEY" default:""`
 	MonoPayWebhookSecret    string `envconfig:"MONOPAY_WEBHOOK_SECRET" default:""`
+	MonoPayWebhookURL       string `envconfig:"MONOPAY_WEBHOOK_URL" default:""`
+	MonoPayReturnURL        string `envconfig:"MONOPAY_RETURN_URL" default:"https://moweton.app/payments/monopay/success"`
+	MonoPayAPIBaseURL       string `envconfig:"MONOPAY_API_BASE_URL" default:"https://api.monobank.ua/api/merchant"`
 }
 
 // LoadConfig loads configuration using the provided environment variable prefix.

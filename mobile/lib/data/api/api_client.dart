@@ -157,6 +157,35 @@ class ApiClient {
     return (response.data as Map<String, dynamic>)['profiles'] as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> getBillingProducts() async {
+    final response = await _dio.get('/v1/billing/products');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getBillingSubscription() async {
+    final response = await _dio.get('/v1/billing/subscription');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getBillingPortal() async {
+    final response = await _dio.post('/v1/billing/portal');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createMonoPayCheckout({
+    required String productCode,
+    String? successUrl,
+  }) async {
+    final response = await _dio.post(
+      '/v1/billing/monopay/checkout',
+      data: {
+        'product_code': productCode,
+        if (successUrl != null) 'success_url': successUrl,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<void> registerPushDevice({
     required String token,
     required String platform,

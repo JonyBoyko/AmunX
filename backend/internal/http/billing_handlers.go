@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,12 +19,14 @@ import (
 	"github.com/amunx/backend/internal/app"
 	"github.com/amunx/backend/internal/billing"
 	"github.com/amunx/backend/internal/httpctx"
+	"github.com/amunx/backend/internal/integrations/monopay"
 )
 
 func registerBillingRoutes(r chi.Router, deps *app.App) {
 	r.Get("/billing/products", handleBillingProducts(deps))
 	r.Get("/billing/subscription", handleBillingSubscription(deps))
 	r.Post("/billing/portal", handleBillingPortal(deps))
+	r.Post("/billing/monopay/checkout", handleMonoPayCheckout(deps))
 }
 
 func registerBillingWebhookRoutes(r chi.Router, deps *app.App) {
@@ -86,6 +89,86 @@ func handleBillingPortal(deps *app.App) http.HandlerFunc {
 			"monopay_checkout_notice": "MonoPay checkout handled client-side",
 		}
 		WriteJSON(w, http.StatusOK, response)
+	}
+}
+
+func handleMonoPayCheckout(deps *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpctx.UserFromContext(r.Context())
+		if !ok {
+			WriteError(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+			return
+		}
+		if deps.MonoPay == nil {
+			WriteError(w, http.StatusServiceUnavailable, "monopay_disabled", "MonoPay integration not configured")
+			return
+		}
+		if deps.Config.MonoPayWebhookURL == "" {
+			WriteError(w, http.StatusServiceUnavailable, "monopay_webhook_missing", "MONOPAY_WEBHOOK_URL not configured")
+			return
+		}
+
+		var req struct {
+			ProductCode string `json:"product_code"`
+			SuccessURL  string `json:"success_url"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			WriteError(w, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+		if strings.TrimSpace(req.ProductCode) == "" {
+			WriteError(w, http.StatusBadRequest, "invalid_request", "product_code is required")
+			return
+		}
+
+		svc := billing.NewService(deps.DB)
+		product, err := svc.GetProductByCode(r.Context(), req.ProductCode)
+		if err != nil {
+			if err == billing.ErrProductNotFound {
+				WriteError(w, http.StatusNotFound, "product_not_found", "billing product not found")
+				return
+			}
+			WriteError(w, http.StatusInternalServerError, "product_lookup_failed", err.Error())
+			return
+		}
+		if product.Provider != billing.ProviderMonoPay {
+			WriteError(w, http.StatusBadRequest, "invalid_provider", "product is not a MonoPay plan")
+			return
+		}
+
+		redirect := strings.TrimSpace(req.SuccessURL)
+		if redirect == "" {
+			redirect = deps.Config.MonoPayReturnURL
+		}
+
+		reference := fmt.Sprintf("mono-%s-%d", user.ID.String(), time.Now().Unix())
+		customerData := map[string]string{
+			"user_id":      user.ID.String(),
+			"product_code": product.Code,
+		}
+
+		invoice, err := deps.MonoPay.CreateInvoice(r.Context(), monopay.InvoiceRequest{
+			AmountCents:  product.AmountCents,
+			Currency:     product.Currency,
+			Reference:    reference,
+			Destination:  firstNonEmpty(product.Description, product.Name, "Moweton Pro"),
+			RedirectURL:  redirect,
+			WebhookURL:   deps.Config.MonoPayWebhookURL,
+			CustomerData: customerData,
+			Validity:     time.Hour,
+		})
+		if err != nil {
+			WriteError(w, http.StatusBadGateway, "monopay_invoice_failed", err.Error())
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"invoice_id":   invoice.InvoiceID,
+			"checkout_url": invoice.PageURL,
+			"reference":    reference,
+			"amount_cents": product.AmountCents,
+			"currency":     product.Currency,
+		})
 	}
 }
 
@@ -259,20 +342,35 @@ func handleMonoPayWebhook(deps *app.App) http.HandlerFunc {
 			WriteError(w, http.StatusBadRequest, "invalid_payload", err.Error())
 			return
 		}
-		userID, err := uuid.Parse(payload.UserID)
+		customerData := parseMonoPayCustomerData(payload.CustomerData)
+		userID, err := resolveMonoPayUser(payload, customerData)
 		if err != nil {
-			WriteError(w, http.StatusBadRequest, "invalid_user", "user_id must be UUID")
+			WriteError(w, http.StatusBadRequest, "invalid_user", err.Error())
 			return
 		}
 		status := mapMonoPayStatus(payload.Status)
 		exp := time.Now().AddDate(0, 1, 0)
+		productCode := safeString(payload.ProductCode, customerData["product_code"])
+		if productCode == "" {
+			productCode = "monopay_plan"
+		}
+		productName := firstNonEmpty(payload.ProductName, productCode)
+		meta := map[string]any{
+			"invoice_id": payload.InvoiceID,
+			"order_id":   payload.OrderID,
+			"status":     payload.Status,
+		}
+		for k, v := range customerData {
+			meta[k] = v
+		}
+
 		update := billing.SubscriptionUpdate{
 			UserID:                 userID,
 			Provider:               billing.ProviderMonoPay,
-			ProductCode:            safeString(payload.ProductCode, "monopay_plan"),
-			ProductName:            payload.ProductName,
-			ProductDescription:     payload.Details,
-			ExternalProductID:      payload.ProductCode,
+			ProductCode:            productCode,
+			ProductName:            productName,
+			ProductDescription:     firstNonEmpty(payload.Details, productName),
+			ExternalProductID:      productCode,
 			ExternalSubscriptionID: payload.InvoiceID,
 			ExternalCustomerID:     payload.CustomerID,
 			Currency:               strings.ToUpper(payload.Currency),
@@ -280,13 +378,10 @@ func handleMonoPayWebhook(deps *app.App) http.HandlerFunc {
 			Interval:               "month",
 			Status:                 status,
 			CurrentPeriodEnd:       &exp,
-			EntitlementCode:        safeString(payload.EntitlementCode, "pro"),
+			EntitlementCode:        safeString(payload.EntitlementCode, productCode),
 			EntitlementExpires:     &exp,
-			Metadata: map[string]any{
-				"invoice_id": payload.InvoiceID,
-				"status":     payload.Status,
-			},
-			RawEvent: body,
+			Metadata:               meta,
+			RawEvent:               body,
 		}
 		svc := billing.NewService(deps.DB)
 		if err := svc.ApplySubscriptionUpdate(r.Context(), update); err != nil {
@@ -403,6 +498,58 @@ func mapMonoPayStatus(status string) billing.SubscriptionStatus {
 	}
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func parseMonoPayCustomerData(raw string) map[string]string {
+	result := make(map[string]string)
+	if strings.TrimSpace(raw) == "" {
+		return result
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return result
+	}
+	for k, v := range payload {
+		result[k] = fmt.Sprintf("%v", v)
+	}
+	return result
+}
+
+func resolveMonoPayUser(payload monoPayPayload, meta map[string]string) (uuid.UUID, error) {
+	if payload.UserID != "" {
+		return uuid.Parse(payload.UserID)
+	}
+	if userID := meta["user_id"]; userID != "" {
+		return uuid.Parse(userID)
+	}
+	if payload.OrderID != "" {
+		if candidate, err := uuid.Parse(payload.OrderID); err == nil {
+			return candidate, nil
+		}
+		if candidate, err := parseUserFromReference(payload.OrderID); err == nil {
+			return candidate, nil
+		}
+	}
+	return uuid.Nil, errors.New("user_id not provided in webhook payload")
+}
+
+func parseUserFromReference(reference string) (uuid.UUID, error) {
+	trimmed := strings.TrimPrefix(reference, "mono-")
+	parts := strings.Split(trimmed, "-")
+	if len(parts) < 5 {
+		return uuid.Nil, errors.New("reference format invalid")
+	}
+	candidate := strings.Join(parts[:len(parts)-1], "-")
+	return uuid.Parse(candidate)
+}
+
 type revenueCatEvent struct {
 	Type                  string `json:"type"`
 	AppUserID             string `json:"app_user_id"`
@@ -477,4 +624,5 @@ type monoPayPayload struct {
 	Amount          int    `json:"amount"`
 	Currency        string `json:"currency"`
 	Details         string `json:"details"`
+	CustomerData    string `json:"customer_data"`
 }

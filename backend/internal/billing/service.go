@@ -41,6 +41,25 @@ ORDER BY amount_cents ASC, created_at ASC`)
 	return products, rows.Err()
 }
 
+func (s *Service) GetProductByCode(ctx context.Context, code string) (*Product, error) {
+	const query = `
+SELECT id, code, name, COALESCE(description,''), provider, COALESCE(external_id,''), currency, amount_cents, interval, COALESCE(metadata, '{}'::jsonb)
+FROM billing_products
+WHERE active = TRUE AND code = $1
+LIMIT 1`
+	var p Product
+	var metadata json.RawMessage
+	err := s.DB.QueryRowContext(ctx, query, code).Scan(&p.ID, &p.Code, &p.Name, &p.Description, &p.Provider, &p.ExternalID, &p.Currency, &p.AmountCents, &p.Interval, &metadata)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrProductNotFound
+		}
+		return nil, err
+	}
+	p.Metadata = metadata
+	return &p, nil
+}
+
 func (s *Service) CurrentSubscription(ctx context.Context, userID uuid.UUID) (*SubscriptionSnapshot, error) {
 	const query = `
 SELECT p.code, us.status, us.provider, us.current_period_end
