@@ -70,6 +70,14 @@ type Config struct {
 
 	FCMServerKey string `envconfig:"FCM_SERVER_KEY" default:""`
 	FCMEndpoint  string `envconfig:"FCM_ENDPOINT" default:"https://fcm.googleapis.com/fcm/send"`
+
+	StripeAPIKey            string `envconfig:"STRIPE_API_KEY" default:""`
+	StripeWebhookSecret     string `envconfig:"STRIPE_WEBHOOK_SECRET" default:""`
+	StripePortalURL         string `envconfig:"STRIPE_PORTAL_URL" default:""`
+	RevenueCatAPIKey        string `envconfig:"REVENUECAT_API_KEY" default:""`
+	RevenueCatWebhookSecret string `envconfig:"REVENUECAT_WEBHOOK_SECRET" default:""`
+	MonoPayMerchantID       string `envconfig:"MONOPAY_MERCHANT_ID" default:""`
+	MonoPayWebhookSecret    string `envconfig:"MONOPAY_WEBHOOK_SECRET" default:""`
 }
 
 // LoadConfig loads configuration using the provided environment variable prefix.

@@ -71,6 +71,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 		registerPublicLiveRoutes(r, deps)
 		registerExploreRoutes(r, deps)
 		registerSearchRoutes(r, deps)
+		registerBillingWebhookRoutes(r, deps)
 
 		r.Group(func(protected chi.Router) {
 			protected.Use(mw.Auth(deps, logger))
@@ -80,6 +81,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 			registerTopicRoutes(protected, deps)
 			registerCommentRoutes(protected, deps)
 			registerReactionRoutes(protected, deps)
+			registerBillingRoutes(protected, deps)
 			registerPushRoutes(protected, deps)
 			registerReportRoutes(protected, deps)
 			registerLiveRoutes(protected, deps)
