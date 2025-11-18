@@ -1,0 +1,31 @@
+{
+  "@@locale": "en",
+  "commonRetry": "Retry",
+  "smartInboxTitle": "Smart Inbox",
+  "smartInboxOpenInbox": "Open inbox",
+  "smartInboxOpenLatestEpisode": "Open latest episode",
+  "smartInboxOpenEpisode": "Open episode",
+  "smartInboxTrendingTitle": "Trending today",
+  "smartInboxTrendingEmpty": "No standout topics yet. Check back after a few new episodes.",
+  "smartInboxUpdated": "Updated {date}",
+  "@smartInboxUpdated": {
+    "description": "Label that shows when Smart Inbox was last generated",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "smartInboxNewLabel": "NEW",
+  "smartInboxErrorTitle": "Smart Inbox unavailable",
+  "smartInboxErrorDescription": "We couldn't load Smart Inbox insights. Pull to refresh or retry.",
+  "smartInboxRetryCta": "Retry Smart Inbox",
+  "smartInboxLoadFailed": "Smart Inbox failed to load: {error}",
+  "@smartInboxLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}

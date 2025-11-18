@@ -245,3 +245,8 @@
 - API errors like `smart_inbox_warming_up` mean there is no row in `smart_inbox_snapshots`; restart the worker and check logs for `smart inbox snapshot saved`.
 - Snapshot TTL defaults to 15 minutes. If you change digest logic or seed data, restart the worker to immediately repopulate `smart_inbox_snapshots`.
 
+## Feed polish guidance
+- `mobile/lib/presentation/screens/feed_screen.dart` already ships skeleton + error components for Smart Inbox (`_SmartInboxPlaceholder`, `_SmartInboxErrorCard`). Keep copy actionable (e.g., “Unable to load inbox” + Retry button) and retain 14px skeleton bars with `AppTheme.spaceSm` gaps so spacing stays on rhythm.
+- Quick filters (ActionChips in `_SmartInboxPreview`) now drive `feed_filter_provider.applySmartInboxFilter`, which forces the Recommended tab + #tag filter. When tweaking chips, make sure they still dispatch through that notifier method so feed + analytics stay consistent.
+- If skeleton/error UX change, update both the TODO note and design tokens so engineers know whether to adjust AppTheme spacing or copy helpers.
+

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../core/i18n/l10n_extensions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../data/models/episode.dart';
 import '../filters/feed_filters.dart';
@@ -165,7 +166,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   onOpenEpisode: (id) => context.push('/episode/$id'),
                   onOpenInbox: () => context.push('/inbox'),
                   onTagSelected: (tag) {
-                    coverageNotifier.toggleTag(tag);
+                    coverageNotifier.applySmartInboxFilter(tag);
                     tagsNotifier.toggleFollow(tag);
                   },
                 ),
@@ -436,9 +437,9 @@ class _SmartInboxPreview extends StatelessWidget {
             children: [
               const Icon(Icons.auto_awesome, color: AppTheme.brandAccent),
               const SizedBox(width: AppTheme.spaceSm),
-              const Text(
-                'Smart Inbox',
-                style: TextStyle(
+              Text(
+                context.l10n.smartInboxTitle,
+                style: const TextStyle(
                   color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
@@ -446,7 +447,7 @@ class _SmartInboxPreview extends StatelessWidget {
               const Spacer(),
               TextButton(
                 onPressed: onOpenInbox,
-                child: const Text('Open inbox'),
+                child: Text(context.l10n.smartInboxOpenInbox),
               ),
             ],
           ),
@@ -521,7 +522,7 @@ class _SmartInboxPreview extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () => onOpenEpisode(firstEntry.episodeId),
-              child: const Text('Open latest episode'),
+              child: Text(context.l10n.smartInboxOpenLatestEpisode),
             ),
           ),
         ],
@@ -579,22 +580,22 @@ class _SmartInboxErrorCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Smart Inbox unavailable',
-            style: TextStyle(
+          Text(
+            context.l10n.smartInboxErrorTitle,
+            style: const TextStyle(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppTheme.spaceSm),
-          const Text(
-            'We couldn’t load Smart Inbox insights. Pull to refresh or retry.',
-            style: TextStyle(color: AppTheme.textSecondary),
+          Text(
+            context.l10n.smartInboxErrorDescription,
+            style: const TextStyle(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: AppTheme.spaceSm),
           TextButton(
             onPressed: onRetry,
-            child: const Text('Retry Smart Inbox'),
+            child: Text(context.l10n.smartInboxRetryCta),
           ),
         ],
       ),

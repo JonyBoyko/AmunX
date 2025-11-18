@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import '../l10n/app_localizations.dart';
 
 import 'router.dart';
 import 'theme.dart';
-import '../core/i18n/app_localizations.dart';
 import '../core/logging/app_logger.dart';
 import '../presentation/services/push_service.dart';
 import '../presentation/services/revenuecat_service.dart';
@@ -15,7 +15,7 @@ class MowetonApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     AppLogger.info('Building MowetonApp', tag: 'App');
-    
+
     final router = ref.watch(routerProvider);
     ref
       ..watch(pushBootstrapProvider)
@@ -40,4 +40,3 @@ class MowetonApp extends ConsumerWidget {
     );
   }
 }
-

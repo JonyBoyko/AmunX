@@ -1,0 +1,31 @@
+{
+  "@@locale": "uk",
+  "commonRetry": "Повторити",
+  "smartInboxTitle": "Smart Inbox",
+  "smartInboxOpenInbox": "Відкрити інбокс",
+  "smartInboxOpenLatestEpisode": "Відкрити останній епізод",
+  "smartInboxOpenEpisode": "Відкрити епізод",
+  "smartInboxTrendingTitle": "Тренди сьогодні",
+  "smartInboxTrendingEmpty": "Поки немає яскравих тем. Поверніться після появи нових епізодів.",
+  "smartInboxUpdated": "Оновлено {date}",
+  "@smartInboxUpdated": {
+    "description": "Позначка оновлення Smart Inbox",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "smartInboxNewLabel": "НОВЕ",
+  "smartInboxErrorTitle": "Smart Inbox тимчасово недоступний",
+  "smartInboxErrorDescription": "Не вдалося завантажити інсайти Smart Inbox. Потягніть, щоб оновити, або повторіть спробу.",
+  "smartInboxRetryCta": "Повторити Smart Inbox",
+  "smartInboxLoadFailed": "Smart Inbox не завантажився: {error}",
+  "@smartInboxLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}

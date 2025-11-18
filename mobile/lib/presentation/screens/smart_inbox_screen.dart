@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../core/i18n/l10n_extensions.dart';
 import '../providers/smart_inbox_provider.dart';
 
 class SmartInboxScreen extends ConsumerWidget {
@@ -14,7 +15,7 @@ class SmartInboxScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
       appBar: AppBar(
-        title: const Text('Smart Inbox'),
+        title: Text(context.l10n.smartInboxTitle),
         backgroundColor: AppTheme.bgBase,
         foregroundColor: AppTheme.textPrimary,
         elevation: 0,
@@ -62,6 +63,9 @@ class _HighlightsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formattedDate =
+        MaterialLocalizations.of(context).formatFullDate(generatedAt);
+    final updatedLabel = context.l10n.smartInboxUpdated(formattedDate);
     return Card(
       color: AppTheme.surfaceCard,
       child: Padding(
@@ -69,9 +73,9 @@ class _HighlightsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Trending today',
-              style: TextStyle(
+            Text(
+              context.l10n.smartInboxTrendingTitle,
+              style: const TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -79,9 +83,9 @@ class _HighlightsCard extends StatelessWidget {
             ),
             const SizedBox(height: AppTheme.spaceSm),
             if (highlights.isEmpty)
-              const Text(
-                'No standout topics yet. Check back after a few new episodes.',
-                style: TextStyle(color: AppTheme.textSecondary),
+              Text(
+                context.l10n.smartInboxTrendingEmpty,
+                style: const TextStyle(color: AppTheme.textSecondary),
               )
             else
               Wrap(
@@ -100,7 +104,7 @@ class _HighlightsCard extends StatelessWidget {
               ),
             const SizedBox(height: AppTheme.spaceSm),
             Text(
-              'Updated ${MaterialLocalizations.of(context).formatFullDate(generatedAt)}',
+              updatedLabel,
               style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
           ],
@@ -211,9 +215,9 @@ class _InboxEntryTile extends StatelessWidget {
                     color: AppTheme.brandAccent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                   ),
-                  child: const Text(
-                    'NEW',
-                    style: TextStyle(
+                  child: Text(
+                    context.l10n.smartInboxNewLabel,
+                    style: const TextStyle(
                       color: AppTheme.brandAccent,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -241,7 +245,7 @@ class _InboxEntryTile extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () => onOpenEpisode(entry.episodeId),
-              child: const Text('Open episode'),
+              child: Text(context.l10n.smartInboxOpenEpisode),
             ),
           ),
         ],
@@ -265,14 +269,14 @@ class _InboxError extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Smart Inbox failed to load: $message',
+              context.l10n.smartInboxLoadFailed(message),
               style: const TextStyle(color: AppTheme.stateDanger),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppTheme.spaceSm),
             FilledButton(
               onPressed: onRetry,
-              child: const Text('Retry'),
+              child: Text(context.l10n.commonRetry),
             ),
           ],
         ),
