@@ -9,7 +9,7 @@ class LiveTranscriptPanel extends StatelessWidget {
     required this.status,
     required this.segments,
     this.title = 'Live transcript',
-    this.emptyLabel = 'Start talking to see captions appear here.',
+    this.emptyLabel = 'Start speaking to see text appear here.',
     this.maxItems = 6,
   });
 
@@ -39,7 +39,9 @@ class LiveTranscriptPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppTheme.spaceSm),
-          if (status == LivekitStatus.connected && segments.isNotEmpty)
+          if ((status == LivekitStatus.connected ||
+                  status == LivekitStatus.reconnecting) &&
+              segments.isNotEmpty)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: segments

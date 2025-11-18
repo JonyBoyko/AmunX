@@ -24,15 +24,26 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
   @override
   void initState() {
     super.initState();
+    ref.listen<LivekitSessionState>(
+      livekitControllerProvider,
+      _handleStatusChange,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _joinRoom());
   }
 
-  Future<void> _joinRoom() async {
+  Future<void> _joinRoom({bool retry = false}) async {
     final rooms = ref.read(liveRoomsProvider);
     _resolvedRoom = widget.room ?? (rooms.isNotEmpty ? rooms.first : null);
     final sessionId = _resolvedRoom?.id;
     if (sessionId == null) {
       return;
+    }
+    if (retry && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Retrying connection...')),
+      );
     }
     try {
       await ref.read(livekitControllerProvider.notifier).joinSession(sessionId);
@@ -49,6 +60,50 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
   void dispose() {
     ref.read(livekitControllerProvider.notifier).leave();
     super.dispose();
+  }
+
+  void _handleStatusChange(
+    LivekitSessionState? previous,
+    LivekitSessionState next,
+  ) {
+    if (!mounted) {
+      return;
+    }
+    if (next.status == LivekitStatus.reconnecting &&
+        previous?.status != LivekitStatus.reconnecting) {
+      _showStatusSnackBar(
+        'Trying to reconnect to LiveKit...',
+        actionLabel: 'Retry',
+        onAction: () => _joinRoom(retry: true),
+      );
+      return;
+    }
+    if (previous?.status == LivekitStatus.reconnecting &&
+        next.status == LivekitStatus.connected) {
+      _showStatusSnackBar('Reconnected to LiveKit');
+    }
+  }
+
+  void _showStatusSnackBar(
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: actionLabel != null && onAction != null
+              ? SnackBarAction(label: actionLabel, onPressed: onAction)
+              : null,
+        ),
+      );
+    });
   }
 
   @override
@@ -88,6 +143,13 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
         child: Column(
           children: [
             _ListenerHeader(onBack: () => context.pop()),
+            _ConnectionBanner(
+              status: state.status,
+              error: state.error,
+              onRetry: state.status == LivekitStatus.error
+                  ? () => _joinRoom(retry: true)
+                  : null,
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(AppTheme.spaceXl),
@@ -211,7 +273,15 @@ class _HostCard extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
-                'Connecting to LiveKit…',
+                'Connecting to LiveKit...',
+                style: TextStyle(color: Colors.white70),
+              ),
+            )
+          else if (state.status == LivekitStatus.reconnecting)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Trying to reconnect to LiveKit...',
                 style: TextStyle(color: Colors.white70),
               ),
             ),
@@ -255,3 +325,64 @@ class _ReactionPanel extends StatelessWidget {
   }
 }
 
+class _ConnectionBanner extends StatelessWidget {
+  const _ConnectionBanner({
+    required this.status,
+    required this.error,
+    this.onRetry,
+  });
+
+  final LivekitStatus status;
+  final String? error;
+  final Future<void> Function()? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == LivekitStatus.connected) {
+      return const SizedBox.shrink();
+    }
+    final message = switch (status) {
+      LivekitStatus.connecting => 'Connecting to LiveKit...',
+      LivekitStatus.reconnecting => 'Trying to reconnect to LiveKit...',
+      LivekitStatus.error => error ?? 'Connection lost. Please retry.',
+      _ => '',
+    };
+    if (message.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spaceLg,
+        vertical: AppTheme.spaceSm,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(AppTheme.spaceSm),
+        decoration: BoxDecoration(
+          color: AppTheme.bgRaised,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(color: AppTheme.surfaceBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              status == LivekitStatus.error
+                  ? Icons.warning_amber_outlined
+                  : Icons.wifi_tethering,
+              color: AppTheme.brandAccent,
+            ),
+            const SizedBox(width: AppTheme.spaceSm),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            if (status == LivekitStatus.error && onRetry != null)
+              TextButton(
+                onPressed: () => onRetry!(),
+                child: const Text('Retry'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

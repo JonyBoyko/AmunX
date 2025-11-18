@@ -54,6 +54,15 @@ docker compose up -d        # Postgres, Redis, LiveKit, Loki/Grafana, API, worke
 Locally the API is exposed at `http://localhost:8080/v1` (production: `https://api.moweton.com/v1`).  
 Seed data example: `docker compose exec postgres psql -U postgres -d postgres`.
 
+### Smart Inbox worker
+
+Smart Inbox responses are now served from cached snapshots to keep the `/smart-inbox` handler fast.
+
+- The worker (`cd backend && go run ./cmd/worker` or `docker compose up worker`) warms the cache immediately on start and then refreshes snapshots every five minutes (default interval) with a 15-minute TTL (`smart_inbox_snapshots.valid_until`).
+- While the cache is cold, the API returns `503 smart_inbox_warming_up`; once a snapshot exists, the mobile client fetches the cached payload (limit 60) and only hits the DB directly for custom limits.
+- Logs to watch: `smart inbox warmup failed` (generation error) and `smart inbox snapshot saved` (success). A stuck cache usually means the worker cannot reach Postgres.
+- To manually re-prime the cache, restart the worker; it executes one `Generate` cycle immediately and then resumes the schedule. Old snapshots are pruned after 24 hours.
+
 ## Mobile (Flutter)
 
 ```bash

@@ -239,3 +239,9 @@
 - [x] Smart Inbox worker/TL;DR snapshots (backend/internal/worker/smartinbox)
 - [x] Smart Inbox feed preview skeleton/error states + tag filters
 
+## Smart Inbox worker runbook
+- Worker lives in `backend/cmd/worker` and is already wired into `docker compose up`. For manual runs outside Docker: `cd backend && go run ./cmd/worker`.
+- On startup the worker calls `Generate` once to warm the cache, then refreshes snapshots every ~5 minutes (configurable) and prunes payloads older than 24h.
+- API errors like `smart_inbox_warming_up` mean there is no row in `smart_inbox_snapshots`; restart the worker and check logs for `smart inbox snapshot saved`.
+- Snapshot TTL defaults to 15 minutes. If you change digest logic or seed data, restart the worker to immediately repopulate `smart_inbox_snapshots`.
+

@@ -82,6 +82,12 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
         child: Column(
           children: [
             _Header(timerLabel: '$minutes:$seconds'),
+            _ConnectionBanner(
+              status: state.status,
+              error: state.error,
+              onRetry:
+                  state.status == LivekitStatus.error ? _startSession : null,
+            ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(AppTheme.spaceXl),
@@ -178,7 +184,8 @@ class _AudienceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = switch (status) {
-      LivekitStatus.connecting => 'Connecting to LiveKit…',
+      LivekitStatus.connecting => 'Connecting to LiveKit...',
+      LivekitStatus.reconnecting => 'Trying to reconnect to LiveKit...',
       LivekitStatus.error => error ?? 'Connection lost',
       _ => 'Session is live',
     };
@@ -217,6 +224,70 @@ class _AudienceCard extends StatelessWidget {
   }
 }
 
+class _ConnectionBanner extends StatelessWidget {
+  const _ConnectionBanner({
+    required this.status,
+    required this.error,
+    this.onRetry,
+  });
+
+  final LivekitStatus status;
+  final String? error;
+  final Future<void> Function()? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == LivekitStatus.connected) {
+      return const SizedBox.shrink();
+    }
+    final message = switch (status) {
+      LivekitStatus.connecting => 'Connecting to LiveKit...',
+      LivekitStatus.reconnecting => 'Trying to reconnect to LiveKit...',
+      LivekitStatus.error => error ?? 'Connection lost. Please retry.',
+      _ => '',
+    };
+    if (message.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spaceLg,
+        vertical: AppTheme.spaceSm,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(AppTheme.spaceSm),
+        decoration: BoxDecoration(
+          color: AppTheme.bgRaised,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(color: AppTheme.surfaceBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              status == LivekitStatus.error
+                  ? Icons.warning_amber_outlined
+                  : Icons.wifi_tethering,
+              color: AppTheme.brandAccent,
+            ),
+            const SizedBox(width: AppTheme.spaceSm),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            if (status == LivekitStatus.error && onRetry != null)
+              TextButton(
+                onPressed: () => onRetry!(),
+                child: const Text('Retry'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Controls extends StatelessWidget {
   const _Controls({
     required this.muted,
@@ -232,6 +303,8 @@ class _Controls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isConnecting =
+        status == LivekitStatus.connecting || status == LivekitStatus.reconnecting;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -255,8 +328,8 @@ class _Controls extends StatelessWidget {
             backgroundColor: AppTheme.stateDanger,
             padding: const EdgeInsets.all(26),
           ),
-          onPressed: status == LivekitStatus.connecting ? null : () => onEnd(),
-          child: status == LivekitStatus.connecting
+          onPressed: isConnecting ? null : () => onEnd(),
+          child: isConnecting
               ? const SizedBox(
                   width: 20,
                   height: 20,

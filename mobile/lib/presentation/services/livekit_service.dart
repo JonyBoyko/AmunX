@@ -16,7 +16,7 @@ final livekitControllerProvider =
   (ref) => LivekitController(ref),
 );
 
-enum LivekitStatus { idle, connecting, connected, error }
+enum LivekitStatus { idle, connecting, reconnecting, connected, error }
 
 class LivekitSessionState {
   final LivekitStatus status;
@@ -299,7 +299,7 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
     } else if (event is DataReceivedEvent) {
       _handleTranscriptPacket(event.data);
     } else if (event is RoomReconnectingEvent) {
-      state = state.copyWith(status: LivekitStatus.connecting);
+      state = state.copyWith(status: LivekitStatus.reconnecting);
     } else if (event is RoomDisconnectedEvent) {
       _scheduleReconnect();
     }
@@ -313,6 +313,7 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
       );
       return;
     }
+    state = state.copyWith(status: LivekitStatus.reconnecting);
     final attemptIndex = _reconnectManager.attempts + 1;
     final delay = _reconnectManager.nextDelay();
     AppLogger.warning(
