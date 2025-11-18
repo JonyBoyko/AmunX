@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,12 +8,13 @@ import '../providers/live_rooms_provider.dart';
 import '../services/livekit_service.dart';
 
 class LiveListenerScreen extends ConsumerStatefulWidget {
-  final LiveRoom? room;
-
   const LiveListenerScreen({super.key, this.room});
 
+  final LiveRoom? room;
+
   @override
-  ConsumerState<LiveListenerScreen> createState() => _LiveListenerScreenState();
+  ConsumerState<LiveListenerScreen> createState() =>
+      _LiveListenerScreenState();
 }
 
 class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
@@ -36,10 +36,10 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
     try {
       await ref.read(livekitControllerProvider.notifier).joinSession(sessionId);
       setState(() {});
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не вдалося підʼєднатися: $e')),
+        SnackBar(content: Text('Не вдалося приєднатися: $error')),
       );
     }
   }
@@ -55,7 +55,7 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
     final rooms = ref.watch(liveRoomsProvider);
     final room =
         _resolvedRoom ?? widget.room ?? (rooms.isNotEmpty ? rooms.first : null);
-    final sessionState = ref.watch(livekitControllerProvider);
+    final state = ref.watch(livekitControllerProvider);
 
     if (room == null) {
       return Scaffold(
@@ -65,12 +65,14 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Немає активних live-сесій',
-                    style: TextStyle(color: AppTheme.textPrimary),),
+                const Text(
+                  'Немає активних live.',
+                  style: TextStyle(color: AppTheme.textPrimary),
+                ),
                 const SizedBox(height: AppTheme.spaceMd),
                 FilledButton(
                   onPressed: () => context.pop(),
-                  child: const Text('Назад'),
+                  child: const Text('Повернутись'),
                 ),
               ],
             ),
@@ -84,17 +86,20 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context),
+            _ListenerHeader(onBack: () => context.pop()),
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(AppTheme.spaceXl),
                 child: Column(
                   children: [
-                    _buildHostCard(room, sessionState),
+                    _HostCard(room: room, state: state),
                     const SizedBox(height: AppTheme.spaceXl),
-                    _buildTranscriptPreview(room, sessionState.status),
+                    _TranscriptFeed(
+                      status: state.status,
+                      segments: state.transcript,
+                    ),
                     const SizedBox(height: AppTheme.spaceXl),
-                    _buildReactions(),
+                    _ReactionPanel(),
                   ],
                 ),
               ),
@@ -104,8 +109,15 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
       ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context) {
+class _ListenerHeader extends StatelessWidget {
+  const _ListenerHeader({required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: const BoxDecoration(
@@ -116,94 +128,109 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => context.pop(),
-            icon: const Icon(Icons.arrow_back_ios_new,
-                color: AppTheme.textPrimary,),
+            onPressed: onBack,
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: AppTheme.textPrimary,
+            ),
           ),
           const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spaceMd,
+              vertical: AppTheme.spaceXs,
+            ),
             decoration: BoxDecoration(
-              color: AppTheme.stateDanger,
-              borderRadius: BorderRadius.circular(24),
+              color: AppTheme.stateDanger.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             ),
             child: const Text(
               'LIVE',
               style: TextStyle(
-                  color: AppTheme.textInverse, fontWeight: FontWeight.bold,),
+                color: AppTheme.stateDanger,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildHostCard(LiveRoom room, LivekitSessionState state) {
+class _HostCard extends StatelessWidget {
+  const _HostCard({required this.room, required this.state});
+
+  final LiveRoom room;
+  final LivekitSessionState state;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppTheme.spaceXl),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF4338CA), Color(0xFFEC4899)],
+          colors: [Color(0xFF1F1C2C), Color(0xFF928DAB)],
         ),
         borderRadius: BorderRadius.circular(AppTheme.radiusXl),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 36,
-            backgroundColor: Colors.white24,
-            child: Text(room.emoji,
-                style: const TextStyle(color: Colors.white, fontSize: 24),),
-          ),
-          const SizedBox(width: AppTheme.spaceLg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  room.hostName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  room.topic,
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${state.listenerCount} слухачів',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-                if (state.status == LivekitStatus.error && state.error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      state.error!,
-                      style: const TextStyle(color: Colors.redAccent),
-                    ),
-                  )
-                else if (state.status == LivekitStatus.connecting)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Підключення…',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                  ),
-              ],
+          Text(
+            room.topic,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            '@${room.handle.replaceFirst('@', '')}',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${state.listenerCount} слухачів прямо зараз',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          if (state.status == LivekitStatus.error && state.error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                state.error!,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            )
+          else if (state.status == LivekitStatus.connecting)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'З’єднання з LiveKit…',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildTranscriptPreview(LiveRoom room, LivekitStatus status) {
+class _TranscriptFeed extends StatelessWidget {
+  const _TranscriptFeed({
+    required this.status,
+    required this.segments,
+  });
+
+  final LivekitStatus status;
+  final List<TranscriptSegment> segments;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: BoxDecoration(
         color: AppTheme.bgRaised,
@@ -213,30 +240,83 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Live Translate',
-            style: TextStyle(color: AppTheme.textSecondary),
+            'Live-транскрипт',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            room.topic,
-            style: const TextStyle(color: AppTheme.textPrimary, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          const Divider(color: AppTheme.surfaceBorder),
-          const SizedBox(height: 12),
-          Text(
-            status == LivekitStatus.connected
-                ? 'Слухаємо в реальному часі.'
-                : 'Чекаємо на підключення стриму…',
-            style: const TextStyle(color: AppTheme.textSecondary, height: 1.4),
-          ),
+          const SizedBox(height: AppTheme.spaceSm),
+          if (status == LivekitStatus.connected && segments.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: segments
+                  .take(6)
+                  .map(
+                    (segment) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _TranscriptLine(segment: segment),
+                    ),
+                  )
+                  .toList(),
+            )
+          else
+            const Text(
+              'Текст з’явиться, щойно розмова почнеться.',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildReactions() {
-    final reactions = ['👍', '🔥', '💡', '🎯', '👏'];
+class _TranscriptLine extends StatelessWidget {
+  const _TranscriptLine({required this.segment});
+
+  final TranscriptSegment segment;
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = _languageLabel(segment);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          segment.speakerLabel,
+          style: const TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          segment.text,
+          style: const TextStyle(
+            color: AppTheme.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        if (meta != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              meta,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ReactionPanel extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    const reactions = ['👍', '🔥', '👏', '🤯', '❤️'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -249,18 +329,15 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
           spacing: 12,
           children: reactions
               .map(
-                (emoji) => GestureDetector(
-                  onTap: () {},
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: AppTheme.bgRaised,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                (emoji) => Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppTheme.bgRaised,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                   ),
+                  alignment: Alignment.center,
+                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
                 ),
               )
               .toList(),
@@ -268,4 +345,16 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
       ],
     );
   }
+}
+
+String? _languageLabel(TranscriptSegment segment) {
+  final language = segment.language?.trim();
+  if (language == null || language.isEmpty) {
+    return null;
+  }
+  final upper = language.toUpperCase();
+  if (segment.isTranslation) {
+    return 'Переклад ($upper)';
+  }
+  return upper;
 }

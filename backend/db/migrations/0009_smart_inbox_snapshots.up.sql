@@ -1,0 +1,1 @@
+CREATE TABLE smart_inbox_snapshots (\n    id BIGSERIAL PRIMARY KEY,\n    payload JSONB NOT NULL,\n    generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    valid_until TIMESTAMPTZ NOT NULL,\n    source_count INTEGER NOT NULL DEFAULT 0\n);\n\nCREATE INDEX idx_smart_inbox_snapshots_valid\n    ON smart_inbox_snapshots (valid_until DESC, generated_at DESC);\n

@@ -190,6 +190,16 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getSmartInbox({int? limit}) async {
+    final response = await _dio.get(
+      '/v1/smart-inbox',
+      queryParameters: {
+        if (limit != null) 'limit': limit,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> createMonoPayCheckout({
     required String productCode,
     String? successUrl,

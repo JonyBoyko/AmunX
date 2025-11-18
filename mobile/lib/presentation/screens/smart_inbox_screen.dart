@@ -17,6 +17,7 @@ class SmartInboxScreen extends ConsumerWidget {
         title: const Text('Smart Inbox'),
         backgroundColor: AppTheme.bgBase,
         foregroundColor: AppTheme.textPrimary,
+        elevation: 0,
       ),
       body: inboxAsync.when(
         data: (state) => RefreshIndicator(
@@ -69,7 +70,7 @@ class _HighlightsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Що гарячого',
+              'Trending today',
               style: TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 18,
@@ -79,7 +80,7 @@ class _HighlightsCard extends StatelessWidget {
             const SizedBox(height: AppTheme.spaceSm),
             if (highlights.isEmpty)
               const Text(
-                'Поки затишшя. Підкинь свіжих тем або онови стрічку.',
+                'No standout topics yet. Check back after a few new episodes.',
                 style: TextStyle(color: AppTheme.textSecondary),
               )
             else
@@ -99,11 +100,8 @@ class _HighlightsCard extends StatelessWidget {
               ),
             const SizedBox(height: AppTheme.spaceSm),
             Text(
-              'Оновлено: ${MaterialLocalizations.of(context).formatFullDate(generatedAt)}',
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-              ),
+              'Updated ${MaterialLocalizations.of(context).formatFullDate(generatedAt)}',
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
           ],
         ),
@@ -134,31 +132,33 @@ class _DigestCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                digest.dayLabel,
-                style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              Wrap(
-                spacing: 8,
-                children: digest.tags
-                    .map(
-                      (tag) => Chip(
-                        label: Text('#$tag'),
-                        backgroundColor: AppTheme.surfaceCard,
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
+          Text(
+            digest.dayLabel,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+            ),
           ),
-          const SizedBox(height: AppTheme.spaceSm),
+          const SizedBox(height: 6),
+          if (digest.summary.isNotEmpty)
+            Text(
+              digest.summary,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          if (digest.tags.isNotEmpty) ...[
+            const SizedBox(height: AppTheme.spaceSm),
+            Wrap(
+              spacing: 6,
+              children: digest.tags
+                  .map((tag) => Chip(label: Text('#$tag')))
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: AppTheme.spaceMd),
           ...digest.entries.map(
             (entry) => _InboxEntryTile(
               entry: entry,
@@ -196,7 +196,7 @@ class _InboxEntryTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  entry.episode.title ?? 'Без назви',
+                  entry.title,
                   style: const TextStyle(
                     color: AppTheme.textPrimary,
                     fontWeight: FontWeight.w600,
@@ -205,10 +205,8 @@ class _InboxEntryTile extends StatelessWidget {
               ),
               if (entry.isNew)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppTheme.brandAccent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppTheme.radiusSm),
@@ -227,22 +225,14 @@ class _InboxEntryTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             entry.snippet,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              height: 1.3,
-            ),
+            style: const TextStyle(color: AppTheme.textSecondary, height: 1.4),
           ),
           if (entry.tags.isNotEmpty) ...[
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
               children: entry.tags
-                  .map(
-                    (tag) => Chip(
-                      label: Text('#$tag'),
-                      backgroundColor: AppTheme.bgRaised,
-                    ),
-                  )
+                  .map((tag) => Chip(label: Text('#$tag')))
                   .toList(),
             ),
           ],
@@ -250,8 +240,8 @@ class _InboxEntryTile extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () => onOpenEpisode(entry.episode.id),
-              child: const Text('Відкрити епізод'),
+              onPressed: () => onOpenEpisode(entry.episodeId),
+              child: const Text('Open episode'),
             ),
           ),
         ],
@@ -275,14 +265,14 @@ class _InboxError extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Smart Inbox недоступний: $message',
+              'Smart Inbox failed to load: $message',
               style: const TextStyle(color: AppTheme.stateDanger),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppTheme.spaceSm),
             FilledButton(
               onPressed: onRetry,
-              child: const Text('Спробувати ще раз'),
+              child: const Text('Retry'),
             ),
           ],
         ),

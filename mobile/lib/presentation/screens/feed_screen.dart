@@ -15,6 +15,7 @@ import '../providers/live_rooms_provider.dart';
 import '../providers/tag_provider.dart';
 import '../providers/reaction_provider.dart';
 import '../services/live_notification_service.dart';
+import '../providers/smart_inbox_provider.dart';
 import '../utils/feed_classifiers.dart';
 import '../widgets/episode_card.dart';
 import '../widgets/mini_player_bar.dart';
@@ -69,6 +70,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     final tags = ref.watch(trendingTagsProvider);
     final liveRooms = ref.watch(liveRoomsProvider);
     final liveNotification = ref.watch(liveNotificationProvider);
+    final smartInboxAsync = ref.watch(smartInboxProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
@@ -92,6 +94,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   filterState,
                   tags,
                   liveRooms,
+                  smartInboxAsync,
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stack) => _buildError(context),
@@ -124,6 +127,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     FeedFilterState filters,
     List<FeedTag> tags,
     List<LiveRoom> liveRooms,
+    AsyncValue<SmartInboxState> smartInboxAsync,
   ) {
     final coverageNotifier = ref.read(feedFilterProvider.notifier);
     final tagsNotifier = ref.read(trendingTagsProvider.notifier);
@@ -140,6 +144,34 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             onSearchTap: () => context.push('/search'),
             onInboxTap: () => context.push('/inbox'),
           ),
+        ),
+        smartInboxAsync.when(
+          data: (state) {
+            if (state.digests.isEmpty) {
+              return const SliverToBoxAdapter(child: SizedBox.shrink());
+            }
+            return SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spaceLg,
+                  vertical: AppTheme.spaceMd,
+                ),
+                child: _SmartInboxPreview(
+                  digest: state.digests.first,
+                  highlights: state.highlights,
+                  onOpenEpisode: (id) => context.push('/episode/$id'),
+                  onOpenInbox: () => context.push('/inbox'),
+                ),
+              ),
+            );
+          },
+          loading: () => const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(AppTheme.spaceLg),
+              child: LinearProgressIndicator(),
+            ),
+          ),
+          error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
         ),
         SliverToBoxAdapter(
           child: _FormatSwitchBar(
@@ -341,6 +373,119 @@ class _FeedHeader extends StatelessWidget {
             icon: const Icon(
               Icons.person_outline,
               color: AppTheme.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmartInboxPreview extends StatelessWidget {
+  const _SmartInboxPreview({
+    required this.digest,
+    required this.highlights,
+    required this.onOpenEpisode,
+    required this.onOpenInbox,
+  });
+
+  final SmartInboxDigest digest;
+  final List<String> highlights;
+  final ValueChanged<String> onOpenEpisode;
+  final VoidCallback onOpenInbox;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstEntry = digest.entries.isNotEmpty ? digest.entries.first : null;
+    if (firstEntry == null) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spaceLg),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        border: Border.all(color: AppTheme.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: AppTheme.brandAccent),
+              const SizedBox(width: AppTheme.spaceSm),
+              const Text(
+                'Smart Inbox',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: onOpenInbox,
+                child: const Text('Відкрити'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spaceSm),
+          Text(
+            digest.dayLabel,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (digest.summary.isNotEmpty) ...[
+            Text(
+              digest.summary,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else ...[
+            Text(
+              firstEntry.title,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              firstEntry.snippet,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(color: AppTheme.textSecondary, height: 1.3),
+            ),
+          ],
+          if (highlights.isNotEmpty) ...[
+            const SizedBox(height: AppTheme.spaceSm),
+            Wrap(
+              spacing: 6,
+              children: highlights
+                  .take(3)
+                  .map(
+                    (tag) => Chip(
+                      label: Text('#$tag'),
+                      backgroundColor: AppTheme.bgRaised,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: AppTheme.spaceSm),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => onOpenEpisode(firstEntry.episodeId),
+              child: const Text('Перейти до епізоду'),
             ),
           ),
         ],
@@ -840,3 +985,5 @@ class _LiveNotificationBanner extends StatelessWidget {
     );
   }
 }
+
+

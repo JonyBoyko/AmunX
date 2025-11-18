@@ -45,6 +45,10 @@ class AppConfig {
   static const bool commentsEnabled = true;
   static const bool reactionsEnabled = true;
   static const bool proSubscriptionsEnabled = true;
+  static const bool smartInboxFallbackEnabled = bool.fromEnvironment(
+    'SMART_INBOX_FALLBACK',
+    defaultValue: true,
+  );
 
   // App Info
   static const String appVersion = '1.0.0';

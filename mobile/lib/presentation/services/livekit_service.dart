@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -9,6 +8,8 @@ import '../../data/models/live_session.dart';
 import '../models/live_room.dart';
 import '../providers/live_rooms_provider.dart';
 import '../providers/session_provider.dart';
+import 'livekit_reconnect_manager.dart';
+import 'transcript_parser.dart';
 
 final livekitControllerProvider =
     StateNotifierProvider<LivekitController, LivekitSessionState>(
@@ -23,6 +24,7 @@ class LivekitSessionState {
   final LiveSession? session;
   final int listenerCount;
   final String? error;
+  final List<TranscriptSegment> transcript;
 
   const LivekitSessionState({
     required this.status,
@@ -30,12 +32,14 @@ class LivekitSessionState {
     required this.listenerCount,
     this.session,
     this.error,
+    this.transcript = const [],
   });
 
   const LivekitSessionState._({
     required this.status,
     required this.isHost,
     required this.listenerCount,
+    this.transcript = const [],
   })  : session = null,
         error = null;
 
@@ -54,6 +58,7 @@ class LivekitSessionState {
     bool clearSession = false,
     int? listenerCount,
     String? error,
+    List<TranscriptSegment>? transcript,
   }) {
     return LivekitSessionState(
       status: status ?? this.status,
@@ -61,6 +66,7 @@ class LivekitSessionState {
       session: clearSession ? null : (session ?? this.session),
       listenerCount: listenerCount ?? this.listenerCount,
       error: error,
+      transcript: transcript ?? this.transcript,
     );
   }
 }
@@ -70,7 +76,12 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
 
   final Ref _ref;
   Room? _room;
+  EventsListener<RoomEvent>? _roomEvents;
   Timer? _statsTimer;
+  Timer? _reconnectTimer;
+  _JoinContext? _lastJoin;
+  final LivekitReconnectManager _reconnectManager =
+      LivekitReconnectManager();
 
   Future<void> startHosting({
     String? title,
@@ -211,17 +222,23 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
     required bool isHost,
   }) async {
     final room = Room();
+    await _roomEvents?.dispose();
+    final listener = room.createListener();
+    listener.on<RoomEvent>(_handleRoomEvent);
+    _roomEvents = listener;
     await room.connect(join.url, join.token);
     final localParticipant = room.localParticipant;
     if (localParticipant != null) {
       await localParticipant.setMicrophoneEnabled(isHost);
     }
     _room = room;
+    _lastJoin = _JoinContext(join, isHost);
     _statsTimer?.cancel();
     _statsTimer = Timer.periodic(
       const Duration(seconds: 2),
       (_) => _emitStats(),
     );
+    _reconnectManager.reset();
 
     state = LivekitSessionState(
       status: LivekitStatus.connected,
@@ -236,11 +253,17 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
   Future<void> _disconnectRoom() async {
     _statsTimer?.cancel();
     _statsTimer = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    await _roomEvents?.dispose();
+    _roomEvents = null;
     if (_room != null) {
       await _room?.disconnect();
       await _room?.dispose();
       _room = null;
     }
+    _lastJoin = null;
+    _reconnectManager.reset();
   }
 
   int _currentListenerCount() {
@@ -262,4 +285,97 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
         .read(liveRoomsProvider.notifier)
         .updateListenerCount(session.id, listeners);
   }
+
+  void _handleRoomEvent(RoomEvent event) {
+    if (event is ParticipantConnectedEvent ||
+        event is ParticipantDisconnectedEvent) {
+      _emitStats();
+    } else if (event is DataReceivedEvent) {
+      _handleTranscriptPacket(event.data);
+    } else if (event is RoomReconnectingEvent) {
+      state = state.copyWith(status: LivekitStatus.connecting);
+    } else if (event is RoomDisconnectedEvent) {
+      _scheduleReconnect();
+    }
+  }
+
+  void _scheduleReconnect() {
+    if (_lastJoin == null || !_reconnectManager.canAttempt) {
+      state = state.copyWith(
+        status: LivekitStatus.error,
+        error: 'connectivity_lost',
+      );
+      return;
+    }
+    final delay = _reconnectManager.nextDelay();
+    _reconnectManager.markAttempt();
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(delay, _attemptReconnect);
+  }
+
+  Future<void> _attemptReconnect() async {
+    final context = _lastJoin;
+    if (context == null) {
+      return;
+    }
+    try {
+      await _connect(context.join, isHost: context.isHost);
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'LiveKit reconnect failed',
+        tag: 'LiveKit',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      _scheduleReconnect();
+    }
+  }
+
+  void _handleTranscriptPacket(List<int> data) {
+    final message = decodeTranscriptMessage(data);
+    if (message == null || message.text.isEmpty) {
+      return;
+    }
+    final updated = List<TranscriptSegment>.from(state.transcript)
+      ..add(
+        TranscriptSegment(
+          text: message.text,
+          timestamp: message.timestamp ?? DateTime.now(),
+          speaker: message.speaker,
+          language: message.displayLanguage,
+          isTranslation: message.isTranslation,
+        ),
+      );
+    const maxSegments = 20;
+    final trimmed = updated.length > maxSegments
+        ? updated.sublist(updated.length - maxSegments)
+        : updated;
+    state = state.copyWith(transcript: trimmed);
+  }
+}
+
+class _JoinContext {
+  _JoinContext(this.join, this.isHost);
+  final LiveSessionJoin join;
+  final bool isHost;
+}
+
+class TranscriptSegment {
+  const TranscriptSegment({
+    required this.text,
+    required this.timestamp,
+    this.speaker,
+    this.language,
+    this.isTranslation = false,
+  });
+
+  final String text;
+  final DateTime timestamp;
+  final String? speaker;
+  final String? language;
+  final bool isTranslation;
+
+  String get speakerLabel => speaker == null || speaker!.trim().isEmpty
+      ? 'Host'
+      : speaker!;
 }

@@ -70,6 +70,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 		registerPublicCommentRoutes(r, deps)
 		registerPublicLiveRoutes(r, deps)
 		registerExploreRoutes(r, deps)
+		registerSmartInboxRoutes(r, deps)
 		registerSearchRoutes(r, deps)
 		registerBillingWebhookRoutes(r, deps)
 

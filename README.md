@@ -79,12 +79,18 @@ Notes:
 3. Run `flutter run` → log in with any email (dev mode auto-logs you in) → verify feed, episode detail, comments, recorder/publish flows.
 4. Backend tests: `./scripts/test.sh` spins up the test stack (`docker-compose.test.yml`) and executes Go integration suite.
 
-## Open tasks before production
+## Roadmap snapshot
 
-- **Audio pipeline hardening**: dev uploader stores files locally; wire into the finalized `/v1/episodes` + `/finalize` flow, S3 storage, worker processing, and playback stats.
-- **Authentication**: dev login endpoint skips e-mail verification/refresh tokens; finish real magic-link emails + refresh rotation and remove the `/dev-login` shortcut.
-- **Mobile integration coverage**: expand `integration_test/` to cover recording/upload, comments, and profile settings (current test is a smoke path only).
-- **Live features**: connect Live Host/Listener screens to LiveKit events (currently UI-only).
-- **Content moderation & analytics**: ensure backend configs (Loki/Grafana) match production requirements once telemetry is finalized.
+### Stage 2 (Backend/UI sync)
+- ✅ Explore/Search hooked to `/v1/explore` + filters, caching, empty/error states.
+- ✅ Author profiles wired to `/v1/me/profile`, social links editor.
+- ✅ Paywall screen talks to Stripe/MonoPay/RevenueCat + portal hand-offs.
+- ✅ Push service registers/unregisters devices, exposes status in Settings.
+- ⏳ Audio hardening + S3 pipeline, auth refresh rotation (in progress).
 
-Everything else from previous documentation was consolidated here to keep a single source of truth. Refer to Git history if you need any removed notes.
+### Stage 3 (AI/behavioral)
+- ✅ Smart Inbox prototype (client-side digest/highlights + tests).
+- ⏳ Move Smart Inbox to backend and feed API when worker is ready.
+- ⏳ LiveKit reconnection/backoff (partially done) + Live transcripts, Smart Inbox + TL;DR, Smart Inbox in feed preview.
+
+Everything else from previous docs lives here now; browse Git history for legacy notes.

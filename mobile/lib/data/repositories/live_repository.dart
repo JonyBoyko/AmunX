@@ -4,12 +4,14 @@ import '../api/api_client.dart';
 import '../../presentation/providers/session_provider.dart';
 
 class LiveRepository {
-  LiveRepository(this._ref);
+  LiveRepository(this.ref);
 
-  final Ref _ref;
+  final Ref ref;
 
-  Future<List<Map<String, dynamic>>> fetchActiveRoomsRaw({int limit = 20}) async {
-    final token = _ref.read(sessionProvider).token;
+  Future<List<Map<String, dynamic>>> fetchActiveRoomsRaw({
+    int limit = 20,
+  }) async {
+    final token = ref.read(sessionProvider).token;
     final client = createApiClient(token: token);
     final response = await client.getLiveSessions(limit: limit);
     final sessions = response['sessions'] as List<dynamic>? ?? const [];
