@@ -75,7 +75,7 @@ func NewServer(cfg app.Config, logger zerolog.Logger, deps *app.App) *Server {
 
 		r.Group(func(protected chi.Router) {
 			protected.Use(mw.Auth(deps, logger))
-			registerUserRoutes(protected)
+			registerUserRoutes(protected, deps)
 			registerFollowRoutes(protected, deps)
 			registerEpisodeRoutes(protected, deps)
 			registerTopicRoutes(protected, deps)

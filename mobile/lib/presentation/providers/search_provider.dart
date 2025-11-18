@@ -74,7 +74,10 @@ class SearchNotifier extends StateNotifier<SearchState> {
   final Ref _ref;
   static const _pageSize = 20;
 
-  Future<void> search(String query) async {
+  Future<void> search(
+    String query, {
+    bool preferCache = true,
+  }) async {
     final trimmed = query.trim();
     if (trimmed.length < 2) {
       state = state.copyWith(
@@ -85,13 +88,23 @@ class SearchNotifier extends StateNotifier<SearchState> {
       );
       return;
     }
+    final repo = _ref.read(searchRepositoryProvider);
+    final cached = preferCache ? repo.peekCached(query: trimmed) : null;
     state = state.copyWith(
       query: trimmed,
+      results: cached?.results ?? const <SearchResult>[],
+      total: cached?.total ?? 0,
+      searchType: cached?.searchType ?? 'text',
       isLoading: true,
       hasSearched: true,
       error: null,
     );
-    await _executeSearch(offset: 0, append: false);
+    final forceRefresh = !preferCache || cached != null;
+    await _executeSearch(
+      offset: 0,
+      append: false,
+      forceRefresh: forceRefresh,
+    );
   }
 
   Future<void> loadMore() async {
@@ -99,12 +112,17 @@ class SearchNotifier extends StateNotifier<SearchState> {
       return;
     }
     state = state.copyWith(isLoadingMore: true);
-    await _executeSearch(offset: state.results.length, append: true);
+    await _executeSearch(
+      offset: state.results.length,
+      append: true,
+      forceRefresh: true,
+    );
   }
 
   Future<void> _executeSearch({
     required int offset,
     required bool append,
+    bool forceRefresh = false,
   }) async {
     final repo = _ref.read(searchRepositoryProvider);
     final session = _ref.read(sessionProvider);
@@ -114,6 +132,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
         token: session.token,
         limit: _pageSize,
         offset: offset,
+        forceRefresh: forceRefresh,
       );
       final merged = append
           ? [...state.results, ...response.results]
@@ -141,4 +160,3 @@ class SearchNotifier extends StateNotifier<SearchState> {
     }
   }
 }
-

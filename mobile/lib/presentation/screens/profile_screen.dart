@@ -23,19 +23,56 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notifyDigest = false;
   String _quality = 'Clean';
   String _mask = 'Off';
+  bool _loadingProfile = true;
+  bool _updatingSocial = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(authorDirectoryProvider.notifier).refreshOwnProfile();
+      if (mounted) {
+        setState(() => _loadingProfile = false);
+      }
+    });
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
     final authorsMap = ref.watch(authorDirectoryProvider);
-    final followingAuthors =
-        authorsMap.values.where((author) => author.isFollowed).toList();
+    final currentUserId = session.user?.id;
+    final meProfile =
+        currentUserId == null ? null : authorsMap[currentUserId];
+    final followingAuthors = authorsMap.values
+        .where(
+          (author) => author.isFollowed && author.id != currentUserId,
+        )
+        .toList();
     final suggestedAuthors = authorsMap.values
-        .where((author) => !author.isFollowed)
+        .where(
+          (author) => !author.isFollowed && author.id != currentUserId,
+        )
         .take(4)
         .toList();
-    final postsCount = 12 + (followingAuthors.length * 3);
-    final followersCount = 180 + followingAuthors.length * 9;
+    final postsCount = meProfile?.posts ?? 0;
+    final followersCount = meProfile?.followers ?? 0;
+    final followingCount =
+        meProfile?.following ?? followingAuthors.length;
+
+    if (_loadingProfile && meProfile == null) {
+      return const Scaffold(
+        backgroundColor: AppTheme.bgBase,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
@@ -46,12 +83,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               _buildHeader(context),
               const SizedBox(height: AppTheme.spaceXl),
-              _buildProfileCard(session.user),
+              _buildProfileCard(meProfile, session.user),
+              const SizedBox(height: AppTheme.spaceLg),
+              _buildSocialLinks(meProfile),
               const SizedBox(height: AppTheme.spaceLg),
               _buildSocialStats(
                 posts: postsCount,
                 followers: followersCount,
-                following: followingAuthors.length,
+                following: followingCount,
                 onFollowingTap: () => _showFollowingSheet(followingAuthors,
                     title: 'Ваші підписки',),
               ),
@@ -111,7 +150,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileCard(User? user) {
+  Widget _buildProfileCard(AuthorProfile? profile, User? user) {
+    final fallbackEmail = user?.email ?? 'creator@moweton.com';
+    final defaultHandle = '@${fallbackEmail.split('@').first}';
+    final displayName =
+        profile?.displayName ?? fallbackEmail.split('@').first.toUpperCase();
+    final handle = profile?.handle ?? defaultHandle;
+    final bio = profile?.bio ?? 'Tell listeners what your channel is about.';
+    final avatarLabel =
+        profile?.avatarEmoji ?? (displayName.isNotEmpty ? displayName[0] : '?');
+    final avatarUrl = profile?.avatarUrl;
+
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceXl),
       decoration: BoxDecoration(
@@ -124,11 +173,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 32,
                 backgroundColor: Colors.white24,
-                child: Text('М',
-                    style: TextStyle(color: Colors.white, fontSize: 24),),
+                backgroundImage: avatarUrl?.isNotEmpty == true
+                    ? NetworkImage(avatarUrl!)
+                    : null,
+                child: avatarUrl?.isNotEmpty == true
+                    ? null
+                    : Text(
+                        avatarLabel,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 24),
+                      ),
               ),
               const SizedBox(width: AppTheme.spaceLg),
               Expanded(
@@ -136,8 +193,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      user?.email.split('@').first.toUpperCase() ??
-                          'Moweton Creator',
+                      displayName,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -145,13 +201,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                     Text(
-                      '@${(user?.email ?? 'creator@moweton.com').split('@').first}',
+                      handle,
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ],
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppTheme.spaceMd),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              bio,
+              style: const TextStyle(
+                color: Colors.white70,
+              ),
+            ),
           ),
           const SizedBox(height: AppTheme.spaceLg),
           FilledButton.icon(
@@ -162,10 +228,150 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             onPressed: () => context.push('/paywall'),
             icon: const Icon(Icons.workspace_premium_outlined),
-            label: const Text('Оновити до Pro'),
+            label: const Text('Uplevel to Pro'),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSocialLinks(AuthorProfile? profile) {
+    final links = profile?.socialLinks ?? const {};
+    return _SectionCard(
+      title: 'Social links',
+      action: TextButton.icon(
+        onPressed:
+            _updatingSocial ? null : () => _openSocialLinksEditor(profile),
+        icon: _updatingSocial
+            ? const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.edit_outlined),
+        label: Text(_updatingSocial ? 'Saving...' : 'Edit'),
+      ),
+      child: Column(
+        children: [
+          for (final entry in _socialLinkPresets.asMap().entries) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(entry.value.icon, color: AppTheme.textSecondary),
+              title: Text(
+                links[entry.value.key] ?? 'Add ${entry.value.label}',
+                style: TextStyle(
+                  color: links.containsKey(entry.value.key)
+                      ? AppTheme.textPrimary
+                      : AppTheme.textSecondary,
+                ),
+              ),
+            ),
+            if (entry.key != _socialLinkPresets.length - 1)
+              const Divider(color: AppTheme.surfaceBorder),
+          ],
+          if (links.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: AppTheme.spaceSm),
+              child: Text(
+                'Link your Twitter, LinkedIn or website so listeners can follow along.',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openSocialLinksEditor(AuthorProfile? profile) async {
+    final result = await _showSocialLinksEditor(profile);
+    if (!mounted || result == null) {
+      return;
+    }
+    setState(() => _updatingSocial = true);
+    try {
+      await ref
+          .read(authorDirectoryProvider.notifier)
+          .updateOwnProfile(socialLinks: result);
+      _showSnack('Social links updated');
+    } catch (e) {
+      _showSnack('Failed to update social links');
+    } finally {
+      if (mounted) {
+        setState(() => _updatingSocial = false);
+      }
+    }
+  }
+
+  Future<Map<String, String>?> _showSocialLinksEditor(
+    AuthorProfile? profile,
+  ) async {
+    final existing = Map<String, String>.from(profile?.socialLinks ?? const {});
+    return showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final controllers = {
+          for (final meta in _socialLinkPresets)
+            meta.key:
+                TextEditingController(text: existing[meta.key] ?? ''),
+        };
+        return Padding(
+          padding: EdgeInsets.only(
+            left: AppTheme.spaceXl,
+            right: AppTheme.spaceXl,
+            top: AppTheme.spaceXl,
+            bottom: MediaQuery.of(context).viewInsets.bottom +
+                AppTheme.spaceXl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Edit social links',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppTheme.spaceMd),
+              for (final meta in _socialLinkPresets) ...[
+                TextField(
+                  controller: controllers[meta.key],
+                  decoration: InputDecoration(
+                    labelText: meta.label,
+                    hintText: meta.hint,
+                    prefixIcon: Icon(meta.icon),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spaceSm),
+              ],
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: () {
+                      final payload = <String, String>{};
+                      controllers.forEach((key, controller) {
+                        final value = controller.text.trim();
+                        if (value.isNotEmpty) {
+                          payload[key] = value;
+                        }
+                      });
+                      Navigator.pop(context, payload);
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -311,7 +517,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 (author) => ListTile(
                   leading: CircleAvatar(
                     backgroundColor: AppTheme.surfaceChip,
-                    child: Text(author.avatarEmoji),
+                    backgroundImage: author.avatarUrl != null
+                        ? NetworkImage(author.avatarUrl!)
+                        : null,
+                    child: author.avatarUrl != null
+                        ? null
+                        : Text(author.avatarEmoji),
                   ),
                   title: Text(
                     author.displayName,
@@ -340,10 +551,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
+  final Widget? action;
 
   const _SectionCard({
     required this.title,
     required this.child,
+    this.action,
   });
 
   @override
@@ -358,9 +571,19 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              if (action != null) action!,
+            ],
           ),
           const SizedBox(height: AppTheme.spaceMd),
           child,
@@ -450,7 +673,12 @@ class _FollowCarousel extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           backgroundColor: AppTheme.surfaceChip,
-                          child: Text(author.avatarEmoji),
+                          backgroundImage: author.avatarUrl != null
+                              ? NetworkImage(author.avatarUrl!)
+                              : null,
+                          child: author.avatarUrl != null
+                              ? null
+                              : Text(author.avatarEmoji),
                         ),
                         const SizedBox(width: AppTheme.spaceSm),
                         Expanded(
@@ -507,6 +735,53 @@ class _FollowCarousel extends StatelessWidget {
   }
 }
 
+class _SocialLinkMeta {
+  final String key;
+  final String label;
+  final String hint;
+  final IconData icon;
+
+  const _SocialLinkMeta({
+    required this.key,
+    required this.label,
+    required this.hint,
+    required this.icon,
+  });
+}
+
+const _socialLinkPresets = [
+  _SocialLinkMeta(
+    key: 'twitter',
+    label: 'Twitter',
+    hint: '@handle or url',
+    icon: Icons.alternate_email,
+  ),
+  _SocialLinkMeta(
+    key: 'linkedin',
+    label: 'LinkedIn',
+    hint: 'Profile URL',
+    icon: Icons.business_center_outlined,
+  ),
+  _SocialLinkMeta(
+    key: 'instagram',
+    label: 'Instagram',
+    hint: '@handle',
+    icon: Icons.camera_alt_outlined,
+  ),
+  _SocialLinkMeta(
+    key: 'youtube',
+    label: 'YouTube',
+    hint: 'Channel URL',
+    icon: Icons.ondemand_video,
+  ),
+  _SocialLinkMeta(
+    key: 'website',
+    label: 'Website',
+    hint: 'https://example.com',
+    icon: Icons.language,
+  ),
+];
+
 class _SegmentControl extends StatelessWidget {
   final String label;
   final List<String> values;
@@ -545,3 +820,4 @@ class _SegmentControl extends StatelessWidget {
     );
   }
 }
+

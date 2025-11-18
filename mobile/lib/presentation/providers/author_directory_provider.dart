@@ -112,6 +112,78 @@ class AuthorDirectoryNotifier
     };
   }
 
+  Future<AuthorProfile?> refreshOwnProfile() async {
+    final client = _authedClient();
+    final ref = _ref;
+    final userId = ref?.read(sessionProvider).user?.id;
+    if (client == null || userId == null) {
+      return null;
+    }
+    try {
+      final response = await client.getMyProfile();
+      final payload = response['profile'];
+      if (payload is Map<String, dynamic>) {
+        _applyRemoteProfiles([payload]);
+        final id = payload['id'] as String?;
+        if (id != null) {
+          _hydratedAuthors.add(id);
+        }
+        return state[userId];
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'refreshOwnProfile failed',
+        tag: 'AuthorDirectory',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+    return null;
+  }
+
+  Future<AuthorProfile?> updateOwnProfile({
+    String? bio,
+    Map<String, String>? socialLinks,
+  }) async {
+    if (bio == null && socialLinks == null) {
+      return state[_ref?.read(sessionProvider).user?.id];
+    }
+    final client = _authedClient();
+    final ref = _ref;
+    final userId = ref?.read(sessionProvider).user?.id;
+    if (client == null || userId == null) {
+      return null;
+    }
+    final body = <String, dynamic>{};
+    if (bio != null) {
+      body['bio'] = bio;
+    }
+    if (socialLinks != null) {
+      body['social_links'] = socialLinks;
+    }
+    try {
+      final response = await client.updateMyProfile(body);
+      final payload = response['profile'];
+      if (payload is Map<String, dynamic>) {
+        _applyRemoteProfiles([payload]);
+        final id = payload['id'] as String?;
+        if (id != null) {
+          _hydratedAuthors.add(id);
+        }
+        return state[userId];
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'updateOwnProfile failed',
+        tag: 'AuthorDirectory',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      rethrow;
+    }
+    return null;
+  }
+
   Future<void> _hydrateProfiles(Set<String> authorIds) async {
     final client = _authedClient();
     if (client == null) {
@@ -171,11 +243,17 @@ class AuthorDirectoryNotifier
           (map['handle'] as String?) ?? existing?.handle ?? '@voice.creator';
       final bio =
           (map['bio'] as String?) ?? existing?.bio ?? 'Creator on Moweton';
-      final avatar = (map['avatar'] as String?) ?? existing?.avatarEmoji;
+      final avatarUrl =
+          (map['avatar'] as String?) ?? existing?.avatarUrl ?? '';
+      final avatarEmoji =
+          existing?.avatarEmoji ?? _avatarFromName(displayName);
       final followers = _asInt(map['followers']) ?? existing?.followers ?? 0;
       final following = _asInt(map['following']) ?? existing?.following ?? 0;
+      final posts = _asInt(map['posts']) ?? existing?.posts ?? 0;
       final isFollowing =
           (map['is_following'] as bool?) ?? existing?.isFollowed ?? false;
+      final socialLinks =
+          _parseSocialLinks(map['social_links']) ?? existing?.socialLinks ?? {};
 
       final profile = (existing ??
               AuthorProfile(
@@ -183,22 +261,27 @@ class AuthorDirectoryNotifier
                 displayName: displayName,
                 handle: handle,
                 bio: bio,
-                avatarEmoji: avatar ?? _avatarFromName(displayName),
+                avatarEmoji: avatarEmoji,
+                avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
                 followers: followers,
                 following: following,
-                posts: existing?.posts ?? 0,
+                posts: posts,
                 isFollowed: isFollowing,
                 isLive: existing?.isLive ?? false,
                 badges: existing?.badges ?? const [],
+                socialLinks: socialLinks,
               ))
           .copyWith(
         displayName: displayName,
         handle: handle,
         bio: bio,
-        avatarEmoji: avatar ?? _avatarFromName(displayName),
+        avatarEmoji: avatarEmoji,
+        avatarUrl: avatarUrl.isEmpty ? existing?.avatarUrl : avatarUrl,
         followers: followers,
         following: following,
         isFollowed: isFollowing,
+        posts: posts,
+        socialLinks: socialLinks,
       );
 
       updated[id] = profile;
@@ -236,6 +319,7 @@ const List<AuthorProfile> _demoAuthors = [
     handle: '@olena.walks',
     bio: 'Morning walk recaps and mindful notes.',
     avatarEmoji: 'O',
+    avatarUrl: null,
     followers: 1820,
     following: 312,
     posts: 64,
@@ -249,6 +333,7 @@ const List<AuthorProfile> _demoAuthors = [
     handle: '@fedan',
     bio: 'Product lead sharing daily standups and experiments.',
     avatarEmoji: 'D',
+    avatarUrl: null,
     followers: 940,
     following: 188,
     posts: 41,
@@ -262,6 +347,7 @@ const List<AuthorProfile> _demoAuthors = [
     handle: '@maria.audio',
     bio: 'Async team check-ins and weekend planning capsules.',
     avatarEmoji: 'M',
+    avatarUrl: null,
     followers: 2210,
     following: 503,
     posts: 88,
@@ -288,6 +374,7 @@ AuthorProfile _profileFromEpisode(Episode episode) {
     handle: handle,
     bio: 'Community-generated author synced from recent episodes.',
     avatarEmoji: sticker,
+    avatarUrl: null,
     followers: followers,
     following: following,
     posts: posts,
@@ -330,4 +417,22 @@ String _avatarFromName(String value) {
     return '?';
   }
   return trimmed[0].toUpperCase();
+}
+
+Map<String, String>? _parseSocialLinks(dynamic value) {
+  if (value is Map) {
+    final result = <String, String>{};
+    value.forEach((key, raw) {
+      final k = key?.toString() ?? '';
+      final v = raw?.toString() ?? '';
+      if (k.isEmpty || v.trim().isEmpty) {
+        return;
+      }
+      result[k] = v.trim();
+    });
+    if (result.isNotEmpty) {
+      return result;
+    }
+  }
+  return null;
 }

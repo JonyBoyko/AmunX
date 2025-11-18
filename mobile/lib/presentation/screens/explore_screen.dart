@@ -36,7 +36,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         centerTitle: false,
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(exploreFeedProvider.notifier).refresh(),
+        onRefresh: () =>
+            ref.read(exploreFeedProvider.notifier).refresh(forceNetwork: true),
         color: AppTheme.brandPrimary,
         child: CustomScrollView(
           slivers: [

@@ -163,6 +163,18 @@ class ApiClient {
     return (response.data as Map<String, dynamic>)['profiles'] as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> getMyProfile() async {
+    final response = await _dio.get('/v1/me/profile');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateMyProfile(
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _dio.patch('/v1/me/profile', data: body);
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getBillingProducts() async {
     final response = await _dio.get('/v1/billing/products');
     return response.data as Map<String, dynamic>;

@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -20,14 +21,16 @@ import (
 var errFollowSelf = errors.New("cannot follow yourself")
 
 type authorProfilePayload struct {
-	ID          string  `json:"id"`
-	DisplayName string  `json:"display_name"`
-	Handle      string  `json:"handle"`
-	Bio         *string `json:"bio,omitempty"`
-	Avatar      *string `json:"avatar,omitempty"`
-	Followers   int     `json:"followers"`
-	Following   int     `json:"following"`
-	IsFollowing bool    `json:"is_following"`
+	ID          string            `json:"id"`
+	DisplayName string            `json:"display_name"`
+	Handle      string            `json:"handle"`
+	Bio         *string           `json:"bio,omitempty"`
+	Avatar      *string           `json:"avatar,omitempty"`
+	Followers   int               `json:"followers"`
+	Following   int               `json:"following"`
+	Posts       int               `json:"posts"`
+	SocialLinks map[string]string `json:"social_links,omitempty"`
+	IsFollowing bool              `json:"is_following"`
 }
 
 func registerPublicUserRoutes(r chi.Router, deps *app.App, logger zerolog.Logger) {
@@ -214,7 +217,9 @@ SELECT u.id,
 	   p.bio,
 	   COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar, '')) AS avatar,
 	   (SELECT COUNT(*) FROM user_follows WHERE followee_id = u.id) AS followers,
-	   (SELECT COUNT(*) FROM user_follows WHERE follower_id = u.id) AS following
+	   (SELECT COUNT(*) FROM user_follows WHERE follower_id = u.id) AS following,
+	   (SELECT COUNT(*) FROM episodes WHERE author_id = u.id AND status = 'public' AND visibility = 'public') AS posts,
+	   COALESCE(p.settings, '{}'::jsonb) AS settings
 FROM users u
 LEFT JOIN profiles p ON p.user_id = u.id
 WHERE u.id = ANY($1)
@@ -240,8 +245,10 @@ WHERE u.id = ANY($1)
 			avatar      sql.NullString
 			followers   int
 			following   int
+			posts       int
+			settingsRaw []byte
 		)
-		if err := rows.Scan(&userID, &displayName, &handle, &bio, &avatar, &followers, &following); err != nil {
+		if err := rows.Scan(&userID, &displayName, &handle, &bio, &avatar, &followers, &following, &posts, &settingsRaw); err != nil {
 			return nil, err
 		}
 		payload := authorProfilePayload{
@@ -250,6 +257,8 @@ WHERE u.id = ANY($1)
 			Handle:      handle,
 			Followers:   followers,
 			Following:   following,
+			Posts:       posts,
+			SocialLinks: extractSocialLinks(settingsRaw),
 		}
 		if bio.Valid {
 			payload.Bio = &bio.String
@@ -310,4 +319,38 @@ WHERE follower_id = $1 AND followee_id = ANY($2)
 		set[id] = struct{}{}
 	}
 	return set, rows.Err()
+}
+
+func extractSocialLinks(raw []byte) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return nil
+	}
+	rawLinks, ok := settings["social_links"]
+	if !ok {
+		return nil
+	}
+	linkMap, ok := rawLinks.(map[string]any)
+	if !ok {
+		return nil
+	}
+	result := make(map[string]string)
+	for key, value := range linkMap {
+		strVal, ok := value.(string)
+		if !ok {
+			continue
+		}
+		trimmed := strings.TrimSpace(strVal)
+		if trimmed == "" {
+			continue
+		}
+		result[key] = trimmed
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }

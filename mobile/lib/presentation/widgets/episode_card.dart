@@ -52,6 +52,7 @@ class EpisodeCard extends StatelessWidget {
     final avatarLabel = author?.avatarEmoji ??
         episode.title?.characters.first.toUpperCase() ??
         'A';
+    final avatarUrl = author?.avatarUrl;
     final comments =
         (episode.mood?['comments'] as int?) ?? (episode.id.hashCode % 12) + 3;
     final rngValue = Random(episode.id.hashCode).nextDouble();
@@ -76,6 +77,7 @@ class EpisodeCard extends StatelessWidget {
               children: [
                 _AvatarProgress(
                   label: avatarLabel,
+                  imageUrl: avatarUrl,
                   progress: rngValue,
                   isLive: author?.isLive ?? isLive,
                 ),
@@ -336,11 +338,13 @@ class _Chip extends StatelessWidget {
 
 class _AvatarProgress extends StatelessWidget {
   final String label;
+  final String? imageUrl;
   final double progress;
   final bool isLive;
 
   const _AvatarProgress({
     required this.label,
+    required this.imageUrl,
     required this.progress,
     required this.isLive,
   });
@@ -365,7 +369,7 @@ class _AvatarProgress extends StatelessWidget {
               ),
             ),
           ),
-          _AvatarLabel(label: label),
+          _AvatarLabel(label: label, imageUrl: imageUrl),
         ],
       ),
     );
@@ -374,11 +378,13 @@ class _AvatarProgress extends StatelessWidget {
 
 class _AvatarLabel extends StatelessWidget {
   final String label;
+  final String? imageUrl;
 
-  const _AvatarLabel({required this.label});
+  const _AvatarLabel({required this.label, this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
     return Container(
       width: 42,
       height: 42,
@@ -387,13 +393,22 @@ class _AvatarLabel extends StatelessWidget {
         borderRadius: BorderRadius.circular(21),
       ),
       alignment: Alignment.center,
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppTheme.textPrimary,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: hasImage
+          ? ClipOval(
+              child: Image.network(
+                imageUrl!,
+                width: 42,
+                height: 42,
+                fit: BoxFit.cover,
+              ),
+            )
+          : Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
     );
   }
 }

@@ -39,7 +39,7 @@ class ExploreFeedState {
 
   ExploreFeedState copyWith({
     List<ExploreCard>? cards,
-    String? nextCursor,
+    Object? nextCursor = _noCursor,
     bool? isLoading,
     bool? isLoadingMore,
     ExploreFilters? filters,
@@ -47,7 +47,9 @@ class ExploreFeedState {
   }) {
     return ExploreFeedState(
       cards: cards ?? this.cards,
-      nextCursor: nextCursor ?? this.nextCursor,
+      nextCursor: identical(nextCursor, _noCursor)
+          ? this.nextCursor
+          : nextCursor as String?,
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       filters: filters ?? this.filters,
@@ -56,6 +58,7 @@ class ExploreFeedState {
   }
 
   static const _noError = Object();
+  static const _noCursor = Object();
 }
 
 class ExploreFeedNotifier extends StateNotifier<ExploreFeedState> {
@@ -64,10 +67,28 @@ class ExploreFeedNotifier extends StateNotifier<ExploreFeedState> {
   final Ref _ref;
   static const _pageSize = 20;
 
-  Future<void> refresh() async {
+  Future<void> refresh({bool forceNetwork = false}) async {
     if (state.isLoading) return;
+    final filters = state.filters;
+    if (!forceNetwork && state.cards.isEmpty) {
+      final session = _ref.read(sessionProvider);
+      final cached = _ref.read(exploreRepositoryProvider).peekCachedFeed(
+            userId: session.user?.id,
+            limit: _pageSize,
+            tags: filters.tags.toList(),
+            minLength: filters.length.minSeconds,
+            maxLength: filters.length.maxSeconds,
+          );
+      if (cached != null) {
+        state = state.copyWith(
+          cards: cached.cards,
+          nextCursor: cached.nextCursor,
+          error: null,
+        );
+      }
+    }
     state = state.copyWith(isLoading: true, error: null, nextCursor: null);
-    await _loadPage(reset: true);
+    await _loadPage(reset: true, forceNetwork: forceNetwork);
   }
 
   Future<void> loadMore() async {
@@ -98,18 +119,23 @@ class ExploreFeedNotifier extends StateNotifier<ExploreFeedState> {
     refresh();
   }
 
-  Future<void> _loadPage({required bool reset}) async {
+  Future<void> _loadPage({
+    required bool reset,
+    bool forceNetwork = false,
+  }) async {
     final repo = _ref.read(exploreRepositoryProvider);
     final session = _ref.read(sessionProvider);
     try {
       final filters = state.filters;
       final page = await repo.fetchExploreFeed(
         token: session.token,
+        userId: session.user?.id,
         limit: _pageSize,
         cursor: reset ? null : state.nextCursor,
         tags: filters.tags.toList(),
         minLength: filters.length.minSeconds,
         maxLength: filters.length.maxSeconds,
+        forceRefresh: forceNetwork && reset,
       );
       final data = reset ? page.cards : [...state.cards, ...page.cards];
       state = state.copyWith(
