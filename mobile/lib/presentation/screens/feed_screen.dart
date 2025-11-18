@@ -138,6 +138,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             onProfileTap: () => context.push('/profile'),
             onExploreTap: () => context.push('/explore'),
             onSearchTap: () => context.push('/search'),
+            onInboxTap: () => context.push('/inbox'),
           ),
         ),
         SliverToBoxAdapter(
@@ -268,11 +269,13 @@ class _FeedHeader extends StatelessWidget {
   final VoidCallback onProfileTap;
   final VoidCallback onExploreTap;
   final VoidCallback onSearchTap;
+  final VoidCallback onInboxTap;
 
   const _FeedHeader({
     required this.onProfileTap,
     required this.onExploreTap,
     required this.onSearchTap,
+    required this.onInboxTap,
   });
 
   @override
@@ -321,6 +324,14 @@ class _FeedHeader extends StatelessWidget {
             onPressed: onSearchTap,
             icon: const Icon(
               Icons.search,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Inbox',
+            onPressed: onInboxTap,
+            icon: const Icon(
+              Icons.inbox_outlined,
               color: AppTheme.textPrimary,
             ),
           ),

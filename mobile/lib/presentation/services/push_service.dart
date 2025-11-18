@@ -17,6 +17,11 @@ final pushServiceProvider = Provider<PushService>((ref) {
   return PushService(ref);
 });
 
+final pushStatusProvider =
+    StateNotifierProvider<PushStatusNotifier, PushRegistrationState>(
+  (ref) => PushStatusNotifier(),
+);
+
 final pushBootstrapProvider = FutureProvider<void>((ref) async {
   await ref.read(pushServiceProvider).bootstrap();
 });
@@ -41,6 +46,8 @@ class PushService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+  PushStatusNotifier get _statusNotifier =>
+      _ref.read(pushStatusProvider.notifier);
 
   StreamSubscription<String>? _tokenSubscription;
   String? _currentFcmToken;
@@ -54,7 +61,12 @@ class PushService {
     _initialized = true;
 
     await _initializeLocalNotifications();
-    await _requestPermissions();
+    final settings = await _messaging.getNotificationSettings();
+    _statusNotifier.updateSettings(settings);
+    if (settings.authorizationStatus ==
+        AuthorizationStatus.notDetermined) {
+      await _requestPermissions();
+    }
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -64,12 +76,14 @@ class PushService {
       (token) {
         AppLogger.info('FCM token refreshed', tag: 'PushService');
         _currentFcmToken = token;
+        _statusNotifier.setFirebaseToken(token);
         unawaited(_registerWithBackend(token));
       },
     );
 
     _currentFcmToken = await _messaging.getToken();
     if (_currentFcmToken != null) {
+      _statusNotifier.setFirebaseToken(_currentFcmToken);
       await _registerWithBackend(_currentFcmToken!);
     }
   }
@@ -95,7 +109,7 @@ class PushService {
         ?.createNotificationChannel(androidChannel);
   }
 
-  Future<void> _requestPermissions() async {
+  Future<NotificationSettings> _requestPermissions() async {
     final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
@@ -105,6 +119,54 @@ class PushService {
       'Push permission status: ${settings.authorizationStatus}',
       tag: 'PushService',
     );
+    _statusNotifier.updateSettings(settings);
+    return settings;
+  }
+
+  Future<void> refreshPermissions() async {
+    final settings = await _messaging.getNotificationSettings();
+    _statusNotifier.updateSettings(settings);
+  }
+
+  Future<void> requestUserPermission() => _requestPermissions();
+
+  Future<void> openSystemSettings() async {
+    try {
+      await _requestPermissions();
+    } catch (error, stack) {
+      AppLogger.warning(
+        'Failed to open push settings',
+        tag: 'PushService',
+        error: error,
+        stackTrace: stack,
+      );
+    }
+  }
+
+  Future<void> reRegisterDevice() async {
+    final token = _currentFcmToken ?? await _messaging.getToken();
+    if (token == null) {
+      _statusNotifier.setError('FCM token unavailable');
+      return;
+    }
+    await _registerWithBackend(token);
+  }
+
+  Future<void> unregisterDevice() async {
+    if (_registeredToken == null) {
+      _statusNotifier.setBackendRegistered(false);
+      return;
+    }
+    final session = _ref.read(sessionProvider);
+    if (!session.isAuthenticated || session.token == null) {
+      _statusNotifier.setBackendRegistered(false);
+      return;
+    }
+    await _unregisterFromBackend(
+      authToken: session.token!,
+      deviceToken: _registeredToken!,
+    );
+    _registeredToken = null;
   }
 
   void _handleSessionChanged(SessionState? previous, SessionState next) {
@@ -119,6 +181,7 @@ class PushService {
         deviceToken: _registeredToken!,
       ),);
       _registeredToken = null;
+      _statusNotifier.setBackendRegistered(false);
     }
   }
 
@@ -129,9 +192,13 @@ class PushService {
         'Skipping push registration until auth completes',
         tag: 'PushService',
       );
+      _statusNotifier.setBackendRegistered(false);
       return;
     }
     try {
+      _statusNotifier
+        ..setRegistering(true)
+        ..clearError();
       final api = createApiClient(token: session.token);
       await api.registerPushDevice(
         token: token,
@@ -140,6 +207,10 @@ class PushService {
         locale: PlatformDispatcher.instance.locale.toLanguageTag(),
       );
       _registeredToken = token;
+      _statusNotifier
+        ..setBackendRegistered(true)
+        ..clearError()
+        ..setRegistering(false);
       AppLogger.info('Push token registered with backend', tag: 'PushService');
     } catch (e, stack) {
       AppLogger.error(
@@ -148,6 +219,10 @@ class PushService {
         error: e,
         stackTrace: stack,
       );
+      _statusNotifier
+        ..setBackendRegistered(false)
+        ..setRegistering(false)
+        ..setError(e.toString());
     }
   }
 
@@ -159,12 +234,14 @@ class PushService {
       final api = createApiClient(token: authToken);
       await api.unregisterPushDevice(deviceToken);
       AppLogger.info('Push token removed from backend', tag: 'PushService');
+      _statusNotifier.setBackendRegistered(false);
     } catch (e) {
       AppLogger.warning(
         'Failed to unregister push token',
         tag: 'PushService',
         error: e,
       );
+      _statusNotifier.setError(e.toString());
     }
   }
 
@@ -227,7 +304,7 @@ class PushService {
     }
   }
 
-  String get _platform {
+String get _platform {
     if (kIsWeb) {
       return 'web';
     }
@@ -239,5 +316,78 @@ class PushService {
 
   Future<void> dispose() async {
     await _tokenSubscription?.cancel();
+  }
+}
+
+class PushRegistrationState {
+  const PushRegistrationState({
+    this.settings,
+    this.firebaseToken,
+    this.backendRegistered = false,
+    this.isRegistering = false,
+    this.lastError,
+  });
+
+  final NotificationSettings? settings;
+  final String? firebaseToken;
+  final bool backendRegistered;
+  final bool isRegistering;
+  final String? lastError;
+
+  bool get permissionGranted {
+    final status = settings?.authorizationStatus;
+    return status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
+  }
+
+  PushRegistrationState copyWith({
+    NotificationSettings? settings,
+    bool settingsSet = false,
+    String? firebaseToken,
+    bool firebaseTokenSet = false,
+    bool? backendRegistered,
+    bool? isRegistering,
+    String? lastError,
+    bool clearError = false,
+  }) {
+    return PushRegistrationState(
+      settings: settingsSet ? settings : this.settings,
+      firebaseToken:
+          firebaseTokenSet ? firebaseToken : this.firebaseToken,
+      backendRegistered: backendRegistered ?? this.backendRegistered,
+      isRegistering: isRegistering ?? this.isRegistering,
+      lastError: clearError ? null : (lastError ?? this.lastError),
+    );
+  }
+}
+
+class PushStatusNotifier extends StateNotifier<PushRegistrationState> {
+  PushStatusNotifier() : super(const PushRegistrationState());
+
+  void updateSettings(NotificationSettings settings) {
+    state = state.copyWith(settings: settings, settingsSet: true);
+  }
+
+  void setFirebaseToken(String? token) {
+    state = state.copyWith(
+      firebaseToken: token,
+      firebaseTokenSet: true,
+    );
+  }
+
+  void setBackendRegistered(bool value) {
+    state = state.copyWith(backendRegistered: value);
+  }
+
+  void setRegistering(bool value) {
+    state = state.copyWith(isRegistering: value);
+  }
+
+  void setError(String? message) {
+    state = state.copyWith(lastError: message);
+  }
+
+  void clearError() {
+    state = state.copyWith(clearError: true);
   }
 }

@@ -18,6 +18,7 @@ import '../presentation/screens/topic_detail_screen.dart';
 import '../presentation/screens/settings_screen.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/screens/search_screen.dart';
+import '../presentation/screens/smart_inbox_screen.dart';
 import '../presentation/screens/live_host_screen.dart';
 import '../presentation/screens/live_listener_screen.dart';
 import '../presentation/models/live_room.dart';
@@ -84,6 +85,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/recorder',
         builder: (context, state) => const RecorderScreen(),
+      ),
+      GoRoute(
+        path: '/inbox',
+        builder: (context, state) => const SmartInboxScreen(),
       ),
       GoRoute(
         path: '/publish',
