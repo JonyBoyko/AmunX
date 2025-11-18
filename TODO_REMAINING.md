@@ -250,3 +250,4 @@
 - Quick filters (ActionChips in `_SmartInboxPreview`) now drive `feed_filter_provider.applySmartInboxFilter`, which forces the Recommended tab + #tag filter. When tweaking chips, make sure they still dispatch through that notifier method so feed + analytics stay consistent.
 - If skeleton/error UX change, update both the TODO note and design tokens so engineers know whether to adjust AppTheme spacing or copy helpers.
 
+
