@@ -39,9 +39,9 @@ class LivekitSessionState {
     required this.status,
     required this.isHost,
     required this.listenerCount,
-    this.transcript = const [],
   })  : session = null,
-        error = null;
+        error = null,
+        transcript = const [];
 
   factory LivekitSessionState.idle() {
     return const LivekitSessionState._(

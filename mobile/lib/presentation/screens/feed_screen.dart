@@ -85,7 +85,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 child: _LiveNotificationBanner(notification: liveNotification),
               ),
             RefreshIndicator(
-              onRefresh: () => ref.refresh(feedProvider.future),
+              onRefresh: () => Future.wait([
+                ref.refresh(feedProvider.future),
+                ref.refresh(smartInboxProvider.future),
+              ]),
               color: AppTheme.brandPrimary,
               child: feedAsync.when(
                 data: (episodes) => _buildFeed(
@@ -161,17 +164,34 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   highlights: state.highlights,
                   onOpenEpisode: (id) => context.push('/episode/$id'),
                   onOpenInbox: () => context.push('/inbox'),
+                  onTagSelected: (tag) {
+                    coverageNotifier.toggleTag(tag);
+                    tagsNotifier.toggleFollow(tag);
+                  },
                 ),
               ),
             );
           },
           loading: () => const SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.all(AppTheme.spaceLg),
-              child: LinearProgressIndicator(),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppTheme.spaceLg,
+                vertical: AppTheme.spaceMd,
+              ),
+              child: _SmartInboxPlaceholder(),
             ),
           ),
-          error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+          error: (_, __) => SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spaceLg,
+                vertical: AppTheme.spaceMd,
+              ),
+              child: _SmartInboxErrorCard(
+                onRetry: () => ref.refresh(smartInboxProvider.future),
+              ),
+            ),
+          ),
         ),
         SliverToBoxAdapter(
           child: _FormatSwitchBar(
@@ -387,12 +407,14 @@ class _SmartInboxPreview extends StatelessWidget {
     required this.highlights,
     required this.onOpenEpisode,
     required this.onOpenInbox,
+    required this.onTagSelected,
   });
 
   final SmartInboxDigest digest;
   final List<String> highlights;
   final ValueChanged<String> onOpenEpisode;
   final VoidCallback onOpenInbox;
+  final ValueChanged<String> onTagSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +446,7 @@ class _SmartInboxPreview extends StatelessWidget {
               const Spacer(),
               TextButton(
                 onPressed: onOpenInbox,
-                child: const Text('Відкрити'),
+                child: const Text('Open inbox'),
               ),
             ],
           ),
@@ -472,9 +494,23 @@ class _SmartInboxPreview extends StatelessWidget {
               children: highlights
                   .take(3)
                   .map(
-                    (tag) => Chip(
+                    (tag) => ActionChip(
                       label: Text('#$tag'),
-                      backgroundColor: AppTheme.bgRaised,
+                      onPressed: () => onTagSelected(tag),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if (digest.tags.isNotEmpty) ...[
+            const SizedBox(height: AppTheme.spaceSm),
+            Wrap(
+              spacing: 6,
+              children: digest.tags
+                  .map(
+                    (tag) => ActionChip(
+                      label: Text('#$tag'),
+                      onPressed: () => onTagSelected(tag),
                     ),
                   )
                   .toList(),
@@ -485,8 +521,80 @@ class _SmartInboxPreview extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () => onOpenEpisode(firstEntry.episodeId),
-              child: const Text('Перейти до епізоду'),
+              child: const Text('Open latest episode'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmartInboxPlaceholder extends StatelessWidget {
+  const _SmartInboxPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spaceLg),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        border: Border.all(color: AppTheme.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(
+          4,
+          (index) => Container(
+            margin: EdgeInsets.only(
+              bottom: index == 3 ? 0 : AppTheme.spaceSm,
+            ),
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceBorder,
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SmartInboxErrorCard extends StatelessWidget {
+  const _SmartInboxErrorCard({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spaceLg),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        border: Border.all(color: AppTheme.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Smart Inbox unavailable',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppTheme.spaceSm),
+          const Text(
+            'We couldn’t load Smart Inbox insights. Pull to refresh or retry.',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: AppTheme.spaceSm),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('Retry Smart Inbox'),
           ),
         ],
       ),

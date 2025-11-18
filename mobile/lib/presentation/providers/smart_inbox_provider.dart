@@ -123,9 +123,11 @@ class SmartInboxState {
 
   factory SmartInboxState.fromJson(Map<String, dynamic> json) {
     final digests = (json['digests'] as List<dynamic>? ?? const [])
-        .map((item) => SmartInboxDigest.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ))
+        .map(
+          (item) => SmartInboxDigest.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
         .toList();
     final highlights = (json['highlights'] as List<dynamic>? ?? const [])
         .map((tag) => tag.toString())
@@ -158,9 +160,11 @@ class SmartInboxDigest {
 
   factory SmartInboxDigest.fromJson(Map<String, dynamic> json) {
     final entries = (json['entries'] as List<dynamic>? ?? const [])
-        .map((item) => SmartInboxEntry.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ))
+        .map(
+          (item) => SmartInboxEntry.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
         .toList();
     final tags = (json['tags'] as List<dynamic>? ?? const [])
         .map((tag) => tag.toString())

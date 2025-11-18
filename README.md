@@ -81,16 +81,11 @@ Notes:
 
 ## Roadmap snapshot
 
-### Stage 2 (Backend/UI sync)
-- ✅ Explore/Search hooked to `/v1/explore` + filters, caching, empty/error states.
-- ✅ Author profiles wired to `/v1/me/profile`, social links editor.
-- ✅ Paywall screen talks to Stripe/MonoPay/RevenueCat + portal hand-offs.
-- ✅ Push service registers/unregisters devices, exposes status in Settings.
-- ⏳ Audio hardening + S3 pipeline, auth refresh rotation (in progress).
-
-### Stage 3 (AI/behavioral)
-- ✅ Smart Inbox prototype (client-side digest/highlights + tests).
-- ⏳ Move Smart Inbox to backend and feed API when worker is ready.
-- ⏳ LiveKit reconnection/backoff (partially done) + Live transcripts, Smart Inbox + TL;DR, Smart Inbox in feed preview.
+### Stage 3 (AI/behavioral)
+- [x] Smart Inbox prototype (client-side digest/highlights + tests).
+- [x] Smart Inbox worker + backend feed API (snapshots + TL;DR).
+- [ ] LiveKit reconnection/backoff (partially done) + Live transcripts, Smart Inbox + TL;DR, Smart Inbox in feed preview.
 
 Everything else from previous docs lives here now; browse Git history for legacy notes.
+
+

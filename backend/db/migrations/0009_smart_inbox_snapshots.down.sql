@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS smart_inbox_snapshots;\n
+DROP TABLE IF EXISTS smart_inbox_snapshots;

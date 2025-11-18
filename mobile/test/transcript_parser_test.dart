@@ -10,7 +10,7 @@ void main() {
   });
 
   test('normalizeTranscriptText handles JSON payload', () {
-    final payload = '{"type":"transcript","text":"Hello there"}';
+    const payload = '{"type":"transcript","text":"Hello there"}';
     expect(normalizeTranscriptText(payload), 'Hello there');
   });
 
@@ -25,13 +25,13 @@ void main() {
         'speaker': 'host',
         'lang': 'en',
         'timestamp': 1700000000,
-        'translation': {'text': 'Привіт усім', 'lang': 'uk'},
+        'translation': {'text': 'Privit usim', 'lang': 'uk'},
       }),
     );
 
     final message = decodeTranscriptMessage(payload);
     expect(message, isNotNull);
-    expect(message!.text, 'Привіт усім');
+    expect(message!.text, 'Privit usim');
     expect(message.speaker, 'host');
     expect(message.sourceLanguage, 'en');
     expect(message.targetLanguage, 'uk');

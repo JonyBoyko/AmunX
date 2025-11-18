@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -31,10 +32,22 @@ func registerSmartInboxRoutes(r chi.Router, deps *app.App) {
 		now := time.Now().UTC()
 
 		if limit == smartInboxDefaultLimit {
-			if snapshot, err := store.LoadLatest(ctx, now); err == nil {
+			snapshot, err := store.LoadLatest(ctx, now)
+			if err == nil {
 				WriteJSON(w, http.StatusOK, snapshot.Response)
 				return
 			}
+			if errors.Is(err, smartinbox.ErrNoSnapshot) {
+				WriteError(
+					w,
+					http.StatusServiceUnavailable,
+					"smart_inbox_warming_up",
+					"Smart Inbox is warming up, please try again shortly.",
+				)
+				return
+			}
+			WriteError(w, http.StatusInternalServerError, "smart_inbox_failed", err.Error())
+			return
 		}
 
 		rows, err := smartinbox.FetchEpisodeRows(ctx, deps.DB, limit)
@@ -44,10 +57,6 @@ func registerSmartInboxRoutes(r chi.Router, deps *app.App) {
 		}
 
 		resp := smartinbox.BuildResponse(rows, now)
-		if err := store.Save(ctx, resp, now, smartinbox.DefaultSnapshotTTL, len(rows)); err == nil {
-			_ = store.Prune(ctx, now.Add(-24*time.Hour))
-		}
-
 		WriteJSON(w, http.StatusOK, resp)
 	})
 }

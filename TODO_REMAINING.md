@@ -235,3 +235,7 @@
 
 
 
+## Stage 3 tracker
+- [x] Smart Inbox worker/TL;DR snapshots (backend/internal/worker/smartinbox)
+- [x] Smart Inbox feed preview skeleton/error states + tag filters
+
