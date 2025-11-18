@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../services/livekit_service.dart';
+import '../widgets/live_transcript_panel.dart';
 
 class LiveHostScreen extends ConsumerStatefulWidget {
   const LiveHostScreen({super.key});
@@ -45,7 +46,7 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не вдалося запустити live: $error')),
+        SnackBar(content: Text('Unable to start live: $error')),
       );
       context.pop();
     }
@@ -92,9 +93,11 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
                       error: state.error,
                     ),
                     const SizedBox(height: AppTheme.spaceXl),
-                    _TranscriptPanel(
+                    LiveTranscriptPanel(
                       status: state.status,
                       segments: state.transcript,
+                      emptyLabel:
+                          'Your words will appear here once you start speaking.',
                     ),
                     const Spacer(),
                     _Controls(
@@ -175,9 +178,9 @@ class _AudienceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = switch (status) {
-      LivekitStatus.connecting => 'Зʼєднуємося з LiveKit…',
-      LivekitStatus.error => error ?? 'Сталася помилка',
-      _ => 'У прямому ефірі'
+      LivekitStatus.connecting => 'Connecting to LiveKit…',
+      LivekitStatus.error => error ?? 'Connection lost',
+      _ => 'Session is live',
     };
 
     return Container(
@@ -195,7 +198,7 @@ class _AudienceCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '$listeners слухачів',
+                '$listeners listeners',
                 style: const TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 18,
@@ -210,101 +213,6 @@ class _AudienceCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TranscriptPanel extends StatelessWidget {
-  const _TranscriptPanel({
-    required this.status,
-    required this.segments,
-  });
-
-  final LivekitStatus status;
-  final List<TranscriptSegment> segments;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppTheme.spaceLg),
-      decoration: BoxDecoration(
-        color: AppTheme.bgRaised,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Live-транскрипт',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: AppTheme.spaceSm),
-          if (status == LivekitStatus.connected && segments.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: segments
-                  .take(6)
-                  .map(
-                    (segment) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _TranscriptLine(segment: segment),
-                    ),
-                  )
-                  .toList(),
-            )
-          else
-            const Text(
-              'Щойно ви почнете говорити, тут зʼявиться текст.',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TranscriptLine extends StatelessWidget {
-  const _TranscriptLine({required this.segment});
-
-  final TranscriptSegment segment;
-
-  @override
-  Widget build(BuildContext context) {
-    final meta = _languageLabel(segment);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          segment.speakerLabel,
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          segment.text,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            height: 1.4,
-          ),
-        ),
-        if (meta != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              meta,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-          ),
-      ],
     );
   }
 }
@@ -362,16 +270,4 @@ class _Controls extends StatelessWidget {
       ],
     );
   }
-}
-
-String? _languageLabel(TranscriptSegment segment) {
-  final language = segment.language?.trim();
-  if (language == null || language.isEmpty) {
-    return null;
-  }
-  final upper = language.toUpperCase();
-  if (segment.isTranslation) {
-    return 'Переклад ($upper)';
-  }
-  return upper;
 }

@@ -238,6 +238,12 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
       const Duration(seconds: 2),
       (_) => _emitStats(),
     );
+    if (_reconnectManager.attempts > 0) {
+      AppLogger.info(
+        'LiveKit reconnect successful after ${_reconnectManager.attempts} attempt(s)',
+        tag: 'LiveKit',
+      );
+    }
     _reconnectManager.reset();
 
     state = LivekitSessionState(
@@ -307,7 +313,12 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
       );
       return;
     }
+    final attemptIndex = _reconnectManager.attempts + 1;
     final delay = _reconnectManager.nextDelay();
+    AppLogger.warning(
+      'LiveKit reconnect attempt $attemptIndex/${_reconnectManager.maxAttempts} scheduled in ${delay.inSeconds}s',
+      tag: 'LiveKit',
+    );
     _reconnectManager.markAttempt();
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(delay, _attemptReconnect);

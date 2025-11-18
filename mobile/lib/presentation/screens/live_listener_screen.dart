@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../models/live_room.dart';
 import '../providers/live_rooms_provider.dart';
 import '../services/livekit_service.dart';
+import '../widgets/live_transcript_panel.dart';
 
 class LiveListenerScreen extends ConsumerStatefulWidget {
   const LiveListenerScreen({super.key, this.room});
@@ -39,7 +40,7 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не вдалося приєднатися: $error')),
+        SnackBar(content: Text('Unable to join live: $error')),
       );
     }
   }
@@ -66,13 +67,13 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Немає активних live.',
+                  'No live sessions are active right now.',
                   style: TextStyle(color: AppTheme.textPrimary),
                 ),
                 const SizedBox(height: AppTheme.spaceMd),
                 FilledButton(
                   onPressed: () => context.pop(),
-                  child: const Text('Повернутись'),
+                  child: const Text('Go back'),
                 ),
               ],
             ),
@@ -94,9 +95,11 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
                   children: [
                     _HostCard(room: room, state: state),
                     const SizedBox(height: AppTheme.spaceXl),
-                    _TranscriptFeed(
+                    LiveTranscriptPanel(
                       status: state.status,
                       segments: state.transcript,
+                      emptyLabel:
+                          'Captions will appear here once the host starts talking.',
                     ),
                     const SizedBox(height: AppTheme.spaceXl),
                     _ReactionPanel(),
@@ -193,7 +196,7 @@ class _HostCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${state.listenerCount} слухачів прямо зараз',
+            '${state.listenerCount} listeners tuned in',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           if (state.status == LivekitStatus.error && state.error != null)
@@ -208,107 +211,12 @@ class _HostCard extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
-                'З’єднання з LiveKit…',
+                'Connecting to LiveKit…',
                 style: TextStyle(color: Colors.white70),
               ),
             ),
         ],
       ),
-    );
-  }
-}
-
-class _TranscriptFeed extends StatelessWidget {
-  const _TranscriptFeed({
-    required this.status,
-    required this.segments,
-  });
-
-  final LivekitStatus status;
-  final List<TranscriptSegment> segments;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppTheme.spaceLg),
-      decoration: BoxDecoration(
-        color: AppTheme.bgRaised,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Live-транскрипт',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: AppTheme.spaceSm),
-          if (status == LivekitStatus.connected && segments.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: segments
-                  .take(6)
-                  .map(
-                    (segment) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _TranscriptLine(segment: segment),
-                    ),
-                  )
-                  .toList(),
-            )
-          else
-            const Text(
-              'Текст з’явиться, щойно розмова почнеться.',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TranscriptLine extends StatelessWidget {
-  const _TranscriptLine({required this.segment});
-
-  final TranscriptSegment segment;
-
-  @override
-  Widget build(BuildContext context) {
-    final meta = _languageLabel(segment);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          segment.speakerLabel,
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          segment.text,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            height: 1.4,
-          ),
-        ),
-        if (meta != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              meta,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-          ),
-      ],
     );
   }
 }
@@ -321,7 +229,7 @@ class _ReactionPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Реакції',
+          'Live reactions',
           style: TextStyle(color: AppTheme.textSecondary),
         ),
         const SizedBox(height: AppTheme.spaceSm),
@@ -347,14 +255,3 @@ class _ReactionPanel extends StatelessWidget {
   }
 }
 
-String? _languageLabel(TranscriptSegment segment) {
-  final language = segment.language?.trim();
-  if (language == null || language.isEmpty) {
-    return null;
-  }
-  final upper = language.toUpperCase();
-  if (segment.isTranslation) {
-    return 'Переклад ($upper)';
-  }
-  return upper;
-}
