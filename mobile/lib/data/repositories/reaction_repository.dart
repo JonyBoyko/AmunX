@@ -32,9 +32,11 @@ class ReactionRepository {
       remove: remove,
     );
     final totals = (payload['totals'] as List<dynamic>? ?? const [])
-        .map((entry) => ReactionStat.fromJson(
-              Map<String, dynamic>.from(entry as Map),
-            ))
+        .map(
+          (entry) => ReactionStat.fromJson(
+            Map<String, dynamic>.from(entry as Map),
+          ),
+        )
         .toList();
     final self =
         Set<String>.from(payload['self'] as List<dynamic>? ?? const []);

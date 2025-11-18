@@ -39,24 +39,22 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     context.push('/topic/${Uri.encodeComponent(topic)}');
   }
 
-  Future<void> _handleReactionTap(
-    BuildContext context,
-    Episode episode,
-    String type,
-  ) async {
+  Future<void> _handleReactionTap(Episode episode, String type) async {
     try {
       await ref.read(reactionProvider.notifier).toggleReaction(
             episode.id,
             type,
           );
     } on StateError {
-      _showSnack(context, 'Увійдіть, щоб ставити реакції');
+      if (!mounted) return;
+      _showSnack('Reaction already applied. Try another.');
     } catch (_) {
-      _showSnack(context, 'Не вдалося оновити реакцію');
+      if (!mounted) return;
+      _showSnack('Failed to update reactions. Please retry.');
     }
   }
 
-  void _showSnack(BuildContext context, String message) {
+  void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -203,8 +201,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 onTap: () => _openEpisode(episode),
                 onTopicTap: () => _openTopic(episode),
                 reactionSnapshot: reactionSnapshot,
-                onReactionTap: (type) =>
-                    _handleReactionTap(context, episode, type),
+                onReactionTap: (type) => _handleReactionTap(episode, type),
               );
             },
           ),
@@ -325,8 +322,7 @@ class _FeedHeader extends StatelessWidget {
           IconButton(
             tooltip: 'Profile',
             onPressed: onProfileTap,
-            icon:
-                const Icon(Icons.person_outline, color: AppTheme.textPrimary),
+            icon: const Icon(Icons.person_outline, color: AppTheme.textPrimary),
           ),
         ],
       ),

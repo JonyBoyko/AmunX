@@ -10,19 +10,26 @@ class FeedFilterNotifier extends StateNotifier<FeedFilterState> {
     final nextRegion =
         tab == FeedTab.trendingNearby ? RegionFilter.nearby : state.region;
     state = state.copyWith(tab: tab, region: nextRegion);
-    AppLogger.debug('Feed tab switched to ${tab.name}', tag: 'FeedFilter');
+    AppLogger.debug(
+      'Feed tab switched to ${tab.name}',
+      tag: 'FeedFilter',
+    );
   }
 
   void setFormat(ContentFormat format) {
     state = state.copyWith(format: format);
-    AppLogger.debug('Feed format switched to ${format.name}',
-        tag: 'FeedFilter');
+    AppLogger.debug(
+      'Feed format switched to ${format.name}',
+      tag: 'FeedFilter',
+    );
   }
 
   void setRegion(RegionFilter region) {
     state = state.copyWith(region: region);
-    AppLogger.debug('Region filter switched to ${region.name}',
-        tag: 'FeedFilter');
+    AppLogger.debug(
+      'Region filter switched to ${region.name}',
+      tag: 'FeedFilter',
+    );
   }
 
   void toggleTag(String tagLabel) {
@@ -43,7 +50,10 @@ class FeedFilterNotifier extends StateNotifier<FeedFilterState> {
   void clearTags() {
     if (state.selectedTags.isEmpty) return;
     state = state.copyWith(selectedTags: <String>{});
-    AppLogger.debug('Tag filters cleared', tag: 'FeedFilter');
+    AppLogger.debug(
+      'Tag filters cleared',
+      tag: 'FeedFilter',
+    );
   }
 }
 

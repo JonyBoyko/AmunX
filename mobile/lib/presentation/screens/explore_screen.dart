@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
-import '../../data/models/explore.dart';
 import '../providers/explore_provider.dart';
 import '../widgets/explore_card_tile.dart';
 
@@ -160,7 +159,7 @@ class _ExploreFilters extends StatelessWidget {
               label: Text(_labelForFilter(filter)),
               selected: isSelected,
               onSelected: (_) => onLengthSelected(filter),
-              selectedColor: AppTheme.brandPrimary.withOpacity(0.2),
+              selectedColor: AppTheme.brandPrimary.withValues(alpha: 0.2),
               labelStyle: TextStyle(
                 color:
                     isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
@@ -187,7 +186,7 @@ class _ExploreFilters extends StatelessWidget {
               label: Text('#$tag'),
               selected: isSelected,
               onSelected: (_) => onTagToggled(tag),
-              selectedColor: AppTheme.brandAccent.withOpacity(0.2),
+              selectedColor: AppTheme.brandAccent.withValues(alpha: 0.2),
               side: BorderSide(
                 color:
                     isSelected ? AppTheme.brandAccent : AppTheme.surfaceBorder,
@@ -248,4 +247,3 @@ class _EmptyExploreState extends StatelessWidget {
     );
   }
 }
-

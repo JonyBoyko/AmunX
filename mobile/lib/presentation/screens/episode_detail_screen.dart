@@ -88,24 +88,21 @@ class _EpisodeDetailBodyState extends ConsumerState<_EpisodeDetailBody>
     }
   }
 
-  Future<void> _handleReactionTap(
-    BuildContext context,
-    String type,
-  ) async {
+  Future<void> _handleReactionTap(String type) async {
     try {
       await ref.read(reactionProvider.notifier).toggleReaction(
             widget.episode.id,
             type,
           );
     } on StateError {
-      _showSnack(
-          context, 'РЈРІС–Р№РґС–С‚СЊ, С‰РѕР± СЃС‚Р°РІРёС‚Рё СЂРµР°РєС†С–С—');
+      _showSnack('Reaction already applied. Try another.');
     } catch (_) {
-      _showSnack(context, 'РќРµ РІРґР°Р»РѕСЃСЏ РѕРЅРѕРІРёС‚Рё СЂРµР°РєС†С–СЋ');
+      _showSnack('Failed to update reactions. Please retry.');
     }
   }
 
-  void _showSnack(BuildContext context, String message) {
+  void _showSnack(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -170,9 +167,7 @@ class _EpisodeDetailBodyState extends ConsumerState<_EpisodeDetailBody>
             '/episode/${widget.episode.id}/comments',
             extra: {'title': widget.episode.title},
           ),
-          onReactionTap: AppConfig.reactionsEnabled
-              ? (type) => _handleReactionTap(context, type)
-              : null,
+          onReactionTap: AppConfig.reactionsEnabled ? _handleReactionTap : null,
         ),
       ],
     );

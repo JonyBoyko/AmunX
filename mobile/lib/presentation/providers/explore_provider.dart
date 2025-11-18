@@ -203,4 +203,3 @@ const _defaultExploreTags = <String>[
 final exploreTagSuggestionsProvider = Provider<List<String>>((ref) {
   return _defaultExploreTags;
 });
-

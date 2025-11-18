@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/logging/app_logger.dart';
 import '../api/api_client.dart';
 import '../models/billing.dart';
-import '../models/user.dart';
 import '../../presentation/providers/session_provider.dart';
 
 class BillingRepository {
@@ -17,7 +15,8 @@ class BillingRepository {
     final response = await client.getBillingProducts();
     final products = response['products'] as List<dynamic>? ?? const [];
     return products
-        .map((raw) => BillingProduct.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map<String, dynamic>>()
+        .map(BillingProduct.fromJson)
         .toList();
   }
 
@@ -25,14 +24,18 @@ class BillingRepository {
     final token = _ref.read(sessionProvider).token;
     final client = createApiClient(token: token);
     final response = await client.getBillingSubscription();
-    return BillingSubscription.fromJson(response as Map<String, dynamic>);
+    return BillingSubscription.fromJson(
+      Map<String, dynamic>.from(response as Map),
+    );
   }
 
   Future<BillingPortalInfo> fetchPortal() async {
     final token = _ref.read(sessionProvider).token;
     final client = createApiClient(token: token);
     final response = await client.getBillingPortal();
-    return BillingPortalInfo.fromJson(response as Map<String, dynamic>);
+    return BillingPortalInfo.fromJson(
+      Map<String, dynamic>.from(response as Map),
+    );
   }
 
   Future<String> createMonoPayCheckout({

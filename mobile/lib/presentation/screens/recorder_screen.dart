@@ -1,12 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -135,10 +131,14 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
 
     if (resolvedPath != null) {
       await _uploadRecording(resolvedPath);
-      unawaited(File(resolvedPath).delete().catchError(
-            (e) => AppLogger.warning('Failed to delete temp recording: $e',
-                tag: 'Recorder'),
-          ));
+      try {
+        await File(resolvedPath).delete();
+      } catch (error) {
+        AppLogger.warning(
+          'Failed to delete temp recording: $error',
+          tag: 'Recorder',
+        );
+      }
     }
   }
 
@@ -416,7 +416,7 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppTheme.brandPrimary,
+          activeThumbColor: AppTheme.brandPrimary,
         ),
       ],
     );
@@ -460,4 +460,3 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
     );
   }
 }
-

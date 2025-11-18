@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:characters/characters.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/logging/app_logger.dart';
@@ -25,13 +24,14 @@ class AuthorDirectoryNotifier
   AuthorDirectoryNotifier([this._ref]) : super(_seedAuthors());
 
   final Ref? _ref;
-  final Set<String> _hydratedAuthors = {};
-  final Set<String> _pendingAuthors = {};
+  final Set<String> _hydratedAuthors = <String>{};
+  final Set<String> _pendingAuthors = <String>{};
 
   void syncWithEpisodes(List<Episode> episodes) {
     var changed = false;
     final missing = <String>{};
     final updated = Map<String, AuthorProfile>.from(state);
+
     for (final episode in episodes) {
       if (!updated.containsKey(episode.authorId)) {
         updated[episode.authorId] = _profileFromEpisode(episode);
@@ -39,11 +39,15 @@ class AuthorDirectoryNotifier
         changed = true;
       }
     }
+
     if (changed) {
       state = updated;
-      AppLogger.debug('Author directory synced (${state.length} authors)',
-          tag: 'AuthorDirectory');
+      AppLogger.debug(
+        'Author directory synced (${state.length} authors)',
+        tag: 'AuthorDirectory',
+      );
     }
+
     if (missing.isNotEmpty) {
       unawaited(_hydrateProfiles(missing));
     }
@@ -54,12 +58,14 @@ class AuthorDirectoryNotifier
     if (author == null) {
       return;
     }
+
     final nextFollowState = !author.isFollowed;
     final delta = nextFollowState ? 1 : -1;
     final optimistic = author.copyWith(
       isFollowed: nextFollowState,
       followers: max(0, author.followers + delta),
     );
+
     state = {
       ...state,
       authorId: optimistic,
@@ -69,6 +75,7 @@ class AuthorDirectoryNotifier
     if (client == null) {
       return;
     }
+
     try {
       final response = await (nextFollowState
           ? client.followUser(authorId)
@@ -96,7 +103,9 @@ class AuthorDirectoryNotifier
 
   void boostLiveStatus(String authorId, bool isLive) {
     final author = state[authorId];
-    if (author == null) return;
+    if (author == null) {
+      return;
+    }
     state = {
       ...state,
       authorId: author.copyWith(isLive: isLive),
@@ -108,13 +117,17 @@ class AuthorDirectoryNotifier
     if (client == null) {
       return;
     }
+
     final newIds = authorIds
-        .where((id) =>
-            !_hydratedAuthors.contains(id) && !_pendingAuthors.contains(id))
+        .where(
+          (id) =>
+              !_hydratedAuthors.contains(id) && !_pendingAuthors.contains(id),
+        )
         .toList();
     if (newIds.isEmpty) {
       return;
     }
+
     _pendingAuthors.addAll(newIds);
     try {
       for (final chunk in _chunk(newIds, 20)) {
@@ -135,15 +148,20 @@ class AuthorDirectoryNotifier
   }
 
   void _applyRemoteProfiles(List<dynamic> payloads) {
-    if (payloads.isEmpty) return;
+    if (payloads.isEmpty) {
+      return;
+    }
     final updated = Map<String, AuthorProfile>.from(state);
     var changed = false;
+
     for (final entry in payloads) {
       final map = entry is Map<String, dynamic>
           ? entry
           : Map<String, dynamic>.from(entry as Map);
       final id = map['id'] as String?;
-      if (id == null) continue;
+      if (id == null) {
+        continue;
+      }
 
       final existing = updated[id];
       final displayName = (map['display_name'] as String?) ??
@@ -182,9 +200,11 @@ class AuthorDirectoryNotifier
         following: following,
         isFollowed: isFollowing,
       );
+
       updated[id] = profile;
       changed = true;
     }
+
     if (changed) {
       state = updated;
     }
@@ -209,64 +229,64 @@ Map<String, AuthorProfile> _seedAuthors() {
   };
 }
 
-final List<AuthorProfile> _demoAuthors = [
+const List<AuthorProfile> _demoAuthors = [
   AuthorProfile(
     id: 'creator-olena',
-    displayName: 'Олена Лісова',
+    displayName: 'Olena Walks',
     handle: '@olena.walks',
-    bio: 'Walk-подкасти про підприємництво та ментальне здоровʼя.',
-    avatarEmoji: '🌿',
+    bio: 'Morning walk recaps and mindful notes.',
+    avatarEmoji: 'O',
     followers: 1820,
     following: 312,
     posts: 64,
     isFollowed: true,
     isLive: false,
-    badges: const ['✨ Топ 1 тижня'],
+    badges: ['Walk Club'],
   ),
   AuthorProfile(
     id: 'creator-danylo',
-    displayName: 'Данило Федоров',
+    displayName: 'Danylo Fedan',
     handle: '@fedan',
-    bio: 'Щоденні нотатки фаундера, бекстейдж запусків у Moweton.',
-    avatarEmoji: '🚀',
+    bio: 'Product lead sharing daily standups and experiments.',
+    avatarEmoji: 'D',
     followers: 940,
     following: 188,
     posts: 41,
     isFollowed: false,
     isLive: true,
-    badges: const ['LIVE'],
+    badges: ['Live now'],
   ),
   AuthorProfile(
     id: 'creator-maria',
-    displayName: 'Марія Перегуда',
+    displayName: 'Maria Audio',
     handle: '@maria.audio',
-    bio: 'Медитації та голосові щоденники для продуктивності.',
-    avatarEmoji: '🧘',
+    bio: 'Async team check-ins and weekend planning capsules.',
+    avatarEmoji: 'M',
     followers: 2210,
     following: 503,
     posts: 88,
     isFollowed: true,
     isLive: false,
-    badges: const ['✨ Pro'],
+    badges: ['Pro host'],
   ),
 ];
 
 AuthorProfile _profileFromEpisode(Episode episode) {
   final hash = episode.authorId.hashCode;
-  final stickers = ['🎧', '🎙️', '🌀', '🦊', '🌌', '🦉', '💡'];
+  final stickers = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
   final sticker = stickers[hash.abs() % stickers.length];
   final name = _generatedNames[hash.abs() % _generatedNames.length];
   final handle = '@${name.split(' ').first.toLowerCase()}${hash.abs() % 1000}';
   final followers = 300 + (hash.abs() % 1500);
   final following = 40 + (hash.abs() % 200);
   final posts = 8 + (hash.abs() % 90);
-  final badges = followers > 1500 ? ['🔥 Тренди поруч'] : <String>[];
+  final badges = followers > 1500 ? ['Top Creator'] : <String>[];
 
   return AuthorProfile(
     id: episode.authorId,
     displayName: name,
     handle: handle,
-    bio: 'Автор щоденників та мікроподкастів у Moweton.',
+    bio: 'Community-generated author synced from recent episodes.',
     avatarEmoji: sticker,
     followers: followers,
     following: following,
@@ -278,14 +298,14 @@ AuthorProfile _profileFromEpisode(Episode episode) {
 }
 
 const _generatedNames = [
-  'Антон Ромащенко',
-  'Софія Дорошенко',
-  'Ілля Мельник',
-  'Оксана Ярмолюк',
-  'Іра Жадан',
-  'Марко Пшеничний',
-  'Влад Гончар',
-  'Аліна Кулик',
+  'Marta Dovzhenko',
+  'Andrii Koval',
+  'Larysa Prymak',
+  'Petro Horbunov',
+  'Sofiia Romanenko',
+  'Yuliia Yatsenko',
+  'Oleh Ponomarenko',
+  'Natalia Zakharchuk',
 ];
 
 Iterable<List<String>> _chunk(List<String> ids, int size) sync* {
@@ -305,6 +325,9 @@ int? _asInt(dynamic value) {
 }
 
 String _avatarFromName(String value) {
-  if (value.isEmpty) return '🙂';
-  return value.characters.first;
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return '?';
+  }
+  return trimmed[0].toUpperCase();
 }

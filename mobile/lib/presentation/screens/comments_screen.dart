@@ -1,4 +1,3 @@
-import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,14 +8,14 @@ import '../../data/models/comment.dart';
 import '../providers/comments_provider.dart';
 
 class CommentsScreen extends ConsumerStatefulWidget {
-  final String episodeId;
-  final String? episodeTitle;
-
   const CommentsScreen({
     super.key,
     required this.episodeId,
     this.episodeTitle,
   });
+
+  final String episodeId;
+  final String? episodeTitle;
 
   @override
   ConsumerState<CommentsScreen> createState() => _CommentsScreenState();
@@ -41,22 +40,31 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
   @override
   Widget build(BuildContext context) {
     final commentsState = ref.watch(commentsProvider(widget.episodeId));
-    final comments = commentsState.asData?.value ?? const [];
+    final comments = commentsState.asData?.value ?? const <Comment>[];
 
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context, comments.length),
-            _buildQuickTemplates(),
+            _Header(
+              title: widget.episodeTitle ?? 'Replies',
+              total: comments.length,
+            ),
+            _QuickTemplates(
+              onSelect: (value) {
+                setState(() {
+                  _controller.text = value;
+                });
+              },
+            ),
             Expanded(
               child: commentsState.when(
-                data: (items) => _buildCommentsList(items),
+                data: _CommentsList.new,
                 loading: () => const Center(
                   child: CircularProgressIndicator(),
                 ),
-                error: (error, stackTrace) => _CommentsError(
+                error: (error, __) => _CommentsError(
                   message: error.toString(),
                   onRetry: () => ref
                       .read(commentsProvider(widget.episodeId).notifier)
@@ -64,14 +72,52 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
                 ),
               ),
             ),
-            _buildInput(),
+            _InputBar(
+              controller: _controller,
+              isSubmitting: _isSubmitting,
+              onSubmit: _handleSubmit,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, int count) {
+  Future<void> _handleSubmit() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(commentsProvider(widget.episodeId).notifier).submit(text);
+      _controller.clear();
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to post reply: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header({required this.title, required this.total});
+
+  final String title;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTheme.spaceLg,
@@ -86,24 +132,28 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
         children: [
           IconButton(
             onPressed: () => context.pop(),
-            icon: const Icon(Icons.arrow_back_ios_new,
-                color: AppTheme.textPrimary),
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: AppTheme.textPrimary,
+            ),
           ),
           const SizedBox(width: AppTheme.spaceSm),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.episodeTitle ?? 'Коментарі',
+                title,
                 style: const TextStyle(
                   color: AppTheme.textPrimary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
-                '$count коментарів',
+                '$total comments',
                 style: const TextStyle(
-                    color: AppTheme.textSecondary, fontSize: 12),
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -111,22 +161,30 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
       ),
     );
   }
+}
 
-  Widget _buildQuickTemplates() {
-    final templates = [
-      'Це було важливо...',
-      'Що саме найбільше здивувало?',
-      'Дякую за відвертість!',
-    ];
+class _QuickTemplates extends StatelessWidget {
+  const _QuickTemplates({required this.onSelect});
+
+  final ValueChanged<String> onSelect;
+
+  static const _templates = <String>[
+    'Great insight! Quick thoughtвЂ¦',
+    'Should we clip this for the wider team?',
+    'Can you expand on that idea?',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
       height: 64,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: AppTheme.spaceLg),
         itemBuilder: (context, index) {
-          final template = templates[index];
+          final template = _templates[index];
           return GestureDetector(
-            onTap: () => setState(() => _controller.text = template),
+            onTap: () => onSelect(template),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
@@ -140,98 +198,94 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
             ),
           );
         },
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemCount: templates.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppTheme.spaceSm),
+        itemCount: _templates.length,
       ),
     );
   }
+}
 
-  Widget _buildCommentsList(List<Comment> comments) {
-    if (comments.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: () =>
-            ref.read(commentsProvider(widget.episodeId).notifier).refresh(),
-        child: ListView(
-          children: const [
-            SizedBox(height: 120),
-            Center(
-              child: Text(
-                'Ще немає коментарів — стань першим!',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ),
-          ],
+class _CommentsList extends StatelessWidget {
+  const _CommentsList(List<Comment> comments) : _comments = comments;
+
+  final List<Comment> _comments;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_comments.isEmpty) {
+      return const Center(
+        child: Text(
+          'No replies yet. Be the first to add one.',
+          style: TextStyle(color: AppTheme.textSecondary),
         ),
       );
     }
-
-    return RefreshIndicator(
-      onRefresh: () =>
-          ref.read(commentsProvider(widget.episodeId).notifier).refresh(),
-      child: ListView.separated(
-        padding: const EdgeInsets.all(AppTheme.spaceLg),
-        itemBuilder: (context, index) {
-          final comment = comments[index];
-          return Container(
-            padding: const EdgeInsets.all(AppTheme.spaceLg),
-            decoration: BoxDecoration(
-              color: AppTheme.bgRaised,
-              borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: AppTheme.brandPrimary.withOpacity(0.2),
-                      child: Text(
-                        comment.authorName.characters.first.toUpperCase(),
-                        style: const TextStyle(color: AppTheme.textPrimary),
-                      ),
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppTheme.spaceLg),
+      itemCount: _comments.length,
+      separatorBuilder: (_, __) => const SizedBox(height: AppTheme.spaceMd),
+      itemBuilder: (context, index) {
+        final comment = _comments[index];
+        final formatter = DateFormat('MMM d HH:mm');
+        final timestamp = formatter.format(comment.createdAt);
+        return Container(
+          padding: const EdgeInsets.all(AppTheme.spaceMd),
+          decoration: BoxDecoration(
+            color: AppTheme.bgRaised,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    comment.authorName,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: AppTheme.spaceSm),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          comment.authorName,
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          _formatTimestamp(comment.createdAt),
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.spaceSm),
-                Text(
-                  comment.text,
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
-                    height: 1.5,
                   ),
+                  Text(
+                    timestamp,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.spaceSm),
+              Text(
+                comment.text,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  height: 1.5,
                 ),
-              ],
-            ),
-          );
-        },
-        separatorBuilder: (_, __) => const SizedBox(height: AppTheme.spaceMd),
-        itemCount: comments.length,
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
+}
 
-  Widget _buildInput() {
-    final isDisabled = _controller.text.trim().isEmpty || _isSubmitting;
+class _InputBar extends StatelessWidget {
+  const _InputBar({
+    required this.controller,
+    required this.isSubmitting,
+    required this.onSubmit,
+  });
+
+  final TextEditingController controller;
+  final bool isSubmitting;
+  final Future<void> Function() onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = controller.text.trim().isEmpty || isSubmitting;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTheme.spaceLg,
@@ -246,9 +300,11 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
         children: [
           Expanded(
             child: TextField(
-              controller: _controller,
+              controller: controller,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              maxLines: 2,
               decoration: InputDecoration(
-                hintText: 'Залиш коментар...',
+                hintText: 'Share your replyвЂ¦',
                 hintStyle: const TextStyle(color: AppTheme.textSecondary),
                 filled: true,
                 fillColor: AppTheme.bgRaised,
@@ -257,14 +313,12 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              style: const TextStyle(color: AppTheme.textPrimary),
-              maxLines: 2,
             ),
           ),
           const SizedBox(width: AppTheme.spaceSm),
           FilledButton(
-            onPressed: isDisabled ? null : _submit,
-            child: _isSubmitting
+            onPressed: disabled ? null : onSubmit,
+            child: isSubmitting
                 ? const SizedBox(
                     width: 20,
                     height: 20,
@@ -276,45 +330,16 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
       ),
     );
   }
-
-  Future<void> _submit() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    setState(() => _isSubmitting = true);
-    try {
-      await ref.read(commentsProvider(widget.episodeId).notifier).submit(text);
-      _controller.clear();
-    } on StateError catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Потрібна авторизація')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не вдалося надіслати: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
-    }
-  }
-
-  String _formatTimestamp(DateTime time) {
-    final formatter = DateFormat('HH:mm');
-    return formatter.format(time);
-  }
 }
 
 class _CommentsError extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-
   const _CommentsError({
     required this.message,
     required this.onRetry,
   });
+
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +355,7 @@ class _CommentsError extends StatelessWidget {
           const SizedBox(height: AppTheme.spaceSm),
           FilledButton(
             onPressed: onRetry,
-            child: const Text('Спробувати ще раз'),
+            child: const Text('Try again'),
           ),
         ],
       ),

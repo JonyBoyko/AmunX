@@ -4,8 +4,8 @@ part 'episode.freezed.dart';
 part 'episode.g.dart';
 
 @freezed
+@JsonSerializable(fieldRename: FieldRename.snake)
 class Episode with _$Episode {
-  @JsonSerializable(fieldRename: FieldRename.snake)
   const factory Episode({
     required String id,
     required String authorId,
@@ -33,8 +33,8 @@ class Episode with _$Episode {
 }
 
 @freezed
+@JsonSerializable(fieldRename: FieldRename.snake)
 class FeedResponse with _$FeedResponse {
-  @JsonSerializable(fieldRename: FieldRename.snake)
   const factory FeedResponse({
     required List<Episode> items,
   }) = _FeedResponse;

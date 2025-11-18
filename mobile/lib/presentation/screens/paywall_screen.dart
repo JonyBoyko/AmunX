@@ -33,7 +33,8 @@ class PaywallScreen extends ConsumerWidget {
               IconButton(
                 alignment: Alignment.centerLeft,
                 onPressed: () => context.pop(),
-                icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
+                icon: const Icon(Icons.arrow_back_ios_new,
+                    color: AppTheme.textPrimary),
               ),
               const SizedBox(height: AppTheme.spaceLg),
               const _PaywallHeader(),
@@ -47,13 +48,15 @@ class PaywallScreen extends ConsumerWidget {
               productsAsync.when(
                 data: (products) => _ProductSections(
                   products: products,
-                  onRevenueCatPurchase: (product) => _purchaseWithRevenueCat(context, ref, product),
+                  onRevenueCatPurchase: (product) =>
+                      _purchaseWithRevenueCat(context, ref, product),
                   onStripeManage: () => _openStripePortal(context, ref),
-                  onMonoPayCheckout: (product) => _startMonoPayCheckout(context, ref, product),
+                  onMonoPayCheckout: (product) =>
+                      _startMonoPayCheckout(context, ref, product),
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, _) => _ErrorCard(
-                  message: 'Не вдалося завантажити плани: $error',
+                  message: 'Не вдалося отримати плани: $error',
                   onRetry: () {
                     ref.invalidate(billingProductsProvider);
                   },
@@ -81,14 +84,15 @@ class PaywallScreen extends ConsumerWidget {
       await service.purchaseProduct(product);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Успішно оформлено підписку!')),
+          const SnackBar(content: Text('Підписку оформлено успішно')),
         );
       }
     } catch (e, stack) {
-      AppLogger.error('RevenueCat purchase failed', tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error('RevenueCat purchase failed',
+          tag: 'Paywall', error: e, stackTrace: stack);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Помилка підписки: $e')),
+          SnackBar(content: Text('Помилка оформлення: $e')),
         );
       }
     }
@@ -104,7 +108,8 @@ class PaywallScreen extends ConsumerWidget {
         );
       }
     } catch (e, stack) {
-      AppLogger.error('Restore purchases failed', tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error('Restore purchases failed',
+          tag: 'Paywall', error: e, stackTrace: stack);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Помилка відновлення: $e')),
@@ -120,20 +125,24 @@ class PaywallScreen extends ConsumerWidget {
       if (url == null || url.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Портал Stripe недоступний для акаунта')),
+            const SnackBar(content: Text('Статус Stripe поки недоступний')),
           );
         }
         return;
       }
-      final uri = Uri.parse(url);
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      final launched = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
       if (!launched && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не вдалось відкрити Stripe портал')),
+          const SnackBar(content: Text('Не вдалося відкрити Stripe')),
         );
       }
     } catch (e, stack) {
-      AppLogger.error('Failed to open Stripe portal', tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error('Failed to open Stripe portal',
+          tag: 'Paywall', error: e, stackTrace: stack);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Помилка Stripe: $e')),
@@ -148,55 +157,40 @@ class PaywallScreen extends ConsumerWidget {
     BillingProduct product,
   ) async {
     try {
-      final url = await ref.read(billingRepositoryProvider).createMonoPayCheckout(
-            productCode: product.code,
-            successUrl: null,
-          );
+      final url =
+          await ref.read(billingRepositoryProvider).createMonoPayCheckout(
+                productCode: product.code,
+              );
       if (url.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('MonoPay недоступний')),
-          );
-        }
-        return;
-    }
-}
-
-  Future<void> _startMonoPayCheckout(
-    BuildContext context,
-    WidgetRef ref,
-    BillingProduct product,
-  ) async {
-    try {
-      final url = await ref.read(billingRepositoryProvider).createMonoPayCheckout(
-            productCode: product.code,
-          );
-      if (url.isEmpty) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('MonoPay ��������� �����������')),
+            const SnackBar(content: Text('MonoPay тимчасово недоступний')),
           );
         }
         return;
       }
+
       final launched = await launchUrl(
         Uri.parse(url),
         mode: LaunchMode.externalApplication,
       );
       if (!launched && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('�� ������� ������� MonoPay')),
+          const SnackBar(content: Text('Не вдалося відкрити MonoPay')),
         );
       }
     } catch (e, stack) {
-      AppLogger.error('Failed to start MonoPay checkout', tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error('Failed to start MonoPay checkout',
+          tag: 'Paywall', error: e, stackTrace: stack);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('������� MonoPay: ')),
+          SnackBar(content: Text('Помилка MonoPay: $e')),
         );
       }
     }
   }
+}
+
 class _PlanStatus extends StatelessWidget {
   const _PlanStatus({required this.subscription});
 
@@ -204,6 +198,10 @@ class _PlanStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final planName =
+        subscription.plan.isEmpty ? 'FREE' : subscription.plan.toUpperCase();
+    final expiry = subscription.periodEnd;
+
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: BoxDecoration(
@@ -214,18 +212,36 @@ class _PlanStatus extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            'Ваш план',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
-            'Ваш план: ${subscription.plan.toUpperCase()}',
+            planName,
             style: const TextStyle(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w600,
+              fontSize: 20,
             ),
           ),
-          if (subscription.periodEnd != null)
+          if (expiry != null) ...[
+            const SizedBox(height: 4),
             Text(
-              'Активно до ${subscription.periodEnd}',
+              'Діє до ${expiry.toLocal()}',
               style: const TextStyle(color: AppTheme.textSecondary),
             ),
+          ],
+          if (subscription.provider != null) ...[
+            const SizedBox(height: AppTheme.spaceSm),
+            Text(
+              'Постачальник: ${subscription.provider}',
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+          ],
         ],
       ),
     );
@@ -249,14 +265,29 @@ class _ProductSections extends StatelessWidget {
   Widget build(BuildContext context) {
     final rcProducts = products.where((p) => p.isRevenueCat).toList();
     final stripeProducts = products.where((p) => p.isStripe).toList();
-    final monoPayProducts = products.where((p) => p.isMonoPay).toList();
+    final monoProducts = products.where((p) => p.isMonoPay).toList();
+
+    if (products.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppTheme.spaceLg),
+        decoration: BoxDecoration(
+          color: AppTheme.bgRaised,
+          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+          border: Border.all(color: AppTheme.surfaceBorder),
+        ),
+        child: const Text(
+          'Плани ще не налаштовані. Спробуйте оновити пізніше.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (rcProducts.isNotEmpty) ...[
           const Text(
-            'Підписка через App Store / Google Play',
+            'App Store / Google Play',
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w600,
@@ -266,7 +297,7 @@ class _ProductSections extends StatelessWidget {
           ...rcProducts.map(
             (product) => _BillingProductTile(
               product: product,
-              actionLabel: 'Підписатись',
+              actionLabel: 'Оформити',
               onPressed: () => onRevenueCatPurchase(product),
             ),
           ),
@@ -274,7 +305,7 @@ class _ProductSections extends StatelessWidget {
         ],
         if (stripeProducts.isNotEmpty) ...[
           const Text(
-            'Підписка карткою (Stripe)',
+            'Stripe (веб-клієнти)',
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w600,
@@ -284,22 +315,22 @@ class _ProductSections extends StatelessWidget {
           ...stripeProducts.map(
             (product) => _BillingProductTile(
               product: product,
-              actionLabel: 'Оплатити карткою',
+              actionLabel: 'Керувати підпискою',
               onPressed: onStripeManage,
             ),
           ),
           const SizedBox(height: AppTheme.spaceLg),
         ],
-        if (monoPayProducts.isNotEmpty) ...[
+        if (monoProducts.isNotEmpty) ...[
           const Text(
-            'Оплата MonoPay (Україна)',
+            'MonoPay (Україна)',
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppTheme.spaceSm),
-          ...monoPayProducts.map(
+          ...monoProducts.map(
             (product) => _BillingProductTile(
               product: product,
               actionLabel: 'MonoPay',
@@ -307,19 +338,6 @@ class _ProductSections extends StatelessWidget {
             ),
           ),
         ],
-        if (rcProducts.isEmpty && stripeProducts.isEmpty && monoPayProducts.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(AppTheme.spaceLg),
-            decoration: BoxDecoration(
-              color: AppTheme.bgRaised,
-              borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-              border: Border.all(color: AppTheme.surfaceBorder),
-            ),
-            child: const Text(
-              'Плани поки недоступні. Спробуйте пізніше.',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-          ),
       ],
     );
   }
@@ -358,7 +376,9 @@ class _BillingProductTile extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            product.description.isEmpty ? 'Повний доступ до преміум функцій' : product.description,
+            product.description.isEmpty
+                ? 'Повний доступ до функцій Moweton Pro.'
+                : product.description,
             style: const TextStyle(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: AppTheme.spaceSm),
@@ -394,7 +414,7 @@ class _ErrorCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.bgRaised,
         borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-        border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,8 +439,8 @@ class _PaywallHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: const [
+    return const Column(
+      children: [
         Icon(Icons.workspace_premium, size: 64, color: AppTheme.brandAccent),
         SizedBox(height: AppTheme.spaceSm),
         Text(
@@ -433,7 +453,7 @@ class _PaywallHeader extends StatelessWidget {
         ),
         SizedBox(height: 4),
         Text(
-          'AI-посібник для ваших голосових розмов',
+          'AI-помічник для голосових кімнат, подій і дайджестів.',
           style: TextStyle(color: AppTheme.textSecondary),
           textAlign: TextAlign.center,
         ),
@@ -441,10 +461,3 @@ class _PaywallHeader extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-

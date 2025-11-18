@@ -15,13 +15,15 @@ class ApiClient {
 
   // Auth
   Future<Map<String, dynamic>> requestMagicLink(
-      Map<String, dynamic> body) async {
+    Map<String, dynamic> body,
+  ) async {
     final response = await _dio.post('/v1/auth/magiclink', data: body);
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> verifyMagicLink(
-      Map<String, dynamic> body) async {
+    Map<String, dynamic> body,
+  ) async {
     final response = await _dio.post('/v1/auth/magiclink/verify', data: body);
     return response.data as Map<String, dynamic>;
   }
@@ -119,9 +121,13 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> createComment(
-      String episodeId, Map<String, dynamic> body) async {
-    final response =
-        await _dio.post('/v1/episodes/$episodeId/comments', data: body);
+    String episodeId,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _dio.post(
+      '/v1/episodes/$episodeId/comments',
+      data: body,
+    );
     return response.data as Map<String, dynamic>;
   }
 

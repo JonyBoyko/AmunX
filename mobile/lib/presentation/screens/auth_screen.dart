@@ -100,8 +100,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               children: [
                 IconButton(
                   onPressed: () => context.pop(),
-                  icon: const Icon(Icons.arrow_back_ios_new,
-                      color: AppTheme.textPrimary),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
                 const Spacer(),
                 const Text(
@@ -141,7 +143,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     onPressed: _isRequesting ? null : _requestMagicLink,
                     child: _isRequesting
                         ? const CircularProgressIndicator(
-                            color: AppTheme.textInverse)
+                            color: AppTheme.textInverse,
+                          )
                         : const Text('Надіслати посилання'),
                   ),
                 ),
