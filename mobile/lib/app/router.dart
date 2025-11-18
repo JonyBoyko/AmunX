@@ -48,7 +48,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // authenticated
-      if (location == '/onboarding' || location == '/auth' || location == '/splash') {
+      if (location == '/onboarding' ||
+          location == '/auth' ||
+          location == '/splash') {
         return '/feed';
       }
 
@@ -86,7 +88,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/publish',
         builder: (context, state) {
-          final summary = state.extra is RecordingSummary ? state.extra as RecordingSummary : null;
+          final summary = state.extra is RecordingSummary
+              ? state.extra as RecordingSummary
+              : null;
           return PublishScreen(summary: summary);
         },
       ),
@@ -146,4 +150,3 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-

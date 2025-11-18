@@ -332,7 +332,7 @@ ApiClient createApiClient({String? token}) {
       onResponse: (response, handler) {
         AppLogger.debug(
           'HTTP ${response.requestOptions.method} ${response.requestOptions.uri} '
-          '→ ${response.statusCode}',
+          '-> ${response.statusCode}',
           tag: 'ApiClient',
         );
         return handler.next(response);

@@ -85,6 +85,7 @@ class RevenueCatService {
     } else if (previous?.isAuthenticated == true && next.isAuthenticated == false) {
       Purchases.logOut().catchError((e, stack) {
         AppLogger.error('RevenueCat logout failed', tag: 'RevenueCat', error: e, stackTrace: stack);
+        throw e;
       });
     }
   }
@@ -97,31 +98,37 @@ class RevenueCatService {
   }
 
   Package? _findPackageForProduct(Offerings offerings, BillingProduct product) {
-    final current = offerings.current;
-    if (current == null) {
+    bool matchesPackage(Package pkg) {
+      final targets = <String>{
+        product.code,
+        if (product.externalId.isNotEmpty) product.externalId,
+      };
+      return targets.contains(pkg.identifier) ||
+          targets.contains(pkg.storeProduct.identifier);
+    }
+
+    Package? searchOffering(Offering offering) {
+      for (final pkg in offering.availablePackages) {
+        if (matchesPackage(pkg)) {
+          return pkg;
+        }
+      }
       return null;
     }
-    for (final pkg in current.availablePackages) {
-      if (pkg.identifier == product.code ||
-          pkg.storeProduct.identifier == product.code ||
-          pkg.storeProduct.sku == product.code ||
-          pkg.storeProduct.identifier == product.externalId ||
-          pkg.storeProduct.sku == product.externalId) {
-        return pkg;
+
+    final current = offerings.current;
+    if (current != null) {
+      final match = searchOffering(current);
+      if (match != null) {
+        return match;
       }
     }
     for (final offering in offerings.all.values) {
-      for (final pkg in offering.availablePackages) {
-        if (pkg.identifier == product.code ||
-            pkg.storeProduct.identifier == product.code ||
-            pkg.storeProduct.sku == product.code ||
-            pkg.storeProduct.identifier == product.externalId ||
-            pkg.storeProduct.sku == product.externalId) {
-          return pkg;
-        }
+      final match = searchOffering(offering);
+      if (match != null) {
+        return match;
       }
     }
     return null;
   }
 }
-

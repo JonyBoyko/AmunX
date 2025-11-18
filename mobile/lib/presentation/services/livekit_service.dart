@@ -211,11 +211,11 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
     LiveSessionJoin join, {
     required bool isHost,
   }) async {
-    final room = await LiveKitClient.connect(join.url, join.token);
-    if (isHost) {
-      await room.localParticipant?.setMicrophoneEnabled(true);
-    } else {
-      await room.localParticipant?.setMicrophoneEnabled(false);
+    final room = Room();
+    await room.connect(join.url, join.token);
+    final localParticipant = room.localParticipant;
+    if (localParticipant != null) {
+      await localParticipant.setMicrophoneEnabled(isHost);
     }
     _room = room;
     _statsTimer?.cancel();
@@ -249,7 +249,7 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
     if (room == null) {
       return 0;
     }
-    return room.remoteParticipants.length;
+    return room.participants.length;
   }
 
   void _emitStats() {

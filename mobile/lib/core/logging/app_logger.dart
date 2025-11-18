@@ -21,8 +21,8 @@ class AppLogger {
     _log(LogLevel.info, message, tag: tag, error: error);
   }
 
-  static void warning(String message, {String? tag, Object? error}) {
-    _log(LogLevel.warning, message, tag: tag, error: error);
+  static void warning(String message, {String? tag, Object? error, StackTrace? stackTrace}) {
+    _log(LogLevel.warning, message, tag: tag, error: error, stackTrace: stackTrace);
   }
 
   static void error(String message, {String? tag, Object? error, StackTrace? stackTrace}) {
