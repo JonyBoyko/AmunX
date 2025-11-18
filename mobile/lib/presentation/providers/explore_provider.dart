@@ -20,12 +20,12 @@ class ExploreFeedState {
     this.error,
   });
 
-  factory ExploreFeedState.initial() => ExploreFeedState(
-        cards: const [],
+  factory ExploreFeedState.initial() => const ExploreFeedState(
+        cards: [],
         nextCursor: null,
         isLoading: false,
         isLoadingMore: false,
-        filters: const ExploreFilters(),
+        filters: ExploreFilters(),
       );
 
   final List<ExploreCard> cards;

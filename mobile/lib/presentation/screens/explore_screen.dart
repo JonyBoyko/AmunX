@@ -107,11 +107,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                         child: const Text('Load more'),
                       ),
                     if (exploreState.error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: AppTheme.spaceSm),
+                      const Padding(
+                        padding: EdgeInsets.only(top: AppTheme.spaceSm),
                         child: Text(
                           'Failed to load explore feed',
-                          style: const TextStyle(color: AppTheme.stateDanger),
+                          style: TextStyle(color: AppTheme.stateDanger),
                         ),
                       ),
                   ],

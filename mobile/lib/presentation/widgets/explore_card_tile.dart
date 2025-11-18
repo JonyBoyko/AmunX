@@ -1,4 +1,3 @@
-import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
@@ -119,7 +118,7 @@ class _CardHeader extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 20,
-          backgroundColor: AppTheme.brandPrimary.withOpacity(0.15),
+          backgroundColor: AppTheme.brandPrimary.withValues(alpha: 0.15),
           backgroundImage: card.owner.avatarUrl?.isNotEmpty == true
               ? NetworkImage(card.owner.avatarUrl!)
               : null,
@@ -159,7 +158,7 @@ class _CardHeader extends StatelessWidget {
               vertical: 4,
             ),
             decoration: BoxDecoration(
-              color: AppTheme.brandAccent.withOpacity(0.15),
+              color: AppTheme.brandAccent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             ),
             child: Text(
@@ -233,3 +232,4 @@ String _formatTimestamp(DateTime input) {
   }
   return '${diff.inDays}d ago';
 }
+

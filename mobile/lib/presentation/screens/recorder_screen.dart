@@ -74,7 +74,7 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'РќР°РґР°Р№С‚Рµ РґРѕСЃС‚СѓРї РґРѕ РјС–РєСЂРѕС„РѕРЅР° Сѓ РЅР°Р»Р°С€С‚СѓРІР°РЅРЅСЏС…'),
+                'РќР°РґР°Р№С‚Рµ РґРѕСЃС‚СѓРї РґРѕ РјС–РєСЂРѕС„РѕРЅР° Сѓ РЅР°Р»Р°С€С‚СѓРІР°РЅРЅСЏС…',),
           ),
         );
       }
@@ -175,7 +175,7 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
       }
     } catch (e, stackTrace) {
       AppLogger.error('Failed to upload recording',
-          tag: 'Recorder', error: e, stackTrace: stackTrace);
+          tag: 'Recorder', error: e, stackTrace: stackTrace,);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -216,7 +216,7 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
                     const SizedBox(height: AppTheme.spaceXl),
                     if (_isUploading)
                       const CircularProgressIndicator(
-                          color: AppTheme.brandPrimary),
+                          color: AppTheme.brandPrimary,),
                     if (!_isUploading)
                       OutlinedButton.icon(
                         onPressed: () => context.push('/live/host'),
@@ -248,7 +248,7 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
           IconButton(
             onPressed: _isUploading ? null : () => context.pop(),
             icon: const Icon(Icons.arrow_back_ios_new,
-                color: AppTheme.textPrimary),
+                color: AppTheme.textPrimary,),
           ),
           const Spacer(),
           Container(

@@ -3,7 +3,6 @@ import 'package:moweton_flutter/data/api/api_client.dart';
 import 'package:moweton_flutter/data/models/episode.dart';
 import 'package:moweton_flutter/data/repositories/reaction_repository.dart';
 import 'package:moweton_flutter/data/repositories/auth_repository.dart';
-import 'package:moweton_flutter/presentation/models/reaction_state.dart';
 import 'package:moweton_flutter/presentation/providers/reaction_provider.dart';
 import 'package:moweton_flutter/presentation/providers/session_provider.dart';
 import 'package:riverpod/riverpod.dart';

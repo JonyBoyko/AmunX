@@ -53,7 +53,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 followers: followersCount,
                 following: followingAuthors.length,
                 onFollowingTap: () => _showFollowingSheet(followingAuthors,
-                    title: 'Ваші підписки'),
+                    title: 'Ваші підписки',),
               ),
               if (followingAuthors.isNotEmpty) ...[
                 const SizedBox(height: AppTheme.spaceLg),
@@ -128,7 +128,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 radius: 32,
                 backgroundColor: Colors.white24,
                 child: Text('М',
-                    style: TextStyle(color: Colors.white, fontSize: 24)),
+                    style: TextStyle(color: Colors.white, fontSize: 24),),
               ),
               const SizedBox(width: AppTheme.spaceLg),
               Expanded(
@@ -230,7 +230,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           onTap: () {},
           leading: const Icon(Icons.info_outline, color: AppTheme.textPrimary),
           title: const Text('Про додаток',
-              style: TextStyle(color: AppTheme.textPrimary)),
+              style: TextStyle(color: AppTheme.textPrimary),),
         ),
         ListTile(
           onTap: () => context.go('/'),
@@ -318,7 +318,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                   ),
                   subtitle: Text(author.handle,
-                      style: const TextStyle(color: AppTheme.textSecondary)),
+                      style: const TextStyle(color: AppTheme.textSecondary),),
                   trailing: FollowButton(
                     isFollowing: author.isFollowed,
                     onPressed: () => setState(() {

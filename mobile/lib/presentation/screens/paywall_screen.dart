@@ -33,15 +33,19 @@ class PaywallScreen extends ConsumerWidget {
               IconButton(
                 alignment: Alignment.centerLeft,
                 onPressed: () => context.pop(),
-                icon: const Icon(Icons.arrow_back_ios_new,
-                    color: AppTheme.textPrimary),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: AppTheme.textPrimary,
+                ),
               ),
               const SizedBox(height: AppTheme.spaceLg),
               const _PaywallHeader(),
               const SizedBox(height: AppTheme.spaceLg),
               subscriptionAsync.when(
                 data: (sub) => _PlanStatus(subscription: sub),
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
+                ),
                 error: (_, __) => const SizedBox.shrink(),
               ),
               const SizedBox(height: AppTheme.spaceXl),
@@ -54,7 +58,9 @@ class PaywallScreen extends ConsumerWidget {
                   onMonoPayCheckout: (product) =>
                       _startMonoPayCheckout(context, ref, product),
                 ),
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
+                ),
                 error: (error, _) => _ErrorCard(
                   message: 'Не вдалося отримати плани: $error',
                   onRetry: () {
@@ -88,8 +94,12 @@ class PaywallScreen extends ConsumerWidget {
         );
       }
     } catch (e, stack) {
-      AppLogger.error('RevenueCat purchase failed',
-          tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error(
+        'RevenueCat purchase failed',
+        tag: 'Paywall',
+        error: e,
+        stackTrace: stack,
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Помилка оформлення: $e')),
@@ -108,8 +118,12 @@ class PaywallScreen extends ConsumerWidget {
         );
       }
     } catch (e, stack) {
-      AppLogger.error('Restore purchases failed',
-          tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error(
+        'Restore purchases failed',
+        tag: 'Paywall',
+        error: e,
+        stackTrace: stack,
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Помилка відновлення: $e')),
@@ -141,8 +155,12 @@ class PaywallScreen extends ConsumerWidget {
         );
       }
     } catch (e, stack) {
-      AppLogger.error('Failed to open Stripe portal',
-          tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error(
+        'Failed to open Stripe portal',
+        tag: 'Paywall',
+        error: e,
+        stackTrace: stack,
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Помилка Stripe: $e')),
@@ -180,8 +198,12 @@ class PaywallScreen extends ConsumerWidget {
         );
       }
     } catch (e, stack) {
-      AppLogger.error('Failed to start MonoPay checkout',
-          tag: 'Paywall', error: e, stackTrace: stack);
+      AppLogger.error(
+        'Failed to start MonoPay checkout',
+        tag: 'Paywall',
+        error: e,
+        stackTrace: stack,
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Помилка MonoPay: $e')),

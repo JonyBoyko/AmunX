@@ -223,7 +223,9 @@ class _EpisodeDetailBodyState extends ConsumerState<_EpisodeDetailBody>
   }
 
   Widget _buildTabs(
-      List<Map<String, Object>> chapters, List<String> transcript) {
+    List<Map<String, Object>> chapters,
+    List<String> transcript,
+  ) {
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -285,7 +287,7 @@ class _EpisodeDetailBodyState extends ConsumerState<_EpisodeDetailBody>
                             padding: const EdgeInsets.all(AppTheme.spaceMd),
                             decoration: BoxDecoration(
                               color: isAlt
-                                  ? AppTheme.bgRaised.withOpacity(0.8)
+                                  ? AppTheme.bgRaised.withValues(alpha: 0.8)
                                   : Colors.transparent,
                             ),
                             child: Text(
@@ -308,8 +310,10 @@ class _EpisodeDetailBodyState extends ConsumerState<_EpisodeDetailBody>
                         ),
                         child: Column(
                           children: [
-                            const Icon(Icons.lock_outline,
-                                color: AppTheme.textSecondary),
+                            const Icon(
+                              Icons.lock_outline,
+                              color: AppTheme.textSecondary,
+                            ),
                             const SizedBox(height: 12),
                             const Text(
                               'РўСЂР°РЅСЃРєСЂРёРїС‚Рё РґРѕСЃС‚СѓРїРЅС– Сѓ Pro',
@@ -374,9 +378,9 @@ class _PlayerCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 32,
-                backgroundColor: Colors.white.withOpacity(0.2),
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
                 child: Text(
-                  (episode.title ?? 'A').characters.first.toUpperCase(),
+                  _initial(),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -451,7 +455,7 @@ class _PlayerCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppTheme.radiusSm),
       ),
       child: Text(
@@ -465,6 +469,14 @@ class _PlayerCard extends StatelessWidget {
     final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
     final secs = (seconds % 60).toString().padLeft(2, '0');
     return '$minutes:$secs';
+  }
+
+  String _initial() {
+    final title = episode.title?.trim();
+    if (title == null || title.isEmpty) {
+      return 'A';
+    }
+    return title[0].toUpperCase();
   }
 }
 
@@ -489,7 +501,7 @@ class _StickyActions extends StatelessWidget {
           vertical: AppTheme.spaceMd,
         ),
         decoration: BoxDecoration(
-          color: AppTheme.bgRaised.withOpacity(0.95),
+          color: AppTheme.bgRaised.withValues(alpha: 0.95),
           border: const Border(
             top: BorderSide(color: AppTheme.surfaceBorder),
           ),

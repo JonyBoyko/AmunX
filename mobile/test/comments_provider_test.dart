@@ -19,7 +19,7 @@ void main() {
         text: 'Hello',
         createdAt: DateTime.utc(2024),
       ),
-    ]);
+    ],);
 
     final container = ProviderContainer(
       overrides: [

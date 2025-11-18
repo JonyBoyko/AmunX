@@ -42,7 +42,7 @@ class TopicDetailScreen extends StatelessWidget {
               backgroundColor: AppTheme.bgBase,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new,
-                    color: AppTheme.textPrimary),
+                    color: AppTheme.textPrimary,),
                 onPressed: () => context.pop(),
               ),
               title: Text(

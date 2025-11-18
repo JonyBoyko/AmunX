@@ -36,9 +36,8 @@ class LivekitSessionState {
     required this.status,
     required this.isHost,
     required this.listenerCount,
-    this.session,
-    this.error,
-  });
+  })  : session = null,
+        error = null;
 
   factory LivekitSessionState.idle() {
     return const LivekitSessionState._(
@@ -83,7 +82,7 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
       throw StateError('auth_required');
     }
     await _disconnectRoom();
-    state = LivekitSessionState(
+    state = const LivekitSessionState(
       status: LivekitStatus.connecting,
       isHost: true,
       session: null,
@@ -158,7 +157,7 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
 
   Future<void> joinSession(String sessionId) async {
     await _disconnectRoom();
-    state = LivekitSessionState(
+    state = const LivekitSessionState(
       status: LivekitStatus.connecting,
       isHost: false,
       session: null,
@@ -264,4 +263,3 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
         .updateListenerCount(session.id, listeners);
   }
 }
-

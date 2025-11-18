@@ -27,7 +27,7 @@ class MiniPlayerBar extends StatelessWidget {
         vertical: AppTheme.spaceSm,
       ),
       decoration: BoxDecoration(
-        color: AppTheme.bgRaised.withOpacity(0.9),
+        color: AppTheme.bgRaised.withValues(alpha: 0.9),
         border: const Border(
           top: BorderSide(color: AppTheme.surfaceBorder),
         ),
@@ -95,4 +95,5 @@ class MiniPlayerBar extends StatelessWidget {
     );
   }
 }
+
 

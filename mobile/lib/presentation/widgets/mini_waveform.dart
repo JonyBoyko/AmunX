@@ -33,8 +33,8 @@ class MiniWaveform extends StatelessWidget {
               height: height.toDouble(),
               decoration: BoxDecoration(
                 color: isPlayed
-                    ? AppTheme.brandPrimary.withOpacity(0.9)
-                    : AppTheme.surfaceBorder.withOpacity(0.5),
+                    ? AppTheme.brandPrimary.withValues(alpha: 0.9)
+                    : AppTheme.surfaceBorder.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
               ),
             ),
@@ -44,4 +44,5 @@ class MiniWaveform extends StatelessWidget {
     );
   }
 }
+
 

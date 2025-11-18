@@ -289,9 +289,9 @@ class _FeedHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Column(
+          const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Text(
                 'Moweton',
                 style: TextStyle(
@@ -311,18 +311,26 @@ class _FeedHeader extends StatelessWidget {
           IconButton(
             tooltip: 'Explore',
             onPressed: onExploreTap,
-            icon: const Icon(Icons.travel_explore_outlined,
-                color: AppTheme.textPrimary),
+            icon: const Icon(
+              Icons.travel_explore_outlined,
+              color: AppTheme.textPrimary,
+            ),
           ),
           IconButton(
             tooltip: 'Search',
             onPressed: onSearchTap,
-            icon: const Icon(Icons.search, color: AppTheme.textPrimary),
+            icon: const Icon(
+              Icons.search,
+              color: AppTheme.textPrimary,
+            ),
           ),
           IconButton(
             tooltip: 'Profile',
             onPressed: onProfileTap,
-            icon: const Icon(Icons.person_outline, color: AppTheme.textPrimary),
+            icon: const Icon(
+              Icons.person_outline,
+              color: AppTheme.textPrimary,
+            ),
           ),
         ],
       ),
@@ -388,8 +396,8 @@ class _FormatSwitchBar extends StatelessWidget {
             .toList(),
         selected: {selected},
         style: const ButtonStyle(
-          backgroundColor: MaterialStatePropertyAll(AppTheme.bgRaised),
-          foregroundColor: MaterialStatePropertyAll(AppTheme.textPrimary),
+          backgroundColor: WidgetStatePropertyAll(AppTheme.bgRaised),
+          foregroundColor: WidgetStatePropertyAll(AppTheme.textPrimary),
         ),
         onSelectionChanged: (value) {
           if (value.isNotEmpty) {
@@ -418,13 +426,13 @@ class _LiveNowStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(
+        const Padding(
+          padding: EdgeInsets.symmetric(
             horizontal: AppTheme.spaceLg,
             vertical: AppTheme.spaceSm,
           ),
           child: Row(
-            children: const [
+            children: [
               Text(
                 'Прямо зараз',
                 style: TextStyle(
@@ -434,7 +442,7 @@ class _LiveNowStrip extends StatelessWidget {
               ),
               SizedBox(width: 6),
               Icon(Icons.podcasts_rounded,
-                  color: AppTheme.stateDanger, size: 16),
+                  color: AppTheme.stateDanger, size: 16,),
             ],
           ),
         ),
@@ -570,21 +578,21 @@ class _FilterPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionLabel('Формати'),
+          const _SectionLabel('Формати'),
           const SizedBox(height: AppTheme.spaceSm),
           _FormatSelector(
             selected: filters.format,
             onSelected: onFormatSelected,
           ),
           const SizedBox(height: AppTheme.spaceLg),
-          _SectionLabel('Вкладки стрічки'),
+          const _SectionLabel('Вкладки стрічки'),
           const SizedBox(height: AppTheme.spaceSm),
           _TabSelector(
             selected: filters.tab,
             onSelected: onTabSelected,
           ),
           const SizedBox(height: AppTheme.spaceLg),
-          _SectionLabel('Регіон'),
+          const _SectionLabel('Регіон'),
           const SizedBox(height: AppTheme.spaceSm),
           _RegionSelector(
             selected: filters.tab == FeedTab.trendingNearby
@@ -654,7 +662,7 @@ class _FormatSelector extends StatelessWidget {
           label: Text('${format.label} · ${format.description}'),
           selected: isSelected,
           onSelected: (_) => onSelected(format),
-          selectedColor: AppTheme.brandPrimary.withOpacity(0.2),
+          selectedColor: AppTheme.brandPrimary.withValues(alpha: 0.2),
           labelStyle: TextStyle(
             color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
           ),
@@ -686,7 +694,7 @@ class _TabSelector extends StatelessWidget {
               label: Text(tab.label),
               selected: isSelected,
               onSelected: (_) => onSelected(tab),
-              selectedColor: AppTheme.brandAccent.withOpacity(0.2),
+              selectedColor: AppTheme.brandAccent.withValues(alpha: 0.2),
               labelStyle: TextStyle(
                 color:
                     isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
@@ -764,7 +772,7 @@ class _TagSelector extends StatelessWidget {
           avatar: tag.isFollowed
               ? const Icon(Icons.star, size: 14, color: AppTheme.brandAccent)
               : null,
-          selectedColor: AppTheme.brandPrimary.withOpacity(0.15),
+          selectedColor: AppTheme.brandPrimary.withValues(alpha: 0.15),
           checkmarkColor: AppTheme.textPrimary,
           side: BorderSide(
             color: isSelected ? AppTheme.brandPrimary : AppTheme.surfaceBorder,

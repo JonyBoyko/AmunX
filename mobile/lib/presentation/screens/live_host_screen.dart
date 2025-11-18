@@ -1,5 +1,4 @@
-﻿import 'dart:async';
-import 'dart:ui';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -114,7 +113,7 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
           const Text(
             'LIVE',
             style: TextStyle(
-                color: AppTheme.stateDanger, fontWeight: FontWeight.bold),
+                color: AppTheme.stateDanger, fontWeight: FontWeight.bold,),
           ),
           const Spacer(),
           Text(
@@ -167,17 +166,17 @@ class _LiveHostScreenState extends ConsumerState<LiveHostScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Тема',
-                    style: TextStyle(color: AppTheme.textSecondary)),
+                    style: TextStyle(color: AppTheme.textSecondary),),
                 const SizedBox(height: AppTheme.spaceSm),
                 const Text('Live AMA: історії з комʼюніті',
-                    style: TextStyle(color: AppTheme.textPrimary)),
+                    style: TextStyle(color: AppTheme.textPrimary),),
                 const SizedBox(height: AppTheme.spaceSm),
                 if (status == LivekitStatus.connecting)
                   const Text('Підключення до LiveKit…',
-                      style: TextStyle(color: AppTheme.textSecondary))
+                      style: TextStyle(color: AppTheme.textSecondary),)
                 else if (status == LivekitStatus.error && error != null)
                   Text(error,
-                      style: const TextStyle(color: AppTheme.stateDanger)),
+                      style: const TextStyle(color: AppTheme.stateDanger),),
               ],
             ),
           ),

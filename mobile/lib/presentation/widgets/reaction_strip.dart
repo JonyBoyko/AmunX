@@ -89,7 +89,7 @@ class _ReactionPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final background =
-        isActive ? definition.accent.withOpacity(0.24) : AppTheme.surfaceChip;
+        isActive ? definition.accent.withValues(alpha: 0.24) : AppTheme.surfaceChip;
     final borderColor = isActive ? definition.accent : AppTheme.surfaceBorder;
 
     return GestureDetector(
@@ -104,7 +104,7 @@ class _ReactionPill extends StatelessWidget {
           boxShadow: isUpdating && isActive
               ? [
                   BoxShadow(
-                    color: definition.accent.withOpacity(0.25),
+                    color: definition.accent.withValues(alpha: 0.25),
                     blurRadius: 12,
                     spreadRadius: 1,
                   ),
@@ -141,3 +141,4 @@ const _badgeGradients = [
   [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
   [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
 ];
+

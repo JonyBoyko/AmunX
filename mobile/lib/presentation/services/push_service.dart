@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -118,7 +117,7 @@ class PushService {
       unawaited(_unregisterFromBackend(
         authToken: previous!.token!,
         deviceToken: _registeredToken!,
-      ));
+      ),);
       _registeredToken = null;
     }
   }

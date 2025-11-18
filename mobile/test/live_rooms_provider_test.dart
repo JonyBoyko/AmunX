@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moweton_flutter/presentation/models/live_room.dart';
@@ -65,8 +64,8 @@ void main() {
       }
     }
     expect(changed, isTrue,
-        reason: 'listeners should fluctuate after a few ticks');
-  }, timeout: const Timeout(Duration(seconds: 12)));
+        reason: 'listeners should fluctuate after a few ticks',);
+  }, timeout: const Timeout(Duration(seconds: 12)),);
 
   test('updateListenerCount overwrites realtime rooms', () {
     final container = ProviderContainer();

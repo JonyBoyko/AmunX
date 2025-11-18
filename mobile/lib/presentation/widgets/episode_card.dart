@@ -127,7 +127,7 @@ class EpisodeCard extends StatelessWidget {
                                                 color: AppTheme.surfaceChip,
                                                 borderRadius:
                                                     BorderRadius.circular(
-                                                        AppTheme.radiusSm),
+                                                        AppTheme.radiusSm,),
                                               ),
                                               child: Text(
                                                 badge,
@@ -246,7 +246,7 @@ class EpisodeCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.messenger_outline_rounded,
                       size: 18,
                       color: AppTheme.textSecondary,
@@ -277,7 +277,7 @@ class EpisodeCard extends StatelessWidget {
   String _formatDuration(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
-    return '${minutes}С…РІ ${remainingSeconds}СЃ';
+    return '$minutesС…РІ $remainingSecondsСЃ';
   }
 
   String _capital(String value) {

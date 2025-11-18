@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,7 +66,7 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Немає активних live-сесій',
-                    style: TextStyle(color: AppTheme.textPrimary)),
+                    style: TextStyle(color: AppTheme.textPrimary),),
                 const SizedBox(height: AppTheme.spaceMd),
                 FilledButton(
                   onPressed: () => context.pop(),
@@ -119,7 +118,7 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
           IconButton(
             onPressed: () => context.pop(),
             icon: const Icon(Icons.arrow_back_ios_new,
-                color: AppTheme.textPrimary),
+                color: AppTheme.textPrimary,),
           ),
           const Spacer(),
           Container(
@@ -131,7 +130,7 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
             child: const Text(
               'LIVE',
               style: TextStyle(
-                  color: AppTheme.textInverse, fontWeight: FontWeight.bold),
+                  color: AppTheme.textInverse, fontWeight: FontWeight.bold,),
             ),
           ),
         ],
@@ -154,7 +153,7 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
             radius: 36,
             backgroundColor: Colors.white24,
             child: Text(room.emoji,
-                style: const TextStyle(color: Colors.white, fontSize: 24)),
+                style: const TextStyle(color: Colors.white, fontSize: 24),),
           ),
           const SizedBox(width: AppTheme.spaceLg),
           Expanded(
