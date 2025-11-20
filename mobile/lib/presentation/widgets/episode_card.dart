@@ -23,6 +23,7 @@ class EpisodeCard extends StatelessWidget {
   final int? liveListeners;
   final ReactionSnapshot reactionSnapshot;
   final ValueChanged<String>? onReactionTap;
+  final List<String> statusLabels;
 
   const EpisodeCard({
     super.key,
@@ -36,6 +37,7 @@ class EpisodeCard extends StatelessWidget {
     this.liveListeners,
     required this.reactionSnapshot,
     this.onReactionTap,
+    this.statusLabels = const [],
   });
 
   @override
@@ -211,14 +213,47 @@ class EpisodeCard extends StatelessWidget {
                               color: AppTheme.textSecondary,
                               fontSize: 12,
                             ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
-                ),
-              ],
+                  if (statusLabels.isNotEmpty) ...[
+                    const SizedBox(height: AppTheme.spaceSm),
+                    Wrap(
+                      spacing: AppTheme.spaceSm,
+                      runSpacing: AppTheme.spaceXs,
+                      children: statusLabels
+                          .map(
+                            (label) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.brandPrimary.withValues(
+                                  alpha: 0.12,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusSm,
+                                ),
+                              ),
+                              child: Text(
+                                label,
+                                style: const TextStyle(
+                                  color: AppTheme.brandPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ],
+              ),
             ),
+          ],
+        ),
             const SizedBox(height: AppTheme.spaceMd),
             Text(
               summary,
