@@ -27,10 +27,17 @@ class MiniPlayerBar extends StatelessWidget {
         vertical: AppTheme.spaceSm,
       ),
       decoration: BoxDecoration(
-        color: AppTheme.bgRaised.withValues(alpha: 0.9),
-        border: const Border(
-          top: BorderSide(color: AppTheme.surfaceBorder),
-        ),
+        color: AppTheme.glassSurface,
+        border: Border.all(color: AppTheme.glassStroke),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 24,
+            offset: Offset(0, -8),
+            spreadRadius: -8,
+          ),
+        ],
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
       ),
       child: Row(
         children: [
@@ -38,8 +45,9 @@ class MiniPlayerBar extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceCard,
+              color: AppTheme.glassSurfaceLight,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: AppTheme.glassStroke),
             ),
             alignment: Alignment.center,
             child: Text(
@@ -75,20 +83,21 @@ class MiniPlayerBar extends StatelessWidget {
           const SizedBox(width: AppTheme.spaceSm),
           IconButton(
             onPressed: onSkipBack,
-            icon: const Icon(Icons.replay_10, color: AppTheme.textSecondary),
+            icon: const Icon(Icons.replay_10, color: AppTheme.neonBlue),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.brandPrimary,
+              backgroundColor: AppTheme.neonBlue,
               minimumSize: const Size(44, 44),
               shape: const CircleBorder(),
+              shadowColor: Colors.transparent,
             ),
             onPressed: onPause,
             child: const Icon(Icons.pause_rounded, color: AppTheme.textInverse),
           ),
           IconButton(
             onPressed: onSkipForward,
-            icon: const Icon(Icons.forward_10, color: AppTheme.textSecondary),
+            icon: const Icon(Icons.forward_10, color: AppTheme.neonBlue),
           ),
         ],
       ),

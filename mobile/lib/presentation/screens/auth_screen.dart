@@ -1,4 +1,5 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,13 +42,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       final tokenHint =
           await ref.read(authProvider.notifier).requestMagicLink(email);
       if (!mounted) return;
-      _showSnack('Ми надіслали посилання на ');
+      _showSnack('Magic link sent. Check your inbox.');
       if (tokenHint != null) {
         _tokenController.text = tokenHint;
-        _showSnack('Токен для дев-режиму автозаповнено');
+        _showSnack('Token prefilled from dev hint.');
       }
     } catch (e) {
-      _showSnack('Помилка: ', isError: true);
+      _showSnack('Request failed: $e', isError: true);
     } finally {
       if (mounted) {
         setState(() => _isRequesting = false);
@@ -65,7 +66,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         context.go('/feed');
       }
     } catch (e) {
-      _showSnack('Помилка входу: ', isError: true);
+      _showSnack('Verification failed: $e', isError: true);
     } finally {
       if (mounted) {
         setState(() => _isVerifying = false);
@@ -78,7 +79,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? AppTheme.stateDanger : null,
+        backgroundColor: isError ? AppTheme.destructive : AppTheme.bgPopover,
       ),
     );
   }
@@ -86,106 +87,310 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0B0D10), Color(0xFF111827)],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.spaceXl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton(
-                  onPressed: () => context.pop(),
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: AppTheme.textPrimary,
-                  ),
+      backgroundColor: AppTheme.bgBase,
+      body: Stack(
+        children: [
+          Container(decoration: const BoxDecoration(gradient: AppTheme.heroGradient)),
+          Positioned(
+            left: -120,
+            top: 40,
+            child: Opacity(
+              opacity: 0.24,
+              child: Container(
+                width: 260,
+                height: 260,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: AppTheme.neonGradient,
                 ),
-                const Spacer(),
-                const Text(
-                  'Укажи email',
-                  style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Ми надішлемо Magic Link на твою пошту.',
-                  style: TextStyle(color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: AppTheme.spaceXl),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'you@email.com',
-                    filled: true,
-                    fillColor: AppTheme.bgRaised,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  enabled: !_isRequesting,
-                ),
-                const SizedBox(height: AppTheme.spaceLg),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: FilledButton(
-                    onPressed: _isRequesting ? null : _requestMagicLink,
-                    child: _isRequesting
-                        ? const CircularProgressIndicator(
-                            color: AppTheme.textInverse,
-                          )
-                        : const Text('Надіслати посилання'),
-                  ),
-                ),
-                const SizedBox(height: AppTheme.spaceXl),
-                const Text(
-                  'Вже маєш токен?',
-                  style: TextStyle(color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: AppTheme.spaceSm),
-                TextField(
-                  controller: _tokenController,
-                  style: const TextStyle(color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Встав token=... із листа',
-                    filled: true,
-                    fillColor: AppTheme.bgRaised,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  enabled: !_isVerifying,
-                ),
-                const SizedBox(height: AppTheme.spaceSm),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.tonal(
-                    onPressed:
-                        (_tokenController.text.trim().isEmpty || _isVerifying)
-                            ? null
-                            : _verifyToken,
-                    child: _isVerifying
-                        ? const CircularProgressIndicator()
-                        : const Text('Підтвердити токен'),
-                  ),
-                ),
-                const Spacer(),
-              ],
+              ),
             ),
           ),
+          Positioned(
+            right: -90,
+            bottom: -60,
+            child: Opacity(
+              opacity: 0.18,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [AppTheme.bgPopover, AppTheme.neonPurple],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spaceXl),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 520),
+                    curve: Curves.easeOutBack,
+                    tween: Tween(begin: 0.94, end: 1),
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: value,
+                        child: Opacity(opacity: value, child: child),
+                      );
+                    },
+                    child: _GlassCard(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppTheme.spaceXl),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () => context.pop(),
+                                  icon: const Icon(
+                                    Icons.arrow_back_ios_new,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppTheme.spaceSm,
+                                    vertical: AppTheme.spaceXs,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.glassSurfaceLight,
+                                    borderRadius:
+                                        BorderRadius.circular(AppTheme.radiusLg),
+                                    border: Border.all(color: AppTheme.glassStroke),
+                                  ),
+                                  child: const Text(
+                                    'Secure Sign-in',
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppTheme.spaceLg),
+                            const Text(
+                              'Sign in with magic link',
+                              style: TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.spaceSm),
+                            const Text(
+                              'Drop your email and we will send a one-time token. Paste it below to get started.',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                height: 1.6,
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.spaceXl),
+                            _GlassField(
+                              controller: _emailController,
+                              enabled: !_isRequesting,
+                              hint: 'you@email.com',
+                              label: 'Email address',
+                              icon: Icons.mail_outline,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            const SizedBox(height: AppTheme.spaceMd),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(AppTheme.radiusLg),
+                                  ),
+                                ),
+                                onPressed:
+                                    _isRequesting ? null : _requestMagicLink,
+                                child: Ink(
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.neonGradient,
+                                    borderRadius:
+                                        BorderRadius.circular(AppTheme.radiusLg),
+                                    boxShadow: [
+                                      ...AppTheme.glowPrimary,
+                                      ...AppTheme.glowAccent,
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: _isRequesting
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppTheme.textInverse,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Send magic link',
+                                            style: TextStyle(
+                                              color: AppTheme.textInverse,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.spaceXl),
+                            const Text(
+                              'Have a token already?',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                            const SizedBox(height: AppTheme.spaceSm),
+                            _GlassField(
+                              controller: _tokenController,
+                              enabled: !_isVerifying,
+                              hint: 'Paste token=... from your email',
+                              label: 'Magic token',
+                              icon: Icons.lock_outline,
+                              keyboardType: TextInputType.text,
+                            ),
+                            const SizedBox(height: AppTheme.spaceSm),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: FilledButton.tonal(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppTheme.glassSurfaceLight,
+                                  foregroundColor: AppTheme.textPrimary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(AppTheme.radiusLg),
+                                    side: const BorderSide(
+                                      color: AppTheme.glassStroke,
+                                    ),
+                                  ),
+                                ),
+                                onPressed:
+                                    (_tokenController.text.trim().isEmpty ||
+                                            _isVerifying)
+                                        ? null
+                                        : _verifyToken,
+                                child: _isVerifying
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Verify token'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlassCard extends StatelessWidget {
+  const _GlassCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: AppTheme.blurLg,
+          sigmaY: AppTheme.blurLg,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.glassSurface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppTheme.glassStroke),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 32,
+                offset: Offset(0, 18),
+                spreadRadius: -8,
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassField extends StatelessWidget {
+  const _GlassField({
+    required this.controller,
+    required this.enabled,
+    required this.hint,
+    required this.label,
+    required this.icon,
+    this.keyboardType = TextInputType.text,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final String hint;
+  final String label;
+  final IconData icon;
+  final TextInputType keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: AppTheme.textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(color: AppTheme.textSecondary),
+        hintStyle: const TextStyle(color: AppTheme.textSecondary),
+        prefixIcon: Icon(icon, color: AppTheme.neonBlue),
+        filled: true,
+        fillColor: AppTheme.glassSurfaceLight,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          borderSide: const BorderSide(color: AppTheme.glassStroke),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          borderSide: const BorderSide(color: AppTheme.glassStroke),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          borderSide: const BorderSide(color: AppTheme.neonBlue),
         ),
       ),
     );

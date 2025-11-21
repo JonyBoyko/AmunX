@@ -33,8 +33,8 @@ class MiniWaveform extends StatelessWidget {
               height: height.toDouble(),
               decoration: BoxDecoration(
                 color: isPlayed
-                    ? AppTheme.brandPrimary.withValues(alpha: 0.9)
-                    : AppTheme.surfaceBorder.withValues(alpha: 0.5),
+                    ? AppTheme.neonBlue.withValues(alpha: 0.9)
+                    : AppTheme.glassStroke,
                 borderRadius: BorderRadius.circular(AppTheme.radiusSm),
               ),
             ),
