@@ -5,6 +5,7 @@ class AppTheme {
   static const Color bgBase = Color(0xFF0B0D10);
   static const Color bgRaised = Color(0xFF111318);
   static const Color bgPopover = Color(0xFF161A20);
+  static const Color bgOverlay = Color(0xB20B0D10);
   
   static const Color textPrimary = Color(0xFFE9EDF2);
   static const Color textSecondary = Color(0xFF9AA4AF);
@@ -12,6 +13,9 @@ class AppTheme {
   
   static const Color brandPrimary = Color(0xFF6AA6FF);
   static const Color brandAccent = Color(0xFF7AF0C1);
+  static const Color neonBlue = Color(0xFF53D7FF);
+  static const Color neonPink = Color(0xFFFF5FD1);
+  static const Color neonPurple = Color(0xFFB58BFF);
   
   static const Color stateSuccess = Color(0xFF21D19F);
   static const Color stateWarning = Color(0xFFFFC252);
@@ -21,6 +25,44 @@ class AppTheme {
   static const Color surfaceCard = Color(0xFF111318);
   static const Color surfaceChip = Color(0xFF1C222B);
   static const Color surfaceBorder = Color(0x0FFFFFFF); // rgba(255,255,255,0.06)
+  static const Color glassSurface = Color(0x80141A22);
+  static const Color glassSurfaceDense = Color(0x6619202A);
+  static const Color glassStroke = Color(0x33FFFFFF);
+
+  // Effects
+  static const double blurSm = 8.0;
+  static const double blurMd = 14.0;
+  static const double blurLg = 24.0;
+
+  static const List<BoxShadow> glowPrimary = [
+    BoxShadow(
+      color: neonBlue,
+      blurRadius: 24,
+      spreadRadius: -4,
+      offset: Offset(0, 10),
+    ),
+  ];
+
+  static const List<BoxShadow> glowAccent = [
+    BoxShadow(
+      color: neonPink,
+      blurRadius: 28,
+      spreadRadius: -6,
+      offset: Offset(0, 14),
+    ),
+  ];
+
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [bgBase, Color(0xFF0D1624), Color(0xFF111827)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient neonGradient = LinearGradient(
+    colors: [neonBlue, neonPink],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   // Radius
   static const double radiusXs = 6.0;

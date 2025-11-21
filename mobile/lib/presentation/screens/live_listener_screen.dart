@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:ui';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,8 +16,7 @@ class LiveListenerScreen extends ConsumerStatefulWidget {
   final LiveRoom? room;
 
   @override
-  ConsumerState<LiveListenerScreen> createState() =>
-      _LiveListenerScreenState();
+  ConsumerState<LiveListenerScreen> createState() => _LiveListenerScreenState();
 }
 
 class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
@@ -116,61 +117,127 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
     if (room == null) {
       return Scaffold(
         backgroundColor: AppTheme.bgBase,
-        body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'No live sessions are active right now.',
-                  style: TextStyle(color: AppTheme.textPrimary),
+        body: Stack(
+          children: [
+            Container(decoration: const BoxDecoration(gradient: AppTheme.heroGradient)),
+            SafeArea(
+              child: Center(
+                child: _GlassPanel(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTheme.spaceXl),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'No live sessions are active right now.',
+                          style: TextStyle(color: AppTheme.textPrimary),
+                        ),
+                        const SizedBox(height: AppTheme.spaceMd),
+                        FilledButton(
+                          onPressed: () => context.pop(),
+                          child: const Text('Go back'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(height: AppTheme.spaceMd),
-                FilledButton(
-                  onPressed: () => context.pop(),
-                  child: const Text('Go back'),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       );
     }
 
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _ListenerHeader(onBack: () => context.pop()),
-            _ConnectionBanner(
-              status: state.status,
-              error: state.error,
-              onRetry: state.status == LivekitStatus.error
-                  ? () => _joinRoom(retry: true)
-                  : null,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppTheme.spaceXl),
-                child: Column(
-                  children: [
-                    _HostCard(room: room, state: state),
-                    const SizedBox(height: AppTheme.spaceXl),
-                    LiveTranscriptPanel(
-                      status: state.status,
-                      segments: state.transcript,
-                      emptyLabel:
-                          'Captions will appear here once the host starts talking.',
-                    ),
-                    const SizedBox(height: AppTheme.spaceXl),
-                    _ReactionPanel(),
-                  ],
+      body: Stack(
+        children: [
+          Container(decoration: const BoxDecoration(gradient: AppTheme.heroGradient)),
+          Positioned(
+            left: -90,
+            top: 40,
+            child: Opacity(
+              opacity: 0.2,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: AppTheme.neonGradient,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            right: -70,
+            bottom: -60,
+            child: Opacity(
+              opacity: 0.18,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [AppTheme.bgPopover, AppTheme.neonBlue],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceLg,
+                    vertical: AppTheme.spaceSm,
+                  ),
+                  child: _ListenerHeader(onBack: () => context.pop()),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceLg,
+                    vertical: AppTheme.spaceSm,
+                  ),
+                  child: _ConnectionBanner(
+                    status: state.status,
+                    error: state.error,
+                    onRetry: state.status == LivekitStatus.error
+                        ? () => _joinRoom(retry: true)
+                        : null,
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppTheme.spaceXl),
+                    child: Column(
+                      children: [
+                        _HostCard(room: room, state: state),
+                        const SizedBox(height: AppTheme.spaceXl),
+                        _GlassPanel(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppTheme.spaceLg),
+                            child: LiveTranscriptPanel(
+                              status: state.status,
+                              segments: state.transcript,
+                              emptyLabel:
+                                  'Captions will appear here once the host starts talking.',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.spaceXl),
+                        const _ReactionPanel(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -183,41 +250,44 @@ class _ListenerHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.spaceLg),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppTheme.surfaceBorder),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.spaceMd,
-              vertical: AppTheme.spaceXs,
-            ),
-            decoration: BoxDecoration(
-              color: AppTheme.stateDanger.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            ),
-            child: const Text(
-              'LIVE',
-              style: TextStyle(
-                color: AppTheme.stateDanger,
-                fontWeight: FontWeight.bold,
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceLg),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: AppTheme.textPrimary,
               ),
             ),
-          ),
-        ],
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spaceMd,
+                vertical: AppTheme.spaceXs,
+              ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppTheme.neonPink, AppTheme.neonBlue],
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                boxShadow: [
+                  ...AppTheme.glowPrimary,
+                  ...AppTheme.glowAccent,
+                ],
+              ),
+              child: const Text(
+                'LIVE',
+                style: TextStyle(
+                  color: AppTheme.textInverse,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -231,96 +301,161 @@ class _HostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppTheme.spaceXl),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1F1C2C), Color(0xFF928DAB)],
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOut,
+      tween: Tween(begin: 0.94, end: 1),
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, (1 - value) * 14),
+          child: Opacity(opacity: value, child: child),
+        );
+      },
+      child: _GlassPanel(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppTheme.spaceXl),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            gradient: const LinearGradient(
+              colors: [AppTheme.glassSurface, AppTheme.glassSurfaceDense],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppTheme.neonBlue.withValues(alpha: 0.2),
+                    child: Text(
+                      room.emoji,
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.spaceMd),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '@${room.handle.replaceFirst('@', '')}',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        room.hostName,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spaceMd,
+                      vertical: AppTheme.spaceXs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.neonBlue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      border: Border.all(color: AppTheme.glassStroke),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.hearing, size: 16, color: AppTheme.neonBlue),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${state.listenerCount} listening',
+                          style: const TextStyle(color: AppTheme.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.spaceMd),
+              Text(
+                room.topic,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                state.status == LivekitStatus.connecting
+                    ? 'Connecting to LiveKit...'
+                    : state.status == LivekitStatus.reconnecting
+                        ? 'Trying to reconnect to LiveKit...'
+                        : state.status == LivekitStatus.error
+                            ? (state.error ?? 'Connection lost')
+                            : 'Live and transcribing',
+                style: const TextStyle(color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            room.topic,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '@${room.handle.replaceFirst('@', '')}',
-            style: const TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${state.listenerCount} listeners tuned in',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          if (state.status == LivekitStatus.error && state.error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                state.error!,
-                style: const TextStyle(color: Colors.redAccent),
-              ),
-            )
-          else if (state.status == LivekitStatus.connecting)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'Connecting to LiveKit...',
-                style: TextStyle(color: Colors.white70),
-              ),
-            )
-          else if (state.status == LivekitStatus.reconnecting)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'Trying to reconnect to LiveKit...',
-                style: TextStyle(color: Colors.white70),
-              ),
-            ),
-        ],
       ),
     );
   }
 }
 
 class _ReactionPanel extends StatelessWidget {
+  const _ReactionPanel();
+
   @override
   Widget build(BuildContext context) {
-    const reactions = ['👍', '🔥', '👏', '🤯', '❤️'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Live reactions',
-          style: TextStyle(color: AppTheme.textSecondary),
+    const reactions = ['🔥', '👏', '😂', '😮', '❤️'];
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceLg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Live reactions',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: AppTheme.spaceSm),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: reactions
+                  .map(
+                    (emoji) => TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 240),
+                      tween: Tween(begin: 0.9, end: 1),
+                      builder: (context, value, child) => Transform.scale(
+                        scale: value,
+                        child: child,
+                      ),
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: AppTheme.glassSurfaceDense,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                          border: Border.all(color: AppTheme.glassStroke),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
         ),
-        const SizedBox(height: AppTheme.spaceSm),
-        Wrap(
-          spacing: 12,
-          children: reactions
-              .map(
-                (emoji) => Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppTheme.bgRaised,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
-                ),
-              )
-              .toList(),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -348,18 +483,9 @@ class _ConnectionBanner extends StatelessWidget {
       _ => '',
     };
     if (message.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spaceLg,
-        vertical: AppTheme.spaceSm,
-      ),
-      child: Container(
+    return _GlassPanel(
+      child: Padding(
         padding: const EdgeInsets.all(AppTheme.spaceSm),
-        decoration: BoxDecoration(
-          color: AppTheme.bgRaised,
-          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          border: Border.all(color: AppTheme.surfaceBorder),
-        ),
         child: Row(
           children: [
             Icon(
@@ -381,6 +507,41 @@ class _ConnectionBanner extends StatelessWidget {
                 child: const Text('Retry'),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: AppTheme.blurMd,
+          sigmaY: AppTheme.blurMd,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.glassSurface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppTheme.glassStroke),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 28,
+                offset: Offset(0, 18),
+                spreadRadius: -8,
+              ),
+            ],
+          ),
+          child: child,
         ),
       ),
     );

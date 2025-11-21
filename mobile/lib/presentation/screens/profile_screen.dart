@@ -1,3 +1,5 @@
+﻿import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -49,23 +51,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final session = ref.watch(sessionProvider);
     final authorsMap = ref.watch(authorDirectoryProvider);
     final currentUserId = session.user?.id;
-    final meProfile =
-        currentUserId == null ? null : authorsMap[currentUserId];
+    final meProfile = currentUserId == null ? null : authorsMap[currentUserId];
     final followingAuthors = authorsMap.values
-        .where(
-          (author) => author.isFollowed && author.id != currentUserId,
-        )
+        .where((author) => author.isFollowed && author.id != currentUserId)
         .toList();
     final suggestedAuthors = authorsMap.values
-        .where(
-          (author) => !author.isFollowed && author.id != currentUserId,
-        )
+        .where((author) => !author.isFollowed && author.id != currentUserId)
         .take(4)
         .toList();
     final postsCount = meProfile?.posts ?? 0;
     final followersCount = meProfile?.followers ?? 0;
-    final followingCount =
-        meProfile?.following ?? followingAuthors.length;
+    final followingCount = meProfile?.following ?? followingAuthors.length;
 
     if (_loadingProfile && meProfile == null) {
       return const Scaffold(
@@ -76,172 +72,269 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppTheme.spaceXl),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: AppTheme.spaceXl),
-              _buildProfileCard(meProfile, session.user),
-              const SizedBox(height: AppTheme.spaceLg),
-              _buildSocialLinks(meProfile),
-              const SizedBox(height: AppTheme.spaceLg),
-              _buildSocialStats(
-                posts: postsCount,
-                followers: followersCount,
-                following: followingCount,
-                onFollowingTap: () => _showFollowingSheet(followingAuthors,
-                    title: 'Ваші підписки',),
-              ),
-              if (followingAuthors.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.spaceLg),
-                _FollowCarousel(
-                  title: 'Ви слухаєте',
-                  authors: followingAuthors,
-                  onFollowToggle: (author) => ref
-                      .read(authorDirectoryProvider.notifier)
-                      .toggleFollow(author.id),
-                ),
-              ],
-              if (suggestedAuthors.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.spaceLg),
-                _FollowCarousel(
-                  title: 'Кого ще послухати',
-                  authors: suggestedAuthors,
-                  onFollowToggle: (author) => ref
-                      .read(authorDirectoryProvider.notifier)
-                      .toggleFollow(author.id),
-                ),
-              ],
-              const SizedBox(height: AppTheme.spaceXl),
-              _buildRecordingSettings(),
-              const SizedBox(height: AppTheme.spaceXl),
-              _buildNotifications(),
-              const SizedBox(height: AppTheme.spaceXl),
-              _buildActions(context),
-              const SizedBox(height: AppTheme.spaceXl),
-              const Text(
-                'Moweton v1.0.0',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => context.pop(),
-          icon:
-              const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
-        ),
-        const Spacer(),
-        IconButton(
-          onPressed: () => context.push('/settings'),
-          icon:
-              const Icon(Icons.settings_outlined, color: AppTheme.textPrimary),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfileCard(AuthorProfile? profile, User? user) {
-    final fallbackEmail = user?.email ?? 'creator@moweton.com';
-    final defaultHandle = '@${fallbackEmail.split('@').first}';
-    final displayName =
-        profile?.displayName ?? fallbackEmail.split('@').first.toUpperCase();
-    final handle = profile?.handle ?? defaultHandle;
-    final bio = profile?.bio ?? 'Tell listeners what your channel is about.';
-    final avatarLabel =
-        profile?.avatarEmoji ?? (displayName.isNotEmpty ? displayName[0] : '?');
-    final avatarUrl = profile?.avatarUrl;
-
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.spaceXl),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4338CA), Color(0xFFEC4899)],
-        ),
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      ),
-      child: Column(
+      body: Stack(
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: Colors.white24,
-                backgroundImage: avatarUrl?.isNotEmpty == true
-                    ? NetworkImage(avatarUrl!)
-                    : null,
-                child: avatarUrl?.isNotEmpty == true
-                    ? null
-                    : Text(
-                        avatarLabel,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 24),
-                      ),
+          Container(decoration: const BoxDecoration(gradient: AppTheme.heroGradient)),
+          Positioned(
+            left: -120,
+            top: 60,
+            child: Opacity(
+              opacity: 0.2,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: AppTheme.neonGradient,
+                ),
               ),
-              const SizedBox(width: AppTheme.spaceLg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+            ),
+          ),
+          Positioned(
+            right: -100,
+            bottom: -80,
+            child: Opacity(
+              opacity: 0.16,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [AppTheme.bgPopover, AppTheme.neonPurple],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppTheme.spaceXl),
+              child: Column(
+                children: [
+                  _buildHeader(context),
+                  const SizedBox(height: AppTheme.spaceXl),
+                  _buildProfileCard(meProfile, session.user),
+                  const SizedBox(height: AppTheme.spaceLg),
+                  _buildSocialLinks(meProfile),
+                  const SizedBox(height: AppTheme.spaceLg),
+                  _buildSocialStats(
+                    posts: postsCount,
+                    followers: followersCount,
+                    following: followingCount,
+                    onFollowingTap: () => _showFollowingSheet(
+                      followingAuthors,
+                      title: 'Following',
                     ),
-                    Text(
-                      handle,
-                      style: const TextStyle(color: Colors.white70),
+                  ),
+                  if (followingAuthors.isNotEmpty) ...[
+                    const SizedBox(height: AppTheme.spaceLg),
+                    _FollowCarousel(
+                      title: 'People you follow',
+                      authors: followingAuthors,
+                      onFollowToggle: (author) => ref
+                          .read(authorDirectoryProvider.notifier)
+                          .toggleFollow(author.id),
                     ),
                   ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTheme.spaceMd),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              bio,
-              style: const TextStyle(
-                color: Colors.white70,
+                  if (suggestedAuthors.isNotEmpty) ...[
+                    const SizedBox(height: AppTheme.spaceLg),
+                    _FollowCarousel(
+                      title: 'Suggested for you',
+                      authors: suggestedAuthors,
+                      onFollowToggle: (author) => ref
+                          .read(authorDirectoryProvider.notifier)
+                          .toggleFollow(author.id),
+                    ),
+                  ],
+                  const SizedBox(height: AppTheme.spaceXl),
+                  _buildRecordingSettings(),
+                  const SizedBox(height: AppTheme.spaceXl),
+                  _buildNotifications(),
+                  const SizedBox(height: AppTheme.spaceXl),
+                  _buildActions(context),
+                  const SizedBox(height: AppTheme.spaceXl),
+                  const Text(
+                    'Moweton v1.0.0',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: AppTheme.spaceLg),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              minimumSize: const Size.fromHeight(48),
-            ),
-            onPressed: () => context.push('/paywall'),
-            icon: const Icon(Icons.workspace_premium_outlined),
-            label: const Text('Uplevel to Pro'),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildHeader(BuildContext context) {
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceMd),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () => context.pop(),
+              icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
+            ),
+            const Spacer(),
+            IconButton(
+              onPressed: () => context.push('/settings'),
+              icon: const Icon(Icons.settings_outlined, color: AppTheme.textPrimary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileCard(AuthorProfile? profile, User? user) {
+    final fallbackEmail = user?.email ?? 'creator@moweton.com';
+    final defaultHandle = '@${fallbackEmail.split('@').first}';
+    final displayName = profile?.displayName ?? fallbackEmail.split('@').first;
+    final handle = profile?.handle ?? defaultHandle;
+    final bio = profile?.bio ?? 'Tell listeners what your channel is about.';
+    final avatarLabel = profile?.avatarEmoji ?? (displayName.isNotEmpty ? displayName[0] : '?');
+    final avatarUrl = profile?.avatarUrl;
+
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 450),
+      tween: Tween(begin: 0.92, end: 1),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(0, (1 - value) * 12),
+          child: Opacity(opacity: value, child: child),
+        );
+      },
+      child: _GlassPanel(
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.spaceXl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: AppTheme.neonBlue.withValues(alpha: 0.2),
+                    backgroundImage: avatarUrl?.isNotEmpty == true
+                        ? NetworkImage(avatarUrl!)
+                        : null,
+                    child: avatarUrl?.isNotEmpty == true
+                        ? null
+                        : Text(
+                            avatarLabel,
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 24,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: AppTheme.spaceLg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          handle,
+                          style: const TextStyle(color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spaceMd,
+                      vertical: AppTheme.spaceXs,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.neonGradient,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      boxShadow: [
+                        ...AppTheme.glowPrimary,
+                        ...AppTheme.glowAccent,
+                      ],
+                    ),
+                    child: const Text(
+                      'Creator',
+                      style: TextStyle(
+                        color: AppTheme.textInverse,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.spaceMd),
+              Text(
+                bio,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: AppTheme.spaceLg),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceLg,
+                    vertical: AppTheme.spaceMd,
+                  ),
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                  ),
+                ),
+                onPressed: () => context.push('/paywall'),
+                icon: const Icon(Icons.workspace_premium_outlined, color: AppTheme.textInverse),
+                label: Ink(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceLg,
+                    vertical: AppTheme.spaceSm,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.neonGradient,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                    boxShadow: [
+                      ...AppTheme.glowPrimary,
+                      ...AppTheme.glowAccent,
+                    ],
+                  ),
+                  child: const Text(
+                    'Uplevel to Pro',
+                    style: TextStyle(
+                      color: AppTheme.textInverse,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   Widget _buildSocialLinks(AuthorProfile? profile) {
     final links = profile?.socialLinks ?? const {};
     return _SectionCard(
       title: 'Social links',
       action: TextButton.icon(
-        onPressed:
-            _updatingSocial ? null : () => _openSocialLinksEditor(profile),
+        onPressed: _updatingSocial ? null : () => _openSocialLinksEditor(profile),
         icon: _updatingSocial
             ? const SizedBox(
                 width: 12,
@@ -267,7 +360,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
             if (entry.key != _socialLinkPresets.length - 1)
-              const Divider(color: AppTheme.surfaceBorder),
+              const Divider(color: AppTheme.glassStroke),
           ],
           if (links.isEmpty)
             const Padding(
@@ -289,9 +382,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
     setState(() => _updatingSocial = true);
     try {
-      await ref
-          .read(authorDirectoryProvider.notifier)
-          .updateOwnProfile(socialLinks: result);
+      await ref.read(authorDirectoryProvider.notifier).updateOwnProfile(
+            socialLinks: result,
+          );
       _showSnack('Social links updated');
     } catch (e) {
       _showSnack('Failed to update social links');
@@ -308,93 +401,100 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final existing = Map<String, String>.from(profile?.socialLinks ?? const {});
     return showModalBottomSheet<Map<String, String>>(
       context: context,
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
         final controllers = {
           for (final meta in _socialLinkPresets)
-            meta.key:
-                TextEditingController(text: existing[meta.key] ?? ''),
+            meta.key: TextEditingController(text: existing[meta.key] ?? ''),
         };
         return Padding(
           padding: EdgeInsets.only(
             left: AppTheme.spaceXl,
             right: AppTheme.spaceXl,
             top: AppTheme.spaceXl,
-            bottom: MediaQuery.of(context).viewInsets.bottom +
-                AppTheme.spaceXl,
+            bottom: MediaQuery.of(context).viewInsets.bottom + AppTheme.spaceXl,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Edit social links',
-                style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: AppTheme.spaceMd),
-              for (final meta in _socialLinkPresets) ...[
-                TextField(
-                  controller: controllers[meta.key],
-                  decoration: InputDecoration(
-                    labelText: meta.label,
-                    hintText: meta.hint,
-                    prefixIcon: Icon(meta.icon),
-                  ),
-                ),
-                const SizedBox(height: AppTheme.spaceSm),
-              ],
-              Row(
+          child: _GlassPanel(
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spaceLg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                  const Text(
+                    'Edit social links',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () {
-                      final payload = <String, String>{};
-                      controllers.forEach((key, controller) {
-                        final value = controller.text.trim();
-                        if (value.isNotEmpty) {
-                          payload[key] = value;
-                        }
-                      });
-                      Navigator.pop(context, payload);
-                    },
-                    child: const Text('Save'),
+                  const SizedBox(height: AppTheme.spaceMd),
+                  for (final meta in _socialLinkPresets) ...[
+                    TextField(
+                      controller: controllers[meta.key],
+                      decoration: InputDecoration(
+                        labelText: meta.label,
+                        hintText: meta.hint,
+                        prefixIcon: Icon(meta.icon),
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.spaceSm),
+                  ],
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: () {
+                          final payload = <String, String>{};
+                          controllers.forEach((key, controller) {
+                            final value = controller.text.trim();
+                            if (value.isNotEmpty) {
+                              payload[key] = value;
+                            }
+                          });
+                          Navigator.pop(context, payload);
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         );
       },
     );
   }
-
   Widget _buildRecordingSettings() {
     return _SectionCard(
-      title: 'Налаштування запису',
+      title: 'Recording defaults',
       child: Column(
         children: [
           SwitchListTile(
             value: _publicDefault,
+            activeColor: AppTheme.neonBlue,
             onChanged: (value) => setState(() => _publicDefault = value),
-            title: const Text('Публічно за замовчуванням'),
+            title: const Text(
+              'Share recordings publicly by default',
+              style: TextStyle(color: AppTheme.textPrimary),
+            ),
           ),
-          const Divider(color: AppTheme.surfaceBorder),
+          const Divider(color: AppTheme.glassStroke),
           _SegmentControl(
-            label: 'Якість',
+            label: 'Quality',
             values: const ['Raw', 'Clean'],
             current: _quality,
             onChanged: (value) => setState(() => _quality = value),
           ),
           const SizedBox(height: AppTheme.spaceMd),
           _SegmentControl(
-            label: 'Маскування',
+            label: 'Voice mask',
             values: const ['Off', 'Basic', 'Studio'],
             current: _mask,
             onChanged: (value) => setState(() => _mask = value),
@@ -406,23 +506,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildNotifications() {
     return _SectionCard(
-      title: 'Нотифікації',
+      title: 'Notifications',
       child: Column(
         children: [
           SwitchListTile(
             value: _notifyTopics,
+            activeColor: AppTheme.neonBlue,
             onChanged: (value) => setState(() => _notifyTopics = value),
-            title: const Text('Нові епізоди в темах'),
+            title: const Text(
+              'Trending tags & topics',
+              style: TextStyle(color: AppTheme.textPrimary),
+            ),
           ),
           SwitchListTile(
             value: _notifyReplies,
+            activeColor: AppTheme.neonBlue,
             onChanged: (value) => setState(() => _notifyReplies = value),
-            title: const Text('Відповіді на епізоди'),
+            title: const Text(
+              'Replies to my posts',
+              style: TextStyle(color: AppTheme.textPrimary),
+            ),
           ),
           SwitchListTile(
             value: _notifyDigest,
+            activeColor: AppTheme.neonBlue,
             onChanged: (value) => setState(() => _notifyDigest = value),
-            title: const Text('Денний дайджест'),
+            title: const Text(
+              'AI digest updates',
+              style: TextStyle(color: AppTheme.textPrimary),
+            ),
           ),
         ],
       ),
@@ -430,23 +542,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildActions(BuildContext context) {
-    return Column(
-      children: [
-        ListTile(
-          onTap: () {},
-          leading: const Icon(Icons.info_outline, color: AppTheme.textPrimary),
-          title: const Text('Про додаток',
-              style: TextStyle(color: AppTheme.textPrimary),),
-        ),
-        ListTile(
-          onTap: () => context.go('/'),
-          leading: const Icon(Icons.logout, color: AppTheme.stateDanger),
-          title: const Text(
-            'Вийти',
-            style: TextStyle(color: AppTheme.stateDanger),
+    return _GlassPanel(
+      child: Column(
+        children: [
+          ListTile(
+            onTap: () {},
+            leading: const Icon(Icons.info_outline, color: AppTheme.textPrimary),
+            title: const Text(
+              'About Moweton',
+              style: TextStyle(color: AppTheme.textPrimary),
+            ),
           ),
-        ),
-      ],
+          const Divider(color: AppTheme.glassStroke),
+          ListTile(
+            onTap: () => context.go('/'),
+            leading: const Icon(Icons.logout, color: AppTheme.stateDanger),
+            title: const Text(
+              'Sign out',
+              style: TextStyle(color: AppTheme.stateDanger),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -456,25 +573,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required int following,
     required VoidCallback onFollowingTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spaceLg,
-        vertical: AppTheme.spaceMd,
-      ),
-      decoration: BoxDecoration(
-        color: AppTheme.bgRaised,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _StatCounter(label: 'Пости', value: posts),
-          _StatCounter(label: 'Підписники', value: followers),
-          GestureDetector(
-            onTap: onFollowingTap,
-            child: _StatCounter(label: 'Підписки', value: following),
-          ),
-        ],
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spaceLg,
+          vertical: AppTheme.spaceMd,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _StatCounter(label: 'Posts', value: posts),
+            _StatCounter(label: 'Followers', value: followers),
+            GestureDetector(
+              onTap: onFollowingTap,
+              child: _StatCounter(label: 'Following', value: following),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -486,68 +601,74 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (authors.isEmpty) return;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppTheme.bgRaised,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.all(AppTheme.spaceLg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceBorder,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: AppTheme.spaceLg),
-              Text(
-                title,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(color: AppTheme.textPrimary),
-              ),
-              const SizedBox(height: AppTheme.spaceLg),
-              ...authors.map(
-                (author) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppTheme.surfaceChip,
-                    backgroundImage: author.avatarUrl != null
-                        ? NetworkImage(author.avatarUrl!)
-                        : null,
-                    child: author.avatarUrl != null
-                        ? null
-                        : Text(author.avatarEmoji),
+          child: _GlassPanel(
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spaceLg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  title: Text(
-                    author.displayName,
-                    style: const TextStyle(color: AppTheme.textPrimary),
+                  const SizedBox(height: AppTheme.spaceLg),
+                  Text(
+                    title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(color: AppTheme.textPrimary),
                   ),
-                  subtitle: Text(author.handle,
-                      style: const TextStyle(color: AppTheme.textSecondary),),
-                  trailing: FollowButton(
-                    isFollowing: author.isFollowed,
-                    onPressed: () => setState(() {
-                      ref
-                          .read(authorDirectoryProvider.notifier)
-                          .toggleFollow(author.id);
-                    }),
+                  const SizedBox(height: AppTheme.spaceLg),
+                  ...authors.map(
+                    (author) => ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.surfaceChip,
+                        backgroundImage: author.avatarUrl != null
+                            ? NetworkImage(author.avatarUrl!)
+                            : null,
+                        child: author.avatarUrl != null
+                            ? null
+                            : Text(author.avatarEmoji),
+                      ),
+                      title: Text(
+                        author.displayName,
+                        style: const TextStyle(color: AppTheme.textPrimary),
+                      ),
+                      subtitle: Text(
+                        author.handle,
+                        style: const TextStyle(color: AppTheme.textSecondary),
+                      ),
+                      trailing: FollowButton(
+                        isFollowing: author.isFollowed,
+                        onPressed: () => setState(() {
+                          ref
+                              .read(authorDirectoryProvider.notifier)
+                              .toggleFollow(author.id);
+                        }),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 }
-
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -561,33 +682,30 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppTheme.spaceLg),
-      decoration: BoxDecoration(
-        color: AppTheme.bgRaised,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 13,
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceLg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
-              ),
-              if (action != null) action!,
-            ],
-          ),
-          const SizedBox(height: AppTheme.spaceMd),
-          child,
-        ],
+                if (action != null) action!,
+              ],
+            ),
+            const SizedBox(height: AppTheme.spaceMd),
+            child,
+          ],
+        ),
       ),
     );
   }
@@ -650,81 +768,79 @@ class _FollowCarousel extends StatelessWidget {
         ),
         const SizedBox(height: AppTheme.spaceMd),
         SizedBox(
-          height: 140,
+          height: 160,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: authors.length,
-            separatorBuilder: (_, __) =>
-                const SizedBox(width: AppTheme.spaceLg),
+            separatorBuilder: (_, __) => const SizedBox(width: AppTheme.spaceLg),
             itemBuilder: (context, index) {
               final author = authors[index];
-              return Container(
+              return SizedBox(
                 width: 200,
-                padding: const EdgeInsets.all(AppTheme.spaceMd),
-                decoration: BoxDecoration(
-                  color: AppTheme.bgRaised,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  border: Border.all(color: AppTheme.surfaceBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                child: _GlassPanel(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTheme.spaceMd),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          backgroundColor: AppTheme.surfaceChip,
-                          backgroundImage: author.avatarUrl != null
-                              ? NetworkImage(author.avatarUrl!)
-                              : null,
-                          child: author.avatarUrl != null
-                              ? null
-                              : Text(author.avatarEmoji),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: AppTheme.surfaceChip,
+                              backgroundImage: author.avatarUrl != null
+                                  ? NetworkImage(author.avatarUrl!)
+                                  : null,
+                              child: author.avatarUrl != null
+                                  ? null
+                                  : Text(author.avatarEmoji),
+                            ),
+                            const SizedBox(width: AppTheme.spaceSm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    author.displayName,
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    author.handle,
+                                    style: const TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: AppTheme.spaceSm),
+                        const SizedBox(height: AppTheme.spaceSm),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                author.displayName,
-                                style: const TextStyle(
-                                  color: AppTheme.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                author.handle,
-                                style: const TextStyle(
-                                  color: AppTheme.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            author.bio,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                              height: 1.3,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                        const SizedBox(height: AppTheme.spaceSm),
+                        FollowButton(
+                          isFollowing: author.isFollowed,
+                          onPressed: () => onFollowToggle(author),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppTheme.spaceSm),
-                    Expanded(
-                      child: Text(
-                        author.bio,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                          height: 1.3,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: AppTheme.spaceSm),
-                    FollowButton(
-                      isFollowing: author.isFollowed,
-                      onPressed: () => onFollowToggle(author),
-                    ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -734,7 +850,6 @@ class _FollowCarousel extends StatelessWidget {
     );
   }
 }
-
 class _SocialLinkMeta {
   final String key;
   final String label;
@@ -752,32 +867,20 @@ class _SocialLinkMeta {
 const _socialLinkPresets = [
   _SocialLinkMeta(
     key: 'twitter',
-    label: 'Twitter',
-    hint: '@handle or url',
+    label: 'Twitter / X',
+    hint: '@handle',
     icon: Icons.alternate_email,
   ),
   _SocialLinkMeta(
     key: 'linkedin',
     label: 'LinkedIn',
-    hint: 'Profile URL',
-    icon: Icons.business_center_outlined,
-  ),
-  _SocialLinkMeta(
-    key: 'instagram',
-    label: 'Instagram',
-    hint: '@handle',
-    icon: Icons.camera_alt_outlined,
-  ),
-  _SocialLinkMeta(
-    key: 'youtube',
-    label: 'YouTube',
-    hint: 'Channel URL',
-    icon: Icons.ondemand_video,
+    hint: 'linkedin.com/in/you',
+    icon: Icons.business_center,
   ),
   _SocialLinkMeta(
     key: 'website',
     label: 'Website',
-    hint: 'https://example.com',
+    hint: 'https://your-site.com',
     icon: Icons.language,
   ),
 ];
@@ -812,6 +915,17 @@ class _SegmentControl extends StatelessWidget {
                   onSelected: (selected) {
                     if (selected) onChanged(value);
                   },
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    side: const BorderSide(color: AppTheme.glassStroke),
+                  ),
+                  selectedColor: AppTheme.neonBlue.withValues(alpha: 0.2),
+                  backgroundColor: AppTheme.glassSurfaceDense,
+                  labelStyle: TextStyle(
+                    color: current == value
+                        ? AppTheme.textPrimary
+                        : AppTheme.textSecondary,
+                  ),
                 ),
               )
               .toList(),
@@ -821,3 +935,37 @@ class _SegmentControl extends StatelessWidget {
   }
 }
 
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: AppTheme.blurMd,
+          sigmaY: AppTheme.blurMd,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.glassSurface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppTheme.glassStroke),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 28,
+                offset: Offset(0, 18),
+                spreadRadius: -8,
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}

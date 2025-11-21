@@ -1,5 +1,7 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -74,7 +76,8 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'РќР°РґР°Р№С‚Рµ РґРѕСЃС‚СѓРї РґРѕ РјС–РєСЂРѕС„РѕРЅР° Сѓ РЅР°Р»Р°С€С‚СѓРІР°РЅРЅСЏС…',),
+              'Microphone permission is required to start recording.',
+            ),
           ),
         );
       }
@@ -149,7 +152,7 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('РЎРїРѕС‡Р°С‚РєСѓ СѓРІС–Р№РґС–С‚СЊ Сѓ Р°РєР°СѓРЅС‚'),
+            content: Text('Please log in before uploading.'),
           ),
         );
       }
@@ -169,17 +172,21 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
       ref.invalidate(feedProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Р•РїС–Р·РѕРґ Р·Р±РµСЂРµР¶РµРЅРѕ')),
+          const SnackBar(content: Text('Upload complete.')), 
         );
         context.go('/feed');
       }
     } catch (e, stackTrace) {
-      AppLogger.error('Failed to upload recording',
-          tag: 'Recorder', error: e, stackTrace: stackTrace,);
+      AppLogger.error(
+        'Failed to upload recording',
+        tag: 'Recorder',
+        error: e,
+        stackTrace: stackTrace,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('РќРµ РІРґР°Р»РѕСЃСЏ Р·Р°РІР°РЅС‚Р°Р¶РёС‚Рё: $e'),
+            content: Text('Upload failed: $e'),
             backgroundColor: AppTheme.stateDanger,
           ),
         );
@@ -195,39 +202,171 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppTheme.spaceXl),
-                child: Column(
-                  children: [
-                    if (_isRecording) _buildAudioLevel(),
-                    const SizedBox(height: AppTheme.spaceXl),
-                    _buildTimer(),
-                    const SizedBox(height: AppTheme.spaceXl),
-                    _buildRecordButton(),
-                    const SizedBox(height: AppTheme.spaceXl),
-                    _buildTitleField(),
-                    const SizedBox(height: AppTheme.spaceXl),
-                    _buildControlsCard(),
-                    const SizedBox(height: AppTheme.spaceXl),
-                    if (_isUploading)
-                      const CircularProgressIndicator(
-                          color: AppTheme.brandPrimary,),
-                    if (!_isUploading)
-                      OutlinedButton.icon(
-                        onPressed: () => context.push('/live/host'),
-                        icon: const Icon(Icons.radio),
-                        label: const Text('РџРѕС‡Р°С‚Рё Live'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.brandPrimary,
-                          side: const BorderSide(color: AppTheme.brandPrimary),
+      body: Stack(
+        children: [
+          Container(decoration: const BoxDecoration(gradient: AppTheme.heroGradient)),
+          Positioned(
+            left: -120,
+            top: 60,
+            child: Opacity(
+              opacity: 0.22,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: AppTheme.neonGradient,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: -80,
+            bottom: -40,
+            child: Opacity(
+              opacity: 0.16,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [AppTheme.bgPopover, AppTheme.neonPurple],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceLg,
+                    vertical: AppTheme.spaceMd,
+                  ),
+                  child: _buildHeader(context),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppTheme.spaceXl),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (_isRecording) ...[
+                          _GlassPanel(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppTheme.spaceLg,
+                                vertical: AppTheme.spaceMd,
+                              ),
+                              child: _buildAudioLevel(),
+                            ),
+                          ),
+                          const SizedBox(height: AppTheme.spaceXl),
+                        ],
+                        _GlassPanel(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppTheme.spaceLg),
+                            child: Column(
+                              children: [
+                                _buildTimer(),
+                                const SizedBox(height: AppTheme.spaceXl),
+                                _buildRecordButton(),
+                              ],
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: AppTheme.spaceXl),
+                        _GlassPanel(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppTheme.spaceLg),
+                            child: _buildTitleField(),
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.spaceXl),
+                        _GlassPanel(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppTheme.spaceLg),
+                            child: _buildControlsCard(),
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.spaceXl),
+                        if (_isUploading)
+                          const CircularProgressIndicator(
+                            color: AppTheme.brandPrimary,
+                          )
+                        else
+                          OutlinedButton.icon(
+                            onPressed: () => context.push('/live/host'),
+                            icon: const Icon(Icons.radio),
+                            label: const Text('Go live'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.brandPrimary,
+                              side: const BorderSide(color: AppTheme.brandPrimary),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppTheme.spaceLg,
+                                vertical: AppTheme.spaceMd,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceMd),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: _isUploading ? null : () => context.pop(),
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spaceMd,
+                vertical: AppTheme.spaceXs,
+              ),
+              decoration: BoxDecoration(
+                gradient: _isPublic
+                    ? AppTheme.neonGradient
+                    : const LinearGradient(
+                        colors: [AppTheme.surfaceChip, AppTheme.glassSurfaceDense],
                       ),
-                  ],
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppTheme.glassStroke),
+                boxShadow: _isPublic
+                    ? [
+                        ...AppTheme.glowPrimary,
+                        ...AppTheme.glowAccent,
+                      ]
+                    : null,
+              ),
+              child: Text(
+                _isPublic ? 'PUBLIC' : 'ANON',
+                style: TextStyle(
+                  color: _isPublic ? AppTheme.textInverse : AppTheme.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
                 ),
               ),
             ),
@@ -237,57 +376,31 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spaceLg,
-        vertical: AppTheme.spaceMd,
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: _isUploading ? null : () => context.pop(),
-            icon: const Icon(Icons.arrow_back_ios_new,
-                color: AppTheme.textPrimary,),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _isPublic ? AppTheme.brandPrimary : AppTheme.surfaceChip,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Text(
-              _isPublic ? 'PUBLIC' : 'ANON',
-              style: const TextStyle(
-                color: AppTheme.textInverse,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAudioLevel() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        12,
-        (index) => Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          width: 6,
+      children: List.generate(14, (index) {
+        final normalizedIndex = (index + 1) / 14;
+        final isActive = normalizedIndex <= _audioLevel + 0.08;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: 8,
           height: 24 + (index * 4),
           decoration: BoxDecoration(
-            color: index / 12 < _audioLevel
-                ? AppTheme.stateSuccess
-                : AppTheme.surfaceChip,
+            gradient: isActive
+                ? const LinearGradient(
+                    colors: [AppTheme.neonBlue, AppTheme.neonPink],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  )
+                : null,
+            color: isActive ? null : AppTheme.surfaceChip,
             borderRadius: BorderRadius.circular(6),
+            boxShadow: isActive ? AppTheme.glowPrimary : null,
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -304,11 +417,11 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
             fontFeatures: [FontFeature.tabularFigures()],
           ),
         ),
-        if (_duration >= 60)
-          const Text(
-            'Р РµРєРѕРјРµРЅРґРѕРІР°РЅРѕ: 1 С…РІРёР»РёРЅР°',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
+        const SizedBox(height: AppTheme.spaceSm),
+        Text(
+          _isRecording ? 'Recording in progress' : 'Ready to record',
+          style: const TextStyle(color: AppTheme.textSecondary),
+        ),
       ],
     );
   }
@@ -316,33 +429,59 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
   Widget _buildRecordButton() {
     final progress = (_duration / 60).clamp(0.0, 1.0);
     return SizedBox(
-      width: 140,
-      height: 140,
+      width: 180,
+      height: 180,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          SizedBox(
-            width: 140,
-            height: 140,
-            child: CircularProgressIndicator(
-              value: _isRecording ? progress : 0,
-              strokeWidth: 4,
-              backgroundColor: AppTheme.surfaceBorder,
-              valueColor: const AlwaysStoppedAnimation(AppTheme.brandPrimary),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 1.0, end: _isRecording ? 1.08 : 1.0),
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeInOut,
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: child,
+              );
+            },
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.glassSurface,
+                border: Border.all(color: AppTheme.glassStroke),
+              ),
+              child: CircularProgressIndicator(
+                value: _isRecording ? progress : 1,
+                strokeWidth: 6,
+                backgroundColor: AppTheme.surfaceBorder,
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(AppTheme.neonBlue),
+              ),
             ),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor:
-                  _isRecording ? AppTheme.stateDanger : AppTheme.brandPrimary,
-              shape: const CircleBorder(),
-              minimumSize: const Size(96, 96),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: _isRecording
+                  ? const LinearGradient(
+                      colors: [AppTheme.stateDanger, AppTheme.neonPink],
+                    )
+                  : AppTheme.neonGradient,
+              shape: BoxShape.circle,
+              boxShadow: [
+                ...AppTheme.glowPrimary,
+                ...AppTheme.glowAccent,
+              ],
             ),
-            onPressed: _isUploading ? null : _toggleRecording,
-            child: Icon(
-              _isRecording ? Icons.stop_rounded : Icons.mic,
-              size: 36,
-              color: AppTheme.textInverse,
+            child: IconButton(
+              iconSize: 48,
+              onPressed: _isUploading ? null : _toggleRecording,
+              icon: Icon(
+                _isRecording ? Icons.stop_rounded : Icons.mic,
+                color: AppTheme.textInverse,
+              ),
+              padding: const EdgeInsets.all(28),
             ),
           ),
         ],
@@ -356,51 +495,54 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
       enabled: !_isRecording && !_isUploading,
       style: const TextStyle(color: AppTheme.textPrimary),
       decoration: InputDecoration(
-        labelText: 'РќР°Р·РІР° РµРїС–Р·РѕРґСѓ',
-        hintText: 'РќР°РїСЂРёРєР»Р°Рґ: рџ¤– РџСЂРѕ РЅРѕРІС– С„С–С‡С– GPT-5',
+        labelText: 'Add a title',
+        hintText: 'Summarize this drop (optional)',
         filled: true,
-        fillColor: AppTheme.bgRaised,
+        fillColor: AppTheme.glassSurface,
+        labelStyle: const TextStyle(color: AppTheme.textSecondary),
+        hintStyle: const TextStyle(color: AppTheme.textSecondary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: AppTheme.glassStroke),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          borderSide: const BorderSide(color: AppTheme.glassStroke),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          borderSide: const BorderSide(color: AppTheme.neonBlue),
         ),
       ),
     );
   }
 
   Widget _buildControlsCard() {
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.spaceLg),
-      decoration: BoxDecoration(
-        color: AppTheme.bgRaised,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSwitch(
-            label: 'РџСѓР±Р»С–С‡РЅРѕ',
-            value: _isPublic,
-            onChanged: _isRecording || _isUploading
-                ? null
-                : (value) => setState(() => _isPublic = value ?? true),
-          ),
-          const SizedBox(height: AppTheme.spaceLg),
-          _buildSegmentControl(
-            label: 'РЇРєС–СЃС‚СЊ',
-            values: const ['Raw', 'Clean'],
-            current: _quality,
-            onChanged: (value) => setState(() => _quality = value),
-          ),
-          const SizedBox(height: AppTheme.spaceLg),
-          _buildSegmentControl(
-            label: 'РњР°СЃРєСѓРІР°РЅРЅСЏ',
-            values: const ['Off', 'Basic', 'Studio'],
-            current: _mask,
-            onChanged: (value) => setState(() => _mask = value),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSwitch(
+          label: 'Share publicly',
+          value: _isPublic,
+          onChanged: _isRecording || _isUploading
+              ? null
+              : (value) => setState(() => _isPublic = value ?? true),
+        ),
+        const SizedBox(height: AppTheme.spaceLg),
+        _buildSegmentControl(
+          label: 'Quality',
+          values: const ['Raw', 'Clean'],
+          current: _quality,
+          onChanged: (value) => setState(() => _quality = value),
+        ),
+        const SizedBox(height: AppTheme.spaceLg),
+        _buildSegmentControl(
+          label: 'Voice mask',
+          values: const ['Off', 'Basic', 'Studio'],
+          current: _mask,
+          onChanged: (value) => setState(() => _mask = value),
+        ),
+      ],
     );
   }
 
@@ -416,7 +558,8 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeThumbColor: AppTheme.brandPrimary,
+          activeColor: AppTheme.neonBlue,
+          activeTrackColor: AppTheme.neonBlue.withValues(alpha: 0.3),
         ),
       ],
     );
@@ -445,18 +588,59 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
                       : (selected) {
                           if (selected) onChanged(value);
                         },
-                  selectedColor: AppTheme.brandPrimary,
-                  backgroundColor: AppTheme.surfaceChip,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    side: const BorderSide(color: AppTheme.glassStroke),
+                  ),
+                  selectedColor: AppTheme.neonBlue.withValues(alpha: 0.2),
+                  backgroundColor: AppTheme.glassSurfaceDense,
                   labelStyle: TextStyle(
                     color: current == value
-                        ? AppTheme.textInverse
+                        ? AppTheme.textPrimary
                         : AppTheme.textSecondary,
+                    fontWeight:
+                        current == value ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
               )
               .toList(),
         ),
       ],
+    );
+  }
+}
+
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: AppTheme.blurMd,
+          sigmaY: AppTheme.blurMd,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.glassSurface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppTheme.glassStroke),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 28,
+                offset: Offset(0, 18),
+                spreadRadius: -8,
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }
