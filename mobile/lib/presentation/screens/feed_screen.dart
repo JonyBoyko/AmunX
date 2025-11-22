@@ -170,19 +170,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> with SingleTickerProvid
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        SliverAppBar(
-          pinned: true,
-          floating: false,
-          backgroundColor: AppTheme.glassSurface,
-          elevation: 0,
-          toolbarHeight: 56,
-          title: _FeedHeader(
+        SliverToBoxAdapter(
+          child: _FeedHeader(
             onProfileTap: () => context.push('/profile'),
             onInboxTap: () => context.push('/inbox'),
-          ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(48),
-            child: _FeedTabBar(controller: _tabController),
           ),
         ),
         if (episodes.isEmpty)
@@ -317,14 +308,18 @@ class _FeedHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       decoration: BoxDecoration(
         color: AppTheme.glassSurface,
         border: Border(bottom: BorderSide(color: AppTheme.glassStroke)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Avatar (left)
+          // GlitchLogo symbol (left/center)
+          const GlitchLogoSymbol(size: 36),
+          const Spacer(),
+          // Avatar (right)
           GestureDetector(
             onTap: onProfileTap,
             child: Container(
@@ -338,15 +333,14 @@ class _FeedHeader extends StatelessWidget {
               child: const Icon(Icons.person, color: AppTheme.neonBlue, size: 20),
             ),
           ),
-          const Spacer(),
-          // GlitchLogo symbol (center)
-          const GlitchLogoSymbol(size: 32),
-          const Spacer(),
+          const SizedBox(width: 8),
           // AI Digest icon (right)
           IconButton(
             tooltip: 'AI Digest',
             onPressed: onInboxTap,
-            icon: const Icon(Icons.auto_awesome, color: AppTheme.neonPurple),
+            icon: const Icon(Icons.auto_awesome, color: AppTheme.neonPurple, size: 24),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -1461,6 +1455,7 @@ class _TagPill extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _FeedTabBar extends StatelessWidget {
   final TabController controller;
 

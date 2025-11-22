@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
@@ -18,7 +19,7 @@ class _GlitchLogoSymbolState extends State<GlitchLogoSymbol> with SingleTickerPr
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 4500), // 3x slower
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     )..repeat();
   }
@@ -55,7 +56,7 @@ class _GlitchWavePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round
       ..shader = const LinearGradient(
         colors: [AppTheme.neonPurple, AppTheme.neonBlue, AppTheme.neonPurple],
@@ -63,19 +64,17 @@ class _GlitchWavePainter extends CustomPainter {
 
     final path = Path();
     final centerY = size.height / 2;
-    path.moveTo(2, centerY);
+    path.moveTo(0, centerY);
 
-    // Плавна хвиля
-    for (double x = 2; x <= size.width - 2; x += 2) {
-      final wave = sin((x / size.width * 2 * 3.14159) + (animationValue * 3.14159 * 2));
-      final y = centerY + wave * (size.height * 0.3);
+    for (double x = 0; x <= size.width; x += 1) {
+      final normalizedX = x / size.width;
+      final wave = sin((normalizedX * pi * 2) + (animationValue * pi * 2));
+      final y = centerY + wave * (size.height * 0.35);
       path.lineTo(x, y);
     }
 
     canvas.drawPath(path, paint);
   }
-  
-  double sin(double value) => (value - (value * value * value / 6) + (value * value * value * value * value / 120));
 
   @override
   bool shouldRepaint(_GlitchWavePainter oldDelegate) => true;

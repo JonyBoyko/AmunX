@@ -21,9 +21,9 @@ class MainShell extends ConsumerWidget {
       body: IndexedStack(
         index: activeTab.index,
         children: const [
-          FeedScreen(), // Головна (з табами Для вас / Підписки)
+          FeedScreen(), // Головна
+          LiveHostScreen(), // Circle
           SearchScreen(), // Пошук
-          LiveHostScreen(), // Circle (TODO: переробити на список кіл)
           NotificationsScreen(),
           MessagesScreen(),
         ],
