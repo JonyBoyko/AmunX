@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +10,7 @@ import '../models/author_profile.dart';
 import '../providers/author_directory_provider.dart';
 import '../providers/session_provider.dart';
 import '../widgets/follow_button.dart';
+import '../widgets/wave_tag_chip.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -76,6 +77,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.bgBase,
+      drawer: _ProfileDrawer(user: session.user),
       body: Stack(
         children: [
           Container(decoration: const BoxDecoration(gradient: AppTheme.heroGradient)),
@@ -133,6 +135,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       title: 'Following',
                     ),
                   ),
+                  const SizedBox(height: AppTheme.spaceLg),
+                  _buildTopWaveTags(),
                   if (followingAuthors.isNotEmpty) ...[
                     const SizedBox(height: AppTheme.spaceLg),
                     _FollowCarousel(
@@ -189,8 +193,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const Spacer(),
             IconButton(
-              onPressed: () => context.push('/settings'),
-              icon: const Icon(Icons.settings_outlined, color: AppTheme.textPrimary),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              icon: const Icon(Icons.menu_rounded, color: AppTheme.textPrimary),
             ),
           ],
         ),
@@ -842,6 +846,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Widget _buildTopWaveTags() {
+    // TODO: отримати реальні теги з профілю
+    final mockTags = ['tech', 'music', 'podcast', 'design', 'ai'];
+    return _SectionCard(
+      title: 'Top WaveTags',
+      child: WaveTagList(
+        tags: mockTags,
+        maxVisible: 5,
+        variant: WaveTagVariant.cyan,
+        size: WaveTagSize.md,
+      ),
+    );
+  }
+
   Future<void> _showFollowingSheet(
     List<AuthorProfile> authors, {
     required String title,
@@ -1272,6 +1290,95 @@ class _GlassPanel extends StatelessWidget {
           child: child,
         ),
       ),
+    );
+  }
+}
+
+class _ProfileDrawer extends StatelessWidget {
+  final User? user;
+
+  const _ProfileDrawer({this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      backgroundColor: AppTheme.bgBase,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spaceLg),
+              decoration: BoxDecoration(
+                gradient: AppTheme.neonGradient,
+                boxShadow: AppTheme.glowPrimary,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.textInverse.withValues(alpha: 0.2),
+                    ),
+                    child: const Icon(Icons.person, color: AppTheme.textInverse, size: 32),
+                  ),
+                  const SizedBox(width: AppTheme.spaceMd),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.email.split('@').first ?? 'User',
+                          style: const TextStyle(color: AppTheme.textInverse, fontWeight: FontWeight.w700, fontSize: 16),
+                        ),
+                        Text(
+                          user?.email ?? '',
+                          style: TextStyle(color: AppTheme.textInverse.withValues(alpha: 0.8), fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTheme.spaceMd),
+            _DrawerItem(icon: Icons.person_outline, label: 'Profile', onTap: () => Navigator.pop(context)),
+            _DrawerItem(icon: Icons.star_border, label: 'Premium', onTap: () {
+              Navigator.pop(context);
+              context.push('/paywall');
+            }),
+            _DrawerItem(icon: Icons.bookmark_border, label: 'Bookmarks', onTap: () => Navigator.pop(context)),
+            _DrawerItem(icon: Icons.settings_outlined, label: 'Settings', onTap: () {
+              Navigator.pop(context);
+              context.push('/settings');
+            }),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.all(AppTheme.spaceLg),
+              child: Text('Moweton v2.0', style: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.6), fontSize: 12)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _DrawerItem({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: AppTheme.neonBlue),
+      title: Text(label, style: const TextStyle(color: AppTheme.textPrimary)),
+      onTap: onTap,
+      hoverColor: AppTheme.glassSurfaceLight,
     );
   }
 }

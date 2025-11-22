@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -486,6 +486,7 @@ class _GlassField extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _SocialButton extends StatelessWidget {
   final String label;
   final IconData icon;

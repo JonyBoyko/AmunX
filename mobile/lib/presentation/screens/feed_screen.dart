@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +21,7 @@ import '../providers/smart_inbox_provider.dart';
 import '../utils/feed_classifiers.dart';
 import '../widgets/episode_card.dart';
 import '../widgets/mini_player_bar.dart';
+import '../widgets/wave_tag_chip.dart';
 
 class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
@@ -29,8 +30,21 @@ class FeedScreen extends ConsumerStatefulWidget {
   ConsumerState<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends ConsumerState<FeedScreen> {
+class _FeedScreenState extends ConsumerState<FeedScreen> with SingleTickerProviderStateMixin {
   Episode? _playingEpisode;
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   Future<void> _openEpisode(Episode episode) async {
     setState(() => _playingEpisode = episode);
@@ -164,6 +178,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             onSearchTap: () => context.push('/search'),
             onInboxTap: () => context.push('/inbox'),
           ),
+        ),
+        SliverToBoxAdapter(
+          child: _FeedTabBar(controller: _tabController),
         ),
         smartInboxAsync.when(
           data: (state) {
@@ -1018,10 +1035,10 @@ class _LiveNowStrip extends StatelessWidget {
         children: [
           Row(
             children: const [
-              Icon(Icons.podcasts, color: AppTheme.neonPink),
+              Icon(Icons.circle_rounded, color: AppTheme.neonPink),
               SizedBox(width: AppTheme.spaceSm),
               Text(
-                'Live now',
+                'Circle',
                 style: TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 18,
@@ -1237,6 +1254,20 @@ class _LiveRoomCard extends StatelessWidget {
                               fontSize: 12,
                             ),
                           ),
+                          // WaveTags
+                          if (room.tags.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            WaveTagList(
+                              tags: room.tags,
+                              maxVisible: 2,
+                              variant: roomColor == AppTheme.neonBlue
+                                  ? WaveTagVariant.cyan
+                                  : roomColor == AppTheme.neonPurple
+                                      ? WaveTagVariant.purple
+                                      : WaveTagVariant.pink,
+                              size: WaveTagSize.sm,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1534,6 +1565,37 @@ class _TagPill extends StatelessWidget {
             fontSize: dense ? 12 : 14,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FeedTabBar extends StatelessWidget {
+  final TabController controller;
+
+  const _FeedTabBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppTheme.spaceLg, vertical: AppTheme.spaceSm),
+      decoration: BoxDecoration(
+        color: AppTheme.glassSurface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(color: AppTheme.glassStroke),
+      ),
+      child: TabBar(
+        controller: controller,
+        indicator: BoxDecoration(
+          gradient: AppTheme.neonGradient,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        ),
+        labelColor: AppTheme.textInverse,
+        unselectedLabelColor: AppTheme.textSecondary,
+        tabs: const [
+          Tab(text: 'Для вас'),
+          Tab(text: 'Підписки'),
+        ],
       ),
     );
   }

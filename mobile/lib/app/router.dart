@@ -6,7 +6,7 @@ import '../presentation/providers/session_provider.dart';
 import '../presentation/screens/splash_screen.dart';
 import '../presentation/screens/onboarding_screen.dart';
 import '../presentation/screens/auth_screen.dart';
-import '../presentation/screens/feed_screen.dart';
+import '../presentation/screens/main_shell.dart';
 import '../presentation/screens/explore_screen.dart';
 import '../presentation/screens/recorder_screen.dart';
 import '../presentation/screens/publish_screen.dart';
@@ -72,7 +72,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/feed',
-        builder: (context, state) => const FeedScreen(),
+        builder: (context, state) => const MainShell(),
       ),
       GoRoute(
         path: '/explore',

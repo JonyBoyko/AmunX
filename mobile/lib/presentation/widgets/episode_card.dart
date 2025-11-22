@@ -10,6 +10,7 @@ import '../models/reaction_state.dart';
 import 'follow_button.dart';
 import 'mini_waveform.dart';
 import 'reaction_strip.dart';
+import 'wave_tag_chip.dart';
 
 class EpisodeCard extends StatelessWidget {
   final Episode episode;
@@ -59,6 +60,8 @@ class EpisodeCard extends StatelessWidget {
     final effectiveStatuses =
         statusLabels.isNotEmpty ? statusLabels : _deriveStatuses(episode);
     final effectiveLength = lengthProgress ?? _autoLengthProgress(duration);
+    // WaveTags (використовуємо keywords як fallback)
+    final waveTags = episode.keywords ?? [];
 
     return Material(
       color: Colors.transparent,
@@ -305,6 +308,16 @@ class EpisodeCard extends StatelessWidget {
                     color: AppTheme.textPrimary,
                     height: 1.5,
                   ),
+                ),
+              ],
+              // WaveTags
+              if (waveTags.isNotEmpty) ...[
+                const SizedBox(height: AppTheme.spaceSm),
+                WaveTagList(
+                  tags: waveTags,
+                  maxVisible: 3,
+                  variant: isLive ? WaveTagVariant.pink : WaveTagVariant.cyan,
+                  size: WaveTagSize.sm,
                 ),
               ],
               const SizedBox(height: AppTheme.spaceSm),
