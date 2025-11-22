@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 
-enum NavTab { feed, subscriptions, circle, notifications, messages }
+enum NavTab { feed, search, circle, notifications, messages }
 
 class BottomNavBar extends StatelessWidget {
   final NavTab activeTab;
@@ -24,8 +24,8 @@ class BottomNavBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(icon: Icons.home_rounded, label: 'Для вас', isActive: activeTab == NavTab.feed, onTap: () => onTabSelected(NavTab.feed)),
-              _NavItem(icon: Icons.people_rounded, label: 'Підписки', isActive: activeTab == NavTab.subscriptions, onTap: () => onTabSelected(NavTab.subscriptions)),
+              _NavItem(icon: Icons.home_rounded, label: 'Головна', isActive: activeTab == NavTab.feed, onTap: () => onTabSelected(NavTab.feed)),
+              _NavItem(icon: Icons.search_rounded, label: 'Пошук', isActive: activeTab == NavTab.search, onTap: () => onTabSelected(NavTab.search)),
               _NavItem(icon: Icons.circle_rounded, label: 'Circle', isActive: activeTab == NavTab.circle, onTap: () => onTabSelected(NavTab.circle)),
               _NavItem(icon: Icons.notifications_rounded, label: 'Сповіщення', isActive: activeTab == NavTab.notifications, onTap: () => onTabSelected(NavTab.notifications)),
               _NavItem(icon: Icons.message_rounded, label: 'Повідомлення', isActive: activeTab == NavTab.messages, onTap: () => onTabSelected(NavTab.messages)),

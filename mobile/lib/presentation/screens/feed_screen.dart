@@ -160,8 +160,6 @@ class _FeedScreenState extends ConsumerState<FeedScreen> with SingleTickerProvid
     List<LiveRoom> liveRooms,
     AsyncValue<SmartInboxState> smartInboxAsync,
   ) {
-    final coverageNotifier = ref.read(feedFilterProvider.notifier);
-    final tagsNotifier = ref.read(trendingTagsProvider.notifier);
     // Delay provider modification until after build
     Future(() {
       ref.read(authorDirectoryProvider.notifier).syncWithEpisodes(episodes);
@@ -171,90 +169,19 @@ class _FeedScreenState extends ConsumerState<FeedScreen> with SingleTickerProvid
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        SliverToBoxAdapter(
-          child: _FeedHeader(
+        SliverAppBar(
+          pinned: true,
+          floating: false,
+          backgroundColor: AppTheme.glassSurface,
+          elevation: 0,
+          toolbarHeight: 56,
+          title: _FeedHeader(
             onProfileTap: () => context.push('/profile'),
-            onExploreTap: () => context.push('/explore'),
-            onSearchTap: () => context.push('/search'),
             onInboxTap: () => context.push('/inbox'),
           ),
-        ),
-        SliverToBoxAdapter(
-          child: _FeedTabBar(controller: _tabController),
-        ),
-        smartInboxAsync.when(
-          data: (state) {
-            if (state.digests.isEmpty) {
-              return const SliverToBoxAdapter(child: SizedBox.shrink());
-            }
-            return SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.spaceLg,
-                  vertical: AppTheme.spaceMd,
-                ),
-                child: _SmartInboxPreview(
-                  digest: state.digests.first,
-                  highlights: state.highlights,
-                  onOpenEpisode: (id) => context.push('/episode/$id'),
-                  onOpenInbox: () => context.push('/inbox'),
-                  onTagSelected: (tag) {
-                    coverageNotifier.applySmartInboxFilter(tag);
-                    tagsNotifier.toggleFollow(tag);
-                  },
-                ),
-              ),
-            );
-          },
-          loading: () => const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppTheme.spaceLg,
-                vertical: AppTheme.spaceMd,
-              ),
-              child: _SmartInboxPlaceholder(),
-            ),
-          ),
-          error: (_, __) => SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.spaceLg,
-                vertical: AppTheme.spaceMd,
-              ),
-              child: _SmartInboxErrorCard(
-                onRetry: () => ref.refresh(smartInboxProvider.future),
-              ),
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: _FormatSwitchBar(
-            selected: filters.format,
-            onSelected: coverageNotifier.setFormat,
-          ),
-        ),
-        if (liveRooms.isNotEmpty)
-          SliverToBoxAdapter(
-            child: _LiveNowStrip(
-              rooms: liveRooms,
-              onRoomTap: (room) => context.push('/live/listener', extra: room),
-              onFollowToggle: (room) => ref
-                  .read(authorDirectoryProvider.notifier)
-                  .toggleFollow(room.hostId),
-            ),
-          ),
-        SliverToBoxAdapter(
-          child: _FilterPanel(
-            filters: filters,
-            tags: tags,
-            onTabSelected: coverageNotifier.setTab,
-            onFormatSelected: coverageNotifier.setFormat,
-            onRegionSelected: coverageNotifier.setRegion,
-            onTagToggled: (label) {
-              coverageNotifier.toggleTag(label);
-              tagsNotifier.toggleFollow(label);
-            },
-            onClearTags: coverageNotifier.clearTags,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: _FeedTabBar(controller: _tabController),
           ),
         ),
         if (episodes.isEmpty)
@@ -379,89 +306,57 @@ class _EmptyFeed extends StatelessWidget {
 
 class _FeedHeader extends StatelessWidget {
   final VoidCallback onProfileTap;
-  final VoidCallback onExploreTap;
-  final VoidCallback onSearchTap;
   final VoidCallback onInboxTap;
 
   const _FeedHeader({
     required this.onProfileTap,
-    required this.onExploreTap,
-    required this.onSearchTap,
     required this.onInboxTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spaceLg,
-        vertical: AppTheme.spaceLg,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppTheme.glassSurface,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-        border: Border.all(color: AppTheme.glassStroke),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 24,
-            offset: Offset(0, 12),
-            spreadRadius: -8,
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: AppTheme.glassStroke)),
       ),
       child: Row(
         children: [
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Moweton',
-                style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+          // Avatar (left)
+          GestureDetector(
+            onTap: onProfileTap,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.neonBlue.withValues(alpha: 0.2),
+                border: Border.all(color: AppTheme.neonBlue, width: 2),
               ),
-              SizedBox(height: 4),
-              Text(
-                'Personalized podcasts & live rooms',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
-            ],
+              child: const Icon(Icons.person, color: AppTheme.neonBlue, size: 20),
+            ),
           ),
           const Spacer(),
-          IconButton(
-            tooltip: 'Explore',
-            onPressed: onExploreTap,
-            icon: const Icon(
-              Icons.travel_explore_outlined,
-              color: AppTheme.textPrimary,
+          // Logo (center)
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: AppTheme.neonGradient,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: AppTheme.neonBlue.withValues(alpha: 0.3), blurRadius: 8)],
+            ),
+            child: const Center(
+              child: Text('M', style: TextStyle(color: AppTheme.textInverse, fontWeight: FontWeight.w900, fontSize: 16)),
             ),
           ),
+          const Spacer(),
+          // AI Digest icon (right)
           IconButton(
-            tooltip: 'Search',
-            onPressed: onSearchTap,
-            icon: const Icon(
-              Icons.search,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Inbox',
+            tooltip: 'AI Digest',
             onPressed: onInboxTap,
-            icon: const Icon(
-              Icons.inbox_outlined,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Profile',
-            onPressed: onProfileTap,
-            icon: const Icon(
-              Icons.person_outline,
-              color: AppTheme.textPrimary,
-            ),
+            icon: const Icon(Icons.auto_awesome, color: AppTheme.neonPurple),
           ),
         ],
       ),
@@ -562,6 +457,7 @@ class _LiveNotificationBanner extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _SmartInboxPreview extends StatelessWidget {
   const _SmartInboxPreview({
     required this.digest,
@@ -787,6 +683,7 @@ class _SmartInboxEntryCard extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _SmartInboxPlaceholder extends StatelessWidget {
   const _SmartInboxPlaceholder();
 
@@ -843,6 +740,7 @@ class _SmartInboxPlaceholder extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _SmartInboxErrorCard extends StatelessWidget {
   const _SmartInboxErrorCard({required this.onRetry});
 
@@ -905,6 +803,7 @@ class _SmartInboxErrorCard extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _FormatSwitchBar extends StatelessWidget {
   const _FormatSwitchBar({
     required this.selected,
@@ -1012,6 +911,7 @@ class _SegmentChip extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _LiveNowStrip extends StatelessWidget {
   const _LiveNowStrip({
     required this.rooms,
@@ -1337,6 +1237,7 @@ class _LiveRoomCard extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _FilterPanel extends StatelessWidget {
   const _FilterPanel({
     required this.filters,

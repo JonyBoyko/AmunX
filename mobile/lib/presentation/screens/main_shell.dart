@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../widgets/bottom_nav_bar.dart';
 import 'feed_screen.dart';
+import 'search_screen.dart';
 import 'notifications_screen.dart';
 import 'messages_screen.dart';
 import 'live_host_screen.dart';
@@ -20,9 +21,9 @@ class MainShell extends ConsumerWidget {
       body: IndexedStack(
         index: activeTab.index,
         children: const [
-          FeedScreen(), // Для вас
-          FeedScreen(), // Підписки (TODO: окремий екран)
-          LiveHostScreen(), // Circle (TODO: переробити)
+          FeedScreen(), // Головна (з табами Для вас / Підписки)
+          SearchScreen(), // Пошук
+          LiveHostScreen(), // Circle (TODO: переробити на список кіл)
           NotificationsScreen(),
           MessagesScreen(),
         ],
