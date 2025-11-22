@@ -182,6 +182,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final session = ref.watch(sessionProvider);
+    final currentUserId = session.user?.id;
+    final authorsMap = ref.watch(authorDirectoryProvider);
+    final meProfile = currentUserId == null ? null : authorsMap[currentUserId];
+    final avatarUrl = meProfile?.avatarUrl;
+    final avatarLabel = meProfile?.avatarEmoji ?? session.user?.email.split('@').first[0].toUpperCase() ?? 'U';
+
     return _GlassPanel(
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spaceMd),
@@ -192,6 +199,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary),
             ),
             const Spacer(),
+            // Avatar
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: AppTheme.neonBlue.withValues(alpha: 0.2),
+              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+              child: avatarUrl == null || avatarUrl.isEmpty ? Text(avatarLabel, style: const TextStyle(fontSize: 14)) : null,
+            ),
+            const SizedBox(width: AppTheme.spaceMd),
             IconButton(
               onPressed: () => Scaffold.of(context).openDrawer(),
               icon: const Icon(Icons.menu_rounded, color: AppTheme.textPrimary),

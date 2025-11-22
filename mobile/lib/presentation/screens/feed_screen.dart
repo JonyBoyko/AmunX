@@ -22,6 +22,7 @@ import '../utils/feed_classifiers.dart';
 import '../widgets/episode_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/wave_tag_chip.dart';
+import '../widgets/animated_mw_logo.dart';
 
 class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
@@ -338,19 +339,8 @@ class _FeedHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          // Logo (center)
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              gradient: AppTheme.neonGradient,
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: AppTheme.neonBlue.withValues(alpha: 0.3), blurRadius: 8)],
-            ),
-            child: const Center(
-              child: Text('M', style: TextStyle(color: AppTheme.textInverse, fontWeight: FontWeight.w900, fontSize: 16)),
-            ),
-          ),
+          // Animated M↔W Logo (center)
+          const AnimatedMWLogo(size: 32),
           const Spacer(),
           // AI Digest icon (right)
           IconButton(
