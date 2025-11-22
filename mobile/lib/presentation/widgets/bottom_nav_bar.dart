@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 
-enum NavTab { feed, circle, search, notifications, messages }
+enum NavTab { feed, circle, search, notifications, podcasts }
 
 class BottomNavBar extends StatelessWidget {
   final NavTab activeTab;
@@ -28,7 +28,7 @@ class BottomNavBar extends StatelessWidget {
               _NavItem(icon: Icons.circle_rounded, label: 'Circle', isActive: activeTab == NavTab.circle, onTap: () => onTabSelected(NavTab.circle)),
               _NavItem(icon: Icons.search_rounded, label: 'Пошук', isActive: activeTab == NavTab.search, onTap: () => onTabSelected(NavTab.search)),
               _NavItem(icon: Icons.notifications_rounded, label: 'Сповіщення', isActive: activeTab == NavTab.notifications, onTap: () => onTabSelected(NavTab.notifications)),
-              _NavItem(icon: Icons.message_rounded, label: 'Повідомлення', isActive: activeTab == NavTab.messages, onTap: () => onTabSelected(NavTab.messages)),
+              _NavItem(icon: Icons.podcasts, label: 'Подкасти', isActive: activeTab == NavTab.podcasts, onTap: () => onTabSelected(NavTab.podcasts)),
             ],
           ),
         ),

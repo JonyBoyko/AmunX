@@ -5,7 +5,7 @@ import '../widgets/bottom_nav_bar.dart';
 import 'feed_screen.dart';
 import 'search_screen.dart';
 import 'notifications_screen.dart';
-import 'messages_screen.dart';
+import 'podcasts_screen.dart';
 import 'live_host_screen.dart';
 
 final currentNavTabProvider = StateProvider<NavTab>((ref) => NavTab.feed);
@@ -22,10 +22,10 @@ class MainShell extends ConsumerWidget {
         index: activeTab.index,
         children: const [
           FeedScreen(), // Головна
-          LiveHostScreen(), // Circle
+          LiveHostScreen(), // Circle (TODO: список кіл)
           SearchScreen(), // Пошук
           NotificationsScreen(),
-          MessagesScreen(),
+          PodcastsScreen(), // Подкасти
         ],
       ),
       bottomNavigationBar: BottomNavBar(

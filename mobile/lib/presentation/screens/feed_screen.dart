@@ -119,9 +119,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 },
               ),
             ),
+            // TODO: додати тумблер режиму запису (звичайний голосовий / broadcast podcast)
             Positioned(
               right: 16,
-              bottom: _playingEpisode != null ? 96 : 24,
+              bottom: _playingEpisode != null ? 100 : 80,
               child: _RecordFab(
                 onTap: () => context.push('/recorder'),
               ),
@@ -295,18 +296,13 @@ class _FeedHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-      decoration: BoxDecoration(
-        color: AppTheme.glassSurface,
-        border: Border(bottom: BorderSide(color: AppTheme.glassStroke)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.transparent,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // GlitchLogo symbol (left/center)
-          const GlitchLogoSymbol(size: 36),
-          const Spacer(),
-          // Avatar (right)
+          // Avatar (left)
           GestureDetector(
             onTap: onProfileTap,
             child: Container(
@@ -320,7 +316,8 @@ class _FeedHeader extends StatelessWidget {
               child: const Icon(Icons.person, color: AppTheme.neonBlue, size: 20),
             ),
           ),
-          const SizedBox(width: 8),
+          // GlitchLogo symbol (center)
+          const GlitchLogoSymbol(size: 36),
           // AI Digest icon (right)
           IconButton(
             tooltip: 'AI Digest',
