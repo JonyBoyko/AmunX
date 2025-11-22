@@ -247,67 +247,90 @@ class _SplashBadgeState extends State<_SplashBadge>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Animated Icon with glow
+                  // M↔W Animated Logo
                   AnimatedBuilder(
                     animation: _glowAnimation,
                     builder: (context, child) {
-                      return Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: AppTheme.neonGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.neonBlue.withValues(
-                                alpha: 0.5 * _glowAnimation.value,
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ShaderMask(
+                                shaderCallback: (bounds) => const LinearGradient(
+                                  colors: [AppTheme.neonBlue, AppTheme.neonBlue],
+                                ).createShader(bounds),
+                                child: Text(
+                                  'M',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 72,
+                                    fontWeight: FontWeight.w900,
+                                    shadows: [
+                                      Shadow(
+                                        color: AppTheme.neonBlue.withValues(alpha: 0.8 * _glowAnimation.value),
+                                        blurRadius: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              blurRadius: 32,
-                              spreadRadius: 0,
-                            ),
-                            BoxShadow(
-                              color: AppTheme.neonPurple.withValues(
-                                alpha: 0.3 * _glowAnimation.value,
+                              ShaderMask(
+                                shaderCallback: (bounds) => const LinearGradient(
+                                  colors: [AppTheme.neonPurple, AppTheme.neonPurple],
+                                ).createShader(bounds),
+                                child: const Text(
+                                  '↔',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 48,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
                               ),
-                              blurRadius: 40,
-                              spreadRadius: 0,
+                              ShaderMask(
+                                shaderCallback: (bounds) => const LinearGradient(
+                                  colors: [AppTheme.neonPurple, AppTheme.neonPurple],
+                                ).createShader(bounds),
+                                child: Text(
+                                  'W',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 72,
+                                    fontWeight: FontWeight.w900,
+                                    shadows: [
+                                      Shadow(
+                                        color: AppTheme.neonPurple.withValues(alpha: 0.8 * _glowAnimation.value),
+                                        blurRadius: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppTheme.spaceMd),
+                          const Text(
+                            'Moweton',
+                            style: TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.4,
                             ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.mic_rounded,
-                          color: AppTheme.textInverse,
-                          size: 48,
-                        ),
+                          ),
+                          const SizedBox(height: AppTheme.spaceXs),
+                          const Text(
+                            'Voice. Async. Connected.',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       );
                     },
-                  ),
-                  const SizedBox(height: AppTheme.spaceLg),
-                  // App Name with neon text
-                  ShaderMask(
-                    shaderCallback: (bounds) => LinearGradient(
-                      colors: [
-                        AppTheme.neonBlue,
-                        AppTheme.neonBlue.withValues(alpha: 0.8),
-                      ],
-                    ).createShader(bounds),
-                    child: const Text(
-                      'Moweton',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 28,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.spaceSm),
-                  const Text(
-                    'Асинхронний голосовий месенджер',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      height: 1.4,
-                    ),
                   ),
                   const SizedBox(height: AppTheme.spaceXl),
                   // Loading indicator with dots

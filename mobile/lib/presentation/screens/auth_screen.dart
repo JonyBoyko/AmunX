@@ -208,37 +208,53 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               ),
                             ),
                             const SizedBox(height: AppTheme.spaceXl),
-                            // Logo/Title
-                            Center(
-                              child: Column(
-                                children: [
-                                  ShaderMask(
-                                    shaderCallback: (bounds) => LinearGradient(
-                                      colors: [
-                                        AppTheme.neonBlue,
-                                        AppTheme.neonBlue.withValues(alpha: 0.8),
+                                  // M↔W Logo
+                                  Center(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ShaderMask(
+                                          shaderCallback: (bounds) => const LinearGradient(
+                                            colors: [AppTheme.neonBlue, AppTheme.neonBlue],
+                                          ).createShader(bounds),
+                                          child: const Text(
+                                            'M',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 48,
+                                            ),
+                                          ),
+                                        ),
+                                        ShaderMask(
+                                          shaderCallback: (bounds) => const LinearGradient(
+                                            colors: [AppTheme.neonPurple, AppTheme.neonPurple],
+                                          ).createShader(bounds),
+                                          child: const Text(
+                                            '↔',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w400,
+                                              fontSize: 32,
+                                            ),
+                                          ),
+                                        ),
+                                        ShaderMask(
+                                          shaderCallback: (bounds) => const LinearGradient(
+                                            colors: [AppTheme.neonPurple, AppTheme.neonPurple],
+                                          ).createShader(bounds),
+                                          child: const Text(
+                                            'W',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 48,
+                                            ),
+                                          ),
+                                        ),
                                       ],
-                                    ).createShader(bounds),
-                                    child: const Text(
-                                      'Moweton',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 32,
-                                        letterSpacing: 0.4,
-                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: AppTheme.spaceSm),
-                                  const Text(
-                                    'Асинхронний голосовий месенджер',
-                                    style: TextStyle(
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             const SizedBox(height: AppTheme.spaceXl),
                             _GlassField(
                               controller: _emailController,
