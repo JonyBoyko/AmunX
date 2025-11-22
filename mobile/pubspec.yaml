@@ -78,7 +78,7 @@ dependency_overrides:
 
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false
   image_path: "assets/icons/app_icon.png"
   adaptive_icon_background: "#0a0a0f"
   adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
