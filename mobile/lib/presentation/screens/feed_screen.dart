@@ -22,7 +22,7 @@ import '../utils/feed_classifiers.dart';
 import '../widgets/episode_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/wave_tag_chip.dart';
-import '../widgets/animated_mw_logo.dart';
+import '../widgets/glitch_logo_symbol.dart';
 
 class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
@@ -339,8 +339,8 @@ class _FeedHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          // Animated M↔W Logo (center)
-          const AnimatedMWLogo(size: 32),
+          // GlitchLogo symbol (center)
+          const GlitchLogoSymbol(size: 32),
           const Spacer(),
           // AI Digest icon (right)
           IconButton(

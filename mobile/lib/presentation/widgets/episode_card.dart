@@ -46,7 +46,9 @@ class EpisodeCard extends StatelessWidget {
     final avatarLabel = author?.avatarEmoji ?? episode.title?.characters.first.toUpperCase() ?? 'A';
     final avatarUrl = author?.avatarUrl;
     final rngValue = Random(episode.id.hashCode).nextDouble();
-    final waveTags = episode.keywords ?? [];
+    final waveTags = episode.keywords?.isNotEmpty == true 
+      ? episode.keywords! 
+      : ['audio', 'voice', 'podcast']; // Мок-теги для демо
     final displayName = author?.displayName ?? 'User';
     final handle = author?.handle ?? '@voice';
     final timeAgo = _formatTimeAgo(episode.createdAt);
@@ -106,11 +108,9 @@ class EpisodeCard extends StatelessWidget {
                 onLongPressEnd: (_) {},
                 child: MiniWaveform(progress: rngValue, isLive: isLive),
               ),
-              // WaveTags
-              if (waveTags.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                WaveTagList(tags: waveTags, maxVisible: 3, variant: WaveTagVariant.cyan, size: WaveTagSize.sm),
-              ],
+              // WaveTags (завжди показуємо)
+              const SizedBox(height: 8),
+              WaveTagList(tags: waveTags, maxVisible: 3, variant: WaveTagVariant.cyan, size: WaveTagSize.sm),
               // Interaction bar
               const SizedBox(height: 12),
               Row(
