@@ -247,84 +247,25 @@ class _SplashBadgeState extends State<_SplashBadge>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Glass Logo Symbol (концентричні кола)
-                  AnimatedBuilder(
-                    animation: _glowAnimation,
-                    builder: (context, child) {
-                      final pulse = _glowAnimation.value;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 120,
-                            height: 120,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Outer circle (purple) - зростає
-                                Container(
-                                  width: 60 + pulse * 10,
-                                  height: 60 + pulse * 10,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppTheme.neonPurple.withValues(alpha: 0.1),
-                                    border: Border.all(
-                                      color: AppTheme.neonPurple.withValues(alpha: 0.5),
-                                      width: 2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.neonPurple.withValues(alpha: 0.3 * pulse),
-                                        blurRadius: 20,
-                                        spreadRadius: 5,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                // Inner circle (cyan) - зменшується коли outer зростає
-                                Container(
-                                  width: 40 + (1 - pulse) * 10,
-                                  height: 40 + (1 - pulse) * 10,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppTheme.neonBlue.withValues(alpha: 0.1),
-                                    border: Border.all(
-                                      color: AppTheme.neonBlue.withValues(alpha: 0.6),
-                                      width: 2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.neonBlue.withValues(alpha: 0.4 * (1 - pulse)),
-                                        blurRadius: 16,
-                                        spreadRadius: 3,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: AppTheme.spaceLg),
-                          const Text(
-                            'Moweton',
-                            style: TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                          const SizedBox(height: AppTheme.spaceXs),
-                          const Text(
-                            'Voice. Async. Connected.',
-                            style: TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                  // Glitch Logo Symbol (звукова хвиля)
+                  const _GlitchLogoSymbol(),
+                  const SizedBox(height: AppTheme.spaceLg),
+                  const Text(
+                    'Moweton',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.spaceXs),
+                  const Text(
+                    'Voice. Async. Connected.',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: AppTheme.spaceXl),
                   // Loading indicator with dots
@@ -407,4 +348,97 @@ class _LoadingDotsState extends State<_LoadingDots>
       }),
     );
   }
+}
+
+class _GlitchLogoSymbol extends StatefulWidget {
+  const _GlitchLogoSymbol();
+
+  @override
+  State<_GlitchLogoSymbol> createState() => _GlitchLogoSymbolState();
+}
+
+class _GlitchLogoSymbolState extends State<_GlitchLogoSymbol> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return SizedBox(
+          width: 120,
+          height: 120,
+          child: CustomPaint(
+            painter: _GlitchWavePainter(_controller.value),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GlitchWavePainter extends CustomPainter {
+  final double animationValue;
+
+  _GlitchWavePainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round
+      ..shader = const LinearGradient(
+        colors: [AppTheme.neonPurple, AppTheme.neonBlue, AppTheme.neonPurple],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    // Анімована звукова хвиля
+    final path = Path();
+    final centerY = size.height / 2;
+    path.moveTo(20, centerY);
+
+    for (double x = 20; x <= size.width - 20; x += 10) {
+      final wave = ((x / 10 + animationValue * 10) % 2) - 1;
+      final y = centerY + wave * 20;
+      path.lineTo(x, y);
+    }
+
+    canvas.drawPath(path, paint);
+
+    // Аудіо бари знизу
+    final barPaint = Paint()
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..shader = const LinearGradient(
+        colors: [AppTheme.neonPurple, AppTheme.neonBlue],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    for (int i = 0; i < 5; i++) {
+      final x = 30.0 + i * 15;
+      final barHeight = 5 + ((animationValue + i * 0.2) % 1.0) * 10;
+      canvas.drawLine(
+        Offset(x, size.height - 20),
+        Offset(x, size.height - 20 - barHeight),
+        barPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GlitchWavePainter oldDelegate) => true;
 }

@@ -486,7 +486,7 @@ class _GlassField extends StatelessWidget {
 class _GlassLogoSymbol extends StatefulWidget {
   final double size;
 
-  const _GlassLogoSymbol({this.size = 100});
+  const _GlassLogoSymbol({this.size = 80});
 
   @override
   State<_GlassLogoSymbol> createState() => _GlassLogoSymbolState();
@@ -494,19 +494,14 @@ class _GlassLogoSymbol extends StatefulWidget {
 
 class _GlassLogoSymbolState extends State<_GlassLogoSymbol> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _pulse;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
-
-    _pulse = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    )..repeat();
   }
 
   @override
@@ -518,61 +513,68 @@ class _GlassLogoSymbolState extends State<_GlassLogoSymbol> with SingleTickerPro
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _pulse,
+      animation: _controller,
       builder: (context, child) {
-        final p = _pulse.value;
         return SizedBox(
           width: widget.size,
           height: widget.size,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Outer circle (purple)
-              Container(
-                width: widget.size * 0.6 + p * widget.size * 0.1,
-                height: widget.size * 0.6 + p * widget.size * 0.1,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.neonPurple.withValues(alpha: 0.1),
-                  border: Border.all(
-                    color: AppTheme.neonPurple.withValues(alpha: 0.5),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.neonPurple.withValues(alpha: 0.3 * (0.6 + p * 0.4)),
-                      blurRadius: 20,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-              ),
-              // Inner circle (cyan)
-              Container(
-                width: widget.size * 0.4 + (1 - p) * widget.size * 0.1,
-                height: widget.size * 0.4 + (1 - p) * widget.size * 0.1,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.neonBlue.withValues(alpha: 0.1),
-                  border: Border.all(
-                    color: AppTheme.neonBlue.withValues(alpha: 0.6),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.neonBlue.withValues(alpha: 0.4 * (1 - p * 0.4)),
-                      blurRadius: 16,
-                      spreadRadius: 3,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          child: CustomPaint(
+            painter: _GlitchWavePainter(_controller.value),
           ),
         );
       },
     );
   }
+}
+
+class _GlitchWavePainter extends CustomPainter {
+  final double animationValue;
+
+  _GlitchWavePainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..shader = const LinearGradient(
+        colors: [AppTheme.neonPurple, AppTheme.neonBlue, AppTheme.neonPurple],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final path = Path();
+    final centerY = size.height / 2;
+    path.moveTo(15, centerY);
+
+    for (double x = 15; x <= size.width - 15; x += 8) {
+      final wave = ((x / 8 + animationValue * 10) % 2) - 1;
+      final y = centerY + wave * 15;
+      path.lineTo(x, y);
+    }
+
+    canvas.drawPath(path, paint);
+
+    // Аудіо бари знизу
+    final barPaint = Paint()
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..shader = const LinearGradient(
+        colors: [AppTheme.neonPurple, AppTheme.neonBlue],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    for (int i = 0; i < 5; i++) {
+      final x = 25.0 + i * 15;
+      final barHeight = 5 + ((animationValue + i * 0.2) % 1.0) * 8;
+      canvas.drawLine(
+        Offset(x, size.height - 15),
+        Offset(x, size.height - 15 - barHeight),
+        barPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GlitchWavePainter oldDelegate) => true;
 }
 
 // ignore: unused_element
