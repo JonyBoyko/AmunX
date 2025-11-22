@@ -1469,20 +1469,21 @@ class _FeedTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppTheme.spaceLg, vertical: AppTheme.spaceSm),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: AppTheme.glassSurface,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(color: AppTheme.glassStroke),
+        border: Border(bottom: BorderSide(color: AppTheme.glassStroke)),
       ),
       child: TabBar(
         controller: controller,
-        indicator: BoxDecoration(
-          gradient: AppTheme.neonGradient,
-          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        indicator: UnderlineTabIndicator(
+          borderSide: BorderSide(color: AppTheme.neonBlue, width: 2),
+          insets: const EdgeInsets.symmetric(horizontal: 16),
         ),
-        labelColor: AppTheme.textInverse,
+        labelColor: AppTheme.textPrimary,
         unselectedLabelColor: AppTheme.textSecondary,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         tabs: const [
           Tab(text: 'Для вас'),
           Tab(text: 'Підписки'),

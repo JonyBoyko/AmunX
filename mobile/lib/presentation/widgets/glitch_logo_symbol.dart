@@ -18,7 +18,7 @@ class _GlitchLogoSymbolState extends State<GlitchLogoSymbol> with SingleTickerPr
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 4500), // 3x slower
       vsync: this,
     )..repeat();
   }
@@ -55,7 +55,7 @@ class _GlitchWavePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
+      ..strokeWidth = 4
       ..strokeCap = StrokeCap.round
       ..shader = const LinearGradient(
         colors: [AppTheme.neonPurple, AppTheme.neonBlue, AppTheme.neonPurple],
@@ -63,16 +63,19 @@ class _GlitchWavePainter extends CustomPainter {
 
     final path = Path();
     final centerY = size.height / 2;
-    path.moveTo(5, centerY);
+    path.moveTo(2, centerY);
 
-    for (double x = 5; x <= size.width - 5; x += 4) {
-      final wave = ((x / 4 + animationValue * 10) % 2) - 1;
-      final y = centerY + wave * (size.height * 0.25);
+    // Плавна хвиля
+    for (double x = 2; x <= size.width - 2; x += 2) {
+      final wave = sin((x / size.width * 2 * 3.14159) + (animationValue * 3.14159 * 2));
+      final y = centerY + wave * (size.height * 0.3);
       path.lineTo(x, y);
     }
 
     canvas.drawPath(path, paint);
   }
+  
+  double sin(double value) => (value - (value * value * value / 6) + (value * value * value * value * value / 120));
 
   @override
   bool shouldRepaint(_GlitchWavePainter oldDelegate) => true;
