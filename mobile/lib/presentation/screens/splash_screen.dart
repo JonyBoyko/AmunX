@@ -247,76 +247,70 @@ class _SplashBadgeState extends State<_SplashBadge>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // M↔W Animated Logo
+                  // Glass Logo Symbol (концентричні кола)
                   AnimatedBuilder(
                     animation: _glowAnimation,
                     builder: (context, child) {
+                      final pulse = _glowAnimation.value;
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [AppTheme.neonBlue, AppTheme.neonBlue],
-                                ).createShader(bounds),
-                                child: Text(
-                                  'M',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 72,
-                                    fontWeight: FontWeight.w900,
-                                    shadows: [
-                                      Shadow(
-                                        color: AppTheme.neonBlue.withValues(alpha: 0.8 * _glowAnimation.value),
+                          SizedBox(
+                            width: 120,
+                            height: 120,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Outer circle (purple) - зростає
+                                Container(
+                                  width: 60 + pulse * 10,
+                                  height: 60 + pulse * 10,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppTheme.neonPurple.withValues(alpha: 0.1),
+                                    border: Border.all(
+                                      color: AppTheme.neonPurple.withValues(alpha: 0.5),
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.neonPurple.withValues(alpha: 0.3 * pulse),
                                         blurRadius: 20,
+                                        spreadRadius: 5,
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [AppTheme.neonPurple, AppTheme.neonPurple],
-                                ).createShader(bounds),
-                                child: const Text(
-                                  '↔',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 48,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                              ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [AppTheme.neonPurple, AppTheme.neonPurple],
-                                ).createShader(bounds),
-                                child: Text(
-                                  'W',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 72,
-                                    fontWeight: FontWeight.w900,
-                                    shadows: [
-                                      Shadow(
-                                        color: AppTheme.neonPurple.withValues(alpha: 0.8 * _glowAnimation.value),
-                                        blurRadius: 20,
+                                // Inner circle (cyan) - зменшується коли outer зростає
+                                Container(
+                                  width: 40 + (1 - pulse) * 10,
+                                  height: 40 + (1 - pulse) * 10,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppTheme.neonBlue.withValues(alpha: 0.1),
+                                    border: Border.all(
+                                      color: AppTheme.neonBlue.withValues(alpha: 0.6),
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.neonBlue.withValues(alpha: 0.4 * (1 - pulse)),
+                                        blurRadius: 16,
+                                        spreadRadius: 3,
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: AppTheme.spaceMd),
+                          const SizedBox(height: AppTheme.spaceLg),
                           const Text(
                             'Moweton',
                             style: TextStyle(
                               color: AppTheme.textPrimary,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
                               letterSpacing: 0.4,
                             ),
                           ),

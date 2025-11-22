@@ -208,48 +208,29 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               ),
                             ),
                             const SizedBox(height: AppTheme.spaceXl),
-                                  // M↔W Logo
-                                  Center(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                  // Glass Logo Symbol
+                                  const Center(
+                                    child: _GlassLogoSymbol(size: 80),
+                                  ),
+                                  const SizedBox(height: AppTheme.spaceMd),
+                                  const Center(
+                                    child: Column(
                                       children: [
-                                        ShaderMask(
-                                          shaderCallback: (bounds) => const LinearGradient(
-                                            colors: [AppTheme.neonBlue, AppTheme.neonBlue],
-                                          ).createShader(bounds),
-                                          child: const Text(
-                                            'M',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 48,
-                                            ),
+                                        Text(
+                                          'Moweton',
+                                          style: TextStyle(
+                                            color: AppTheme.textPrimary,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.4,
                                           ),
                                         ),
-                                        ShaderMask(
-                                          shaderCallback: (bounds) => const LinearGradient(
-                                            colors: [AppTheme.neonPurple, AppTheme.neonPurple],
-                                          ).createShader(bounds),
-                                          child: const Text(
-                                            '↔',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w400,
-                                              fontSize: 32,
-                                            ),
-                                          ),
-                                        ),
-                                        ShaderMask(
-                                          shaderCallback: (bounds) => const LinearGradient(
-                                            colors: [AppTheme.neonPurple, AppTheme.neonPurple],
-                                          ).createShader(bounds),
-                                          child: const Text(
-                                            'W',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 48,
-                                            ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Voice. Async. Connected.',
+                                          style: TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 13,
                                           ),
                                         ),
                                       ],
@@ -498,6 +479,98 @@ class _GlassField extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _GlassLogoSymbol extends StatefulWidget {
+  final double size;
+
+  const _GlassLogoSymbol({this.size = 100});
+
+  @override
+  State<_GlassLogoSymbol> createState() => _GlassLogoSymbolState();
+}
+
+class _GlassLogoSymbolState extends State<_GlassLogoSymbol> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _pulse = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) {
+        final p = _pulse.value;
+        return SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Outer circle (purple)
+              Container(
+                width: widget.size * 0.6 + p * widget.size * 0.1,
+                height: widget.size * 0.6 + p * widget.size * 0.1,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.neonPurple.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: AppTheme.neonPurple.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.neonPurple.withValues(alpha: 0.3 * (0.6 + p * 0.4)),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+              ),
+              // Inner circle (cyan)
+              Container(
+                width: widget.size * 0.4 + (1 - p) * widget.size * 0.1,
+                height: widget.size * 0.4 + (1 - p) * widget.size * 0.1,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.neonBlue.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: AppTheme.neonBlue.withValues(alpha: 0.6),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.neonBlue.withValues(alpha: 0.4 * (1 - p * 0.4)),
+                      blurRadius: 16,
+                      spreadRadius: 3,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
