@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../../app/theme.dart';
 import '../../core/logging/app_logger.dart';
@@ -23,6 +28,9 @@ import '../widgets/episode_card.dart';
 import '../widgets/mini_player_bar.dart';
 import '../widgets/wave_tag_chip.dart';
 import '../widgets/glitch_logo_symbol.dart';
+import '../widgets/quick_record_overlay.dart';
+import '../../data/api/api_client.dart';
+import '../providers/session_provider.dart';
 
 class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
@@ -33,6 +41,12 @@ class FeedScreen extends ConsumerStatefulWidget {
 
 class _FeedScreenState extends ConsumerState<FeedScreen> {
   Episode? _playingEpisode;
+  OverlayEntry? _quickRecordEntry;
+  final AudioRecorder _recorder = AudioRecorder();
+  Timer? _recordTimer;
+  int _recordDuration = 0;
+  double _audioLevel = 0.0;
+  String? _recordingPath;
 
   Future<void> _openEpisode(Episode episode) async {
     setState(() => _playingEpisode = episode);
@@ -64,6 +78,109 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  @override
+  void dispose() {
+    _hideQuickRecordOverlay();
+    _recordTimer?.cancel();
+    _recorder.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startQuickRecord() async {
+    final hasPermission = await _recorder.hasPermission();
+    if (!hasPermission) {
+      _showSnack('Microphone permission required');
+      return;
+    }
+
+    final directory = await getTemporaryDirectory();
+    final fileName = 'quick-${DateTime.now().millisecondsSinceEpoch}.m4a';
+    _recordingPath = p.join(directory.path, fileName);
+
+    await _recorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: 44100, bitRate: 128000),
+      path: _recordingPath!,
+    );
+
+    setState(() => _recordDuration = 0);
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _recordDuration++);
+    });
+
+    _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen((amp) {
+      if (mounted) {
+        final normalized = ((amp.current + 45) / 45).clamp(0.0, 1.0);
+        setState(() => _audioLevel = normalized.isNaN ? 0 : normalized);
+      }
+    });
+
+    _showQuickRecordOverlay();
+  }
+
+  Future<void> _stopQuickRecord() async {
+    _recordTimer?.cancel();
+    final path = await _recorder.stop();
+    _hideQuickRecordOverlay();
+
+    if (path != null || _recordingPath != null) {
+      await _uploadQuickRecording(path ?? _recordingPath!);
+    }
+
+    setState(() {
+      _recordDuration = 0;
+      _audioLevel = 0.0;
+    });
+  }
+
+  Future<void> _uploadQuickRecording(String filePath) async {
+    final session = ref.read(sessionProvider);
+    final token = session.token;
+    if (token == null) return;
+
+    try {
+      final client = createApiClient(token: token);
+      await client.uploadDevEpisode(
+        filePath: filePath,
+        durationSeconds: _recordDuration.clamp(1, 600),
+        title: 'Quick voice note',
+      );
+      ref.invalidate(feedProvider);
+      _showSnack('Відправлено!');
+      await File(filePath).delete();
+    } catch (e) {
+      _showSnack('Помилка: $e');
+    }
+  }
+
+  void _showQuickRecordOverlay() {
+    if (_quickRecordEntry != null) return;
+    _quickRecordEntry = OverlayEntry(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          // Оновлюємо overlay кожні 100ms
+          Timer.periodic(const Duration(milliseconds: 100), (timer) {
+            if (_quickRecordEntry == null) {
+              timer.cancel();
+              return;
+            }
+            _quickRecordEntry!.markNeedsBuild();
+          });
+          
+          return QuickRecordOverlay(
+            duration: _recordDuration,
+            audioLevel: _audioLevel,
+          );
+        },
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(_quickRecordEntry!);
+  }
+
+  void _hideQuickRecordOverlay() {
+    _quickRecordEntry?.remove();
+    _quickRecordEntry = null;
   }
 
   @override
@@ -122,9 +239,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             // TODO: додати тумблер режиму запису (звичайний голосовий / broadcast podcast)
             Positioned(
               right: 16,
-              bottom: _playingEpisode != null ? 100 : 80,
+              bottom: _playingEpisode != null ? 54 : 36,
               child: _RecordFab(
                 onTap: () => context.push('/recorder'),
+                onLongPressStart: () => _startQuickRecord(),
+                onLongPressEnd: () => _stopQuickRecord(),
               ),
             ),
             if (_playingEpisode != null)
@@ -160,7 +279,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       slivers: [
         SliverToBoxAdapter(
           child: _FeedHeader(
-            onProfileTap: () => context.push('/profile'),
+            onPodcastsTap: () {
+              // TODO: navigate to podcasts
+            },
             onInboxTap: () => context.push('/inbox'),
           ),
         ),
@@ -183,8 +304,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   ref.watch(reactionSnapshotProvider(episode.id));
               return Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.spaceLg,
-                  vertical: 4,
+                  horizontal: AppTheme.spaceSm,
+                  vertical: 6,
                 ),
                 child: EpisodeCard(
                   episode: episode,
@@ -285,11 +406,11 @@ class _EmptyFeed extends StatelessWidget {
 }
 
 class _FeedHeader extends StatelessWidget {
-  final VoidCallback onProfileTap;
+  final VoidCallback onPodcastsTap;
   final VoidCallback onInboxTap;
 
   const _FeedHeader({
-    required this.onProfileTap,
+    required this.onPodcastsTap,
     required this.onInboxTap,
   });
 
@@ -302,18 +423,31 @@ class _FeedHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Avatar (left)
+          // Podcasts з LIVE badge (left)
           GestureDetector(
-            onTap: onProfileTap,
+            onTap: onPodcastsTap,
             child: Container(
-              width: 36,
-              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.neonBlue.withValues(alpha: 0.2),
-                border: Border.all(color: AppTheme.neonBlue, width: 2),
+                color: AppTheme.stateDanger.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.stateDanger, width: 2),
               ),
-              child: const Icon(Icons.person, color: AppTheme.neonBlue, size: 20),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.podcasts, color: AppTheme.stateDanger, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'LIVE',
+                    style: TextStyle(
+                      color: AppTheme.stateDanger,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           // GlitchLogo symbol (center)
@@ -1473,34 +1607,50 @@ class _FeedTabBar extends StatelessWidget {
 }
 
 class _RecordFab extends StatelessWidget {
-  const _RecordFab({required this.onTap});
+  const _RecordFab({
+    required this.onTap,
+    required this.onLongPressStart,
+    required this.onLongPressEnd,
+  });
 
   final VoidCallback onTap;
+  final VoidCallback onLongPressStart;
+  final VoidCallback onLongPressEnd;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPressStart: (_) => onLongPressStart(),
+      onLongPressEnd: (_) => onLongPressEnd(),
       child: Container(
-        padding: const EdgeInsets.all(AppTheme.spaceMd),
+        width: 72,
+        height: 72,
         decoration: BoxDecoration(
           gradient: AppTheme.neonGradient,
           shape: BoxShape.circle,
-          boxShadow: AppTheme.glowAccent,
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.neonBlue.withValues(alpha: 0.5),
+              blurRadius: 20,
+              spreadRadius: 0,
+              offset: Offset.zero,
+            ),
+            BoxShadow(
+              color: AppTheme.neonPurple.withValues(alpha: 0.3),
+              blurRadius: 30,
+              spreadRadius: 0,
+              offset: Offset.zero,
+            ),
+          ],
         ),
-        child: Container(
-          padding: const EdgeInsets.all(AppTheme.spaceSm),
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppTheme.bgBase,
-          ),
-          child: const Icon(
-            Icons.mic,
-            color: AppTheme.textPrimary,
-            size: 28,
-          ),
+        child: const Icon(
+          Icons.mic,
+          color: AppTheme.textInverse,
+          size: 36,
         ),
       ),
     );
   }
 }
+

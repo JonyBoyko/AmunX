@@ -9,7 +9,7 @@ import '../models/reaction_state.dart';
 import 'mini_waveform.dart';
 import 'wave_tag_chip.dart';
 
-class EpisodeCard extends StatelessWidget {
+class EpisodeCard extends StatefulWidget {
   final Episode episode;
   final VoidCallback onTap;
   final VoidCallback? onTopicTap;
@@ -40,7 +40,36 @@ class EpisodeCard extends StatelessWidget {
   });
 
   @override
+  State<EpisodeCard> createState() => _EpisodeCardState();
+}
+
+class _EpisodeCardState extends State<EpisodeCard> {
+  bool _isPlaying = false;
+  double _playbackProgress = 0.0;
+
+  void _startPreview() {
+    setState(() {
+      _isPlaying = true;
+      _playbackProgress = 0.0;
+    });
+    // TODO: фактичний запуск аудіо плеєра
+  }
+
+  void _stopPreview() {
+    setState(() {
+      _isPlaying = false;
+      _playbackProgress = 0.0;
+    });
+    // TODO: зупинка аудіо плеєра
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final episode = widget.episode;
+    final author = widget.author;
+    final reactionSnapshot = widget.reactionSnapshot;
+    final onTap = widget.onTap;
+    final onReactionTap = widget.onReactionTap;
     final summary = episode.summary ?? episode.title ?? 'Fresh drop';
     final isLive = episode.isLive;
     final avatarLabel = author?.avatarEmoji ?? episode.title?.characters.first.toUpperCase() ?? 'A';
@@ -48,10 +77,12 @@ class EpisodeCard extends StatelessWidget {
     final rngValue = Random(episode.id.hashCode).nextDouble();
     final waveTags = episode.keywords?.isNotEmpty == true 
       ? episode.keywords! 
-      : ['audio', 'voice', 'podcast']; // Мок-теги для демо
+      : ['audio', 'voice', 'podcast'];
     final displayName = author?.displayName ?? 'User';
     final handle = author?.handle ?? '@voice';
     final timeAgo = _formatTimeAgo(episode.createdAt);
+    final duration = episode.durationSec ?? 0;
+    final durationText = duration > 0 ? _formatTime(duration.toDouble()) : null;
 
     return Material(
       color: Colors.transparent,
@@ -64,7 +95,7 @@ class EpisodeCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppTheme.glassStroke),
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -73,25 +104,25 @@ class EpisodeCard extends StatelessWidget {
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 18,
+                    radius: 16,
                     backgroundColor: AppTheme.neonBlue.withValues(alpha: 0.2),
                     backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                    child: avatarUrl == null ? Text(avatarLabel, style: const TextStyle(fontSize: 14)) : null,
+                    child: avatarUrl == null ? Text(avatarLabel, style: const TextStyle(fontSize: 12)) : null,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Row(
                       children: [
-                        Text(displayName, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
-                        const SizedBox(width: 6),
-                        Text(handle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                        const Text(' · ', style: TextStyle(color: AppTheme.textSecondary)),
-                        Text(timeAgo, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                        Text(displayName, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
+                        const SizedBox(width: 4),
+                        Text(handle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        const Text(' · ', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        Text(timeAgo, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary, size: 18),
+                    icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary, size: 16),
                     onPressed: () {},
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -99,20 +130,40 @@ class EpisodeCard extends StatelessWidget {
                 ],
               ),
               // Title
-              const SizedBox(height: 8),
-              Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15, height: 1.4)),
-              // Waveform
-              const SizedBox(height: 12),
+              const SizedBox(height: 2),
+              Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, height: 1.2)),
+              // Waveform (SoundCloud style)
+              const SizedBox(height: 6),
               GestureDetector(
-                onLongPressStart: (_) {},
-                onLongPressEnd: (_) {},
-                child: MiniWaveform(progress: rngValue, isLive: isLive),
+                onLongPressStart: (_) => _startPreview(),
+                onLongPressEnd: (_) => _stopPreview(),
+                child: Column(
+                  children: [
+                    MiniWaveform(
+                      progress: _isPlaying ? _playbackProgress : rngValue,
+                      isLive: isLive,
+                      isPlaying: _isPlaying,
+                      barCount: 120,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          _isPlaying 
+                            ? _formatTime((duration * (1 - _playbackProgress)).toDouble())
+                            : (durationText ?? ''),
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               // WaveTags (завжди показуємо)
-              const SizedBox(height: 8),
               WaveTagList(tags: waveTags, maxVisible: 3, variant: WaveTagVariant.cyan, size: WaveTagSize.sm),
               // Interaction bar
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   _InteractionButton(icon: Icons.mode_comment_outlined, count: 0, onTap: () {}),
@@ -187,4 +238,11 @@ String _formatTimeAgo(DateTime dateTime) {
   if (diff.inHours > 0) return '${diff.inHours}г';
   if (diff.inMinutes > 0) return '${diff.inMinutes}хв';
   return 'щойно';
+}
+
+String _formatTime(double seconds) {
+  final s = seconds.toInt();
+  final mins = s ~/ 60;
+  final secs = s % 60;
+  return '${mins}:${secs.toString().padLeft(2, '0')}';
 }
