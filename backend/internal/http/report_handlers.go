@@ -187,7 +187,7 @@ func ensureReportableObject(ctx context.Context, db *sql.DB, objectRef string) e
 	}
 	switch parts[0] {
 	case "episodes":
-		const query = `SELECT 1 FROM episodes WHERE id = $1`
+		const query = `SELECT 1 FROM audio_items WHERE id = $1`
 		return db.QueryRowContext(ctx, query, id).Scan(new(int))
 	case "comments":
 		const query = `SELECT 1 FROM comments WHERE id = $1`

@@ -37,18 +37,29 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Future<void> _requestMagicLink() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) return;
+    
+    // Для тестування: якщо email не порожній, використовуємо dev-login
     setState(() => _isRequesting = true);
     try {
-      final tokenHint =
-          await ref.read(authProvider.notifier).requestMagicLink(email);
+      await ref.read(authProvider.notifier).devLogin(email);
       if (!mounted) return;
-      _showSnack('Magic link sent. Check your inbox.');
-      if (tokenHint != null) {
-        _tokenController.text = tokenHint;
-        _showSnack('Token prefilled from dev hint.');
-      }
+      // Автоматично переходимо на feed після успішного входу
+      context.go('/feed');
     } catch (e) {
-      _showSnack('Request failed: $e', isError: true);
+      _showSnack('Login failed: $e', isError: true);
+      // Якщо dev-login не працює, спробуємо magic link
+      try {
+        final tokenHint =
+            await ref.read(authProvider.notifier).requestMagicLink(email);
+        if (!mounted) return;
+        _showSnack('Magic link sent. Check your inbox.');
+        if (tokenHint != null) {
+          _tokenController.text = tokenHint;
+          _showSnack('Token prefilled from dev hint.');
+        }
+      } catch (e2) {
+        _showSnack('Request failed: $e2', isError: true);
+      }
     } finally {
       if (mounted) {
         setState(() => _isRequesting = false);
@@ -197,11 +208,43 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               ),
                             ),
                             const SizedBox(height: AppTheme.spaceXl),
+                            // Logo/Title
+                            Center(
+                              child: Column(
+                                children: [
+                                  ShaderMask(
+                                    shaderCallback: (bounds) => LinearGradient(
+                                      colors: [
+                                        AppTheme.neonBlue,
+                                        AppTheme.neonBlue.withValues(alpha: 0.8),
+                                      ],
+                                    ).createShader(bounds),
+                                    child: const Text(
+                                      'Moweton',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 32,
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppTheme.spaceSm),
+                                  const Text(
+                                    'Асинхронний голосовий месенджер',
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.spaceXl),
                             _GlassField(
                               controller: _emailController,
                               enabled: !_isRequesting,
-                              hint: 'you@email.com',
-                              label: 'Email address',
+                              hint: 'your@email.com',
+                              label: 'Email',
                               icon: Icons.mail_outline,
                               keyboardType: TextInputType.emailAddress,
                             ),
@@ -241,15 +284,58 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                               color: AppTheme.textInverse,
                                             ),
                                           )
-                                        : const Text(
-                                            'Send magic link',
-                                            style: TextStyle(
-                                              color: AppTheme.textInverse,
-                                              fontWeight: FontWeight.w700,
-                                            ),
+                                        : Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: const [
+                                              Text(
+                                                'Sign In',
+                                                style: TextStyle(
+                                                  color: AppTheme.textInverse,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Icon(
+                                                Icons.auto_awesome,
+                                                color: AppTheme.textInverse,
+                                                size: 20,
+                                              ),
+                                            ],
                                           ),
                                   ),
                                 ),
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.spaceSm),
+                            // Quick test login hint
+                            Container(
+                              padding: const EdgeInsets.all(AppTheme.spaceMd),
+                              decoration: BoxDecoration(
+                                color: AppTheme.neonBlue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                                border: Border.all(
+                                  color: AppTheme.neonBlue.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 16,
+                                    color: AppTheme.neonBlue,
+                                  ),
+                                  const SizedBox(width: AppTheme.spaceSm),
+                                  Expanded(
+                                    child: Text(
+                                      'Для тестування: введіть будь-який email і натисніть "Sign In"',
+                                      style: TextStyle(
+                                        color: AppTheme.neonBlue,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: AppTheme.spaceXl),
@@ -390,7 +476,60 @@ class _GlassField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          borderSide: const BorderSide(color: AppTheme.neonBlue),
+          borderSide: const BorderSide(
+            color: AppTheme.neonBlue,
+            width: 2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SocialButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppTheme.glassSurfaceLight,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(
+            color: AppTheme.glassStroke,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+            const SizedBox(width: AppTheme.spaceSm),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

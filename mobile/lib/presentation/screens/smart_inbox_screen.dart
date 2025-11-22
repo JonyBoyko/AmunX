@@ -252,6 +252,83 @@ class _DigestCard extends StatelessWidget {
                     .toList(),
               ),
             ],
+            if (digest.totalTaskCount > 0 || digest.aiSummary.isNotEmpty) ...[
+              const SizedBox(height: AppTheme.spaceSm),
+              Row(
+                children: [
+                  if (digest.totalTaskCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spaceSm,
+                        vertical: AppTheme.spaceXs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.neonPink.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        border: Border.all(
+                          color: AppTheme.neonPink,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.checklist,
+                            size: 14,
+                            color: AppTheme.neonPink,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${digest.totalTaskCount} активних',
+                            style: const TextStyle(
+                              color: AppTheme.neonPink,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (digest.totalTaskCount > 0 && digest.aiSummary.isNotEmpty)
+                    const SizedBox(width: AppTheme.spaceSm),
+                  if (digest.aiSummary.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spaceSm,
+                        vertical: AppTheme.spaceXs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.neonBlue.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        border: Border.all(
+                          color: AppTheme.neonBlue,
+                          width: 1,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome,
+                            size: 14,
+                            color: AppTheme.neonBlue,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'AI',
+                            style: TextStyle(
+                              color: AppTheme.neonBlue,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: AppTheme.spaceMd),
             ...digest.entries.map(
               (entry) => _InboxEntryTile(
@@ -309,26 +386,104 @@ class _InboxEntryTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (entry.isNew)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.neonBlue, AppTheme.neonPink],
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (entry.isNew)
+                      Container(
+                        margin: const EdgeInsets.only(right: AppTheme.spaceXs),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.neonBlue.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                          border: Border.all(
+                            color: AppTheme.neonBlue,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          context.l10n.smartInboxNewLabel,
+                          style: const TextStyle(
+                            color: AppTheme.neonBlue,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                      boxShadow: AppTheme.glowPrimary,
-                    ),
-                    child: Text(
-                      context.l10n.smartInboxNewLabel,
-                      style: const TextStyle(
-                        color: AppTheme.textInverse,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                    if (entry.aiGenerated)
+                      Container(
+                        margin: const EdgeInsets.only(right: AppTheme.spaceXs),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.neonBlue.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                          border: Border.all(
+                            color: AppTheme.neonBlue,
+                            width: 1,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.auto_awesome,
+                              size: 12,
+                              color: AppTheme.neonBlue,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'AI Summary',
+                              style: TextStyle(
+                                color: AppTheme.neonBlue,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
+                    if (entry.taskCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.neonPink.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                          border: Border.all(
+                            color: AppTheme.neonPink,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.checklist,
+                              size: 12,
+                              color: AppTheme.neonPink,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${entry.taskCount}',
+                              style: const TextStyle(
+                                color: AppTheme.neonPink,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -337,8 +492,59 @@ class _InboxEntryTile extends StatelessWidget {
               style:
                   const TextStyle(color: AppTheme.textSecondary, height: 1.5),
             ),
+            if (entry.quotedBlocks.isNotEmpty) ...[
+              const SizedBox(height: AppTheme.spaceSm),
+              ...entry.quotedBlocks.map(
+                (quote) => Container(
+                  margin: const EdgeInsets.only(bottom: AppTheme.spaceXs),
+                  padding: const EdgeInsets.all(AppTheme.spaceMd),
+                  decoration: BoxDecoration(
+                    color: AppTheme.glassSurfaceLight,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    border: Border(
+                      left: BorderSide(
+                        color: AppTheme.neonPink,
+                        width: 4,
+                      ),
+                      top: BorderSide(
+                        color: AppTheme.glassStroke,
+                        width: 1,
+                      ),
+                      right: BorderSide(
+                        color: AppTheme.glassStroke,
+                        width: 1,
+                      ),
+                      bottom: BorderSide(
+                        color: AppTheme.glassStroke,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    '"$quote"',
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (entry.tasks.isNotEmpty) ...[
+              const SizedBox(height: AppTheme.spaceSm),
+              ...entry.tasks.map(
+                (task) => _TaskCheckbox(
+                  task: task,
+                  onChanged: (completed) {
+                    // TODO: Implement task completion
+                  },
+                ),
+              ),
+            ],
             if (entry.tags.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: AppTheme.spaceSm),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -399,6 +605,86 @@ class _InboxError extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskCheckbox extends StatelessWidget {
+  final SmartInboxTask task;
+  final ValueChanged<bool>? onChanged;
+
+  const _TaskCheckbox({
+    required this.task,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onChanged != null
+          ? () => onChanged!(!task.completed)
+          : null,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppTheme.spaceXs),
+        padding: const EdgeInsets.all(AppTheme.spaceMd),
+        decoration: BoxDecoration(
+          color: AppTheme.glassSurfaceLight,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(
+            color: AppTheme.glassStroke,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: task.completed
+                    ? AppTheme.neonBlue
+                    : AppTheme.glassSurfaceDense,
+                borderRadius: BorderRadius.circular(AppTheme.radiusXs),
+                border: Border.all(
+                  color: task.completed
+                      ? AppTheme.neonBlue
+                      : AppTheme.glassStroke,
+                  width: 1,
+                ),
+              ),
+              child: task.completed
+                  ? const Icon(
+                      Icons.check,
+                      size: 14,
+                      color: AppTheme.textInverse,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: AppTheme.spaceMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.text,
+                    style: TextStyle(
+                      color: task.completed
+                          ? AppTheme.textSecondary
+                          : AppTheme.textPrimary,
+                      fontSize: 13,
+                      decoration: task.completed
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      height: 1.4,
+                    ),
+                  ),
+                  // Source може бути додано пізніше, якщо потрібно
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

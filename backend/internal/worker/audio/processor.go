@@ -247,25 +247,24 @@ func intValue(value any) (int, error) {
 
 func (p *Processor) handleMessage(ctx context.Context, episodeID string) error {
 	const selectEpisode = `
-SELECT id, storage_key, mask
-FROM episodes
-WHERE id = $1 AND status = 'pending_public'
+SELECT id, s3_key
+FROM audio_items
+WHERE id = $1 AND visibility = 'private'
 `
 
 	var (
 		id         uuid.UUID
-		storageKey sql.NullString
-		mask       string
+		s3Key      sql.NullString
 	)
 
-	if err := p.DB.QueryRowContext(ctx, selectEpisode, episodeID).Scan(&id, &storageKey, &mask); err != nil {
+	if err := p.DB.QueryRowContext(ctx, selectEpisode, episodeID).Scan(&id, &s3Key); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return err
 	}
 
-	if !storageKey.Valid || storageKey.String == "" {
+	if !s3Key.Valid || s3Key.String == "" {
 		return errors.New("missing storage key")
 	}
 
@@ -276,12 +275,13 @@ WHERE id = $1 AND status = 'pending_public'
 	defer os.RemoveAll(tempDir)
 
 	originalPath := filepath.Join(tempDir, "original")
-	if err := p.downloadOriginal(ctx, storageKey.String, originalPath); err != nil {
+	if err := p.downloadOriginal(ctx, s3Key.String, originalPath); err != nil {
 		return err
 	}
 
 	processedPath := filepath.Join(tempDir, "processed.opus")
-	if err := p.processWithFFmpeg(ctx, originalPath, processedPath, mask); err != nil {
+	// Use default mask 'none' since audio_items don't have mask field
+	if err := p.processWithFFmpeg(ctx, originalPath, processedPath, "none"); err != nil {
 		return err
 	}
 
@@ -301,24 +301,22 @@ WHERE id = $1 AND status = 'pending_public'
 	}
 
 	const updateEpisode = `
-UPDATE episodes
-SET status = 'public',
+UPDATE audio_items
+SET visibility = 'public',
     audio_url = $2,
-    storage_key = $3,
-    size_bytes = $4,
-    waveform_json = $5,
+    s3_key = $3,
+    waveform = $5,
     duration_sec = $6,
-    status_changed_at = now(),
-    updated_at = now(),
-    published_at = COALESCE(published_at, now())
+    updated_at = now()
 WHERE id = $1
 `
 
-	if _, err := p.DB.ExecContext(ctx, updateEpisode, id, processedURL, processedKey, sizeBytes, waveform, int(duration.Seconds())); err != nil {
+	// audio_items don't have size_bytes field, so we skip it
+	if _, err := p.DB.ExecContext(ctx, updateEpisode, id, processedURL, processedKey, waveform, int(duration.Seconds())); err != nil {
 		return err
 	}
 
-	summary, keywords, mood := generatePlaceholderSummary(mask, duration)
+	summary, keywords, mood := generatePlaceholderSummary("none", duration) // Use default mask
 	if err := p.upsertSummary(ctx, id, summary, keywords, mood); err != nil {
 		p.Logger.Warn().Err(err).Str("episode_id", episodeID).Msg("failed to upsert summary")
 	}
@@ -409,9 +407,8 @@ type liveSessionRecord struct {
 
 func (p *Processor) loadLiveSession(ctx context.Context, id uuid.UUID) (liveSessionRecord, error) {
 	const query = `
-SELECT ls.host_id, ls.topic_id, ls.recording_key, ls.duration_sec, ls.ended_at, ls.title, ls.mask, e.id
+SELECT ls.host_id, ls.topic_id, ls.recording_key, ls.duration_sec, ls.ended_at, ls.title, ls.mask, NULL as episode_id
 FROM live_sessions ls
-LEFT JOIN episodes e ON e.live_session_id = ls.id
 WHERE ls.id = $1;
 `
 	var (
@@ -451,7 +448,8 @@ WHERE ls.id = $1;
 		rec.Title = strings.TrimSpace(title.String)
 	}
 	rec.Mask = mask
-	rec.EpisodeExists = episode.Valid
+	// audio_items don't have live_session_id, so we can't check if episode exists
+	rec.EpisodeExists = false
 	return rec, nil
 }
 
@@ -564,9 +562,8 @@ func (p *Processor) uploadProcessed(ctx context.Context, key, path string) error
 
 func (p *Processor) markEpisodeFailed(ctx context.Context, episodeID string, procErr error) error {
 	const update = `
-UPDATE episodes
-SET status = 'deleted',
-    status_changed_at = now(),
+UPDATE audio_items
+SET visibility = 'private',
     updated_at = now()
 WHERE id = $1
 `

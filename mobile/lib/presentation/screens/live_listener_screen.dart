@@ -229,12 +229,27 @@ class _LiveListenerScreenState extends ConsumerState<LiveListenerScreen> {
                           ),
                         ),
                         const SizedBox(height: AppTheme.spaceXl),
+                        // AI Summary Block (згідно з макетом)
+                        _AISummaryBlock(
+                          summary: 'Команда обговорила пропозицію створити окремий екран для AI налаштувань. Всі підтримали ідею та домовились обговорити деталі на наступній зустрічі.',
+                        ),
+                        const SizedBox(height: AppTheme.spaceXl),
                         const _ReactionPanel(),
                       ],
                     ),
                   ),
                 ),
               ],
+            ),
+          ),
+          // FAB "Add episode" - згідно з макетом
+          Positioned(
+            right: 16,
+            bottom: 96,
+            child: _AddEpisodeFab(
+              onTap: () {
+                // TODO: Navigate to record screen
+              },
             ),
           ),
         ],
@@ -454,6 +469,106 @@ class _ReactionPanel extends StatelessWidget {
                   .toList(),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AISummaryBlock extends StatelessWidget {
+  final String summary;
+
+  const _AISummaryBlock({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassPanel(
+      child: Container(
+        padding: const EdgeInsets.all(AppTheme.spaceMd),
+        decoration: BoxDecoration(
+          color: AppTheme.glassSurfaceLight,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border(
+            left: BorderSide(
+              color: AppTheme.neonBlue,
+              width: 4,
+            ),
+            top: BorderSide(
+              color: AppTheme.glassStroke,
+              width: 1,
+            ),
+            right: BorderSide(
+              color: AppTheme.glassStroke,
+              width: 1,
+            ),
+            bottom: BorderSide(
+              color: AppTheme.glassStroke,
+              width: 1,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: AppTheme.neonBlue,
+                ),
+                const SizedBox(width: AppTheme.spaceSm),
+                const Text(
+                  'AI Summary',
+                  style: TextStyle(
+                    color: AppTheme.neonBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spaceSm),
+            Text(
+              summary,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddEpisodeFab extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AddEpisodeFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          gradient: AppTheme.neonGradient,
+          shape: BoxShape.circle,
+          boxShadow: [
+            ...AppTheme.glowPrimary,
+            ...AppTheme.glowAccent,
+          ],
+        ),
+        child: const Icon(
+          Icons.add,
+          color: AppTheme.textInverse,
+          size: 32,
         ),
       ),
     );

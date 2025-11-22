@@ -27,6 +27,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String _mask = 'Off';
   bool _loadingProfile = true;
   bool _updatingSocial = false;
+  bool _neonTheme = true;
+  bool _autoSummary = true;
+  bool _contentFilter = false;
+  String _digestSchedule = 'daily';
 
   @override
   void initState() {
@@ -149,6 +153,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           .toggleFollow(author.id),
                     ),
                   ],
+                  const SizedBox(height: AppTheme.spaceXl),
+                  _buildThemeSettings(),
+                  const SizedBox(height: AppTheme.spaceXl),
+                  _buildAISettings(),
                   const SizedBox(height: AppTheme.spaceXl),
                   _buildRecordingSettings(),
                   const SizedBox(height: AppTheme.spaceXl),
@@ -504,6 +512,234 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Widget _buildThemeSettings() {
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceLg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.settings, color: AppTheme.neonBlue, size: 20),
+                const SizedBox(width: AppTheme.spaceSm),
+                const Text(
+                  'Налаштування теми',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spaceMd),
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spaceMd),
+              decoration: BoxDecoration(
+                color: AppTheme.glassSurfaceLight,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.glassStroke),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Neon Theme',
+                          style: TextStyle(color: AppTheme.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Яскраві неонові акценти',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _neonTheme,
+                    onChanged: (value) => setState(() => _neonTheme = value),
+                    activeColor: AppTheme.neonBlue,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAISettings() {
+    return _GlassPanel(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceLg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.auto_awesome,
+                  color: AppTheme.neonPurple,
+                  size: 20,
+                ),
+                const SizedBox(width: AppTheme.spaceSm),
+                const Text(
+                  'AI Функції',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spaceMd),
+            // Auto Summary
+            Container(
+              margin: const EdgeInsets.only(bottom: AppTheme.spaceMd),
+              padding: const EdgeInsets.all(AppTheme.spaceMd),
+              decoration: BoxDecoration(
+                color: AppTheme.glassSurfaceLight,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.glassStroke),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Auto Summary',
+                          style: TextStyle(color: AppTheme.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Автоматичні TL;DR для епізодів',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _autoSummary,
+                    onChanged: (value) => setState(() => _autoSummary = value),
+                    activeColor: AppTheme.neonPurple,
+                  ),
+                ],
+              ),
+            ),
+            // Content Filter
+            Container(
+              margin: const EdgeInsets.only(bottom: AppTheme.spaceMd),
+              padding: const EdgeInsets.all(AppTheme.spaceMd),
+              decoration: BoxDecoration(
+                color: AppTheme.glassSurfaceLight,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.glassStroke),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Content Filter AI',
+                          style: TextStyle(color: AppTheme.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Фільтрація небажаного контенту',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _contentFilter,
+                    onChanged: (value) =>
+                        setState(() => _contentFilter = value),
+                    activeColor: AppTheme.neonPurple,
+                  ),
+                ],
+              ),
+            ),
+            // Digest Schedule
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spaceMd),
+              decoration: BoxDecoration(
+                color: AppTheme.glassSurfaceLight,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(color: AppTheme.glassStroke),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Digest Schedule',
+                    style: TextStyle(color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Частота генерації дайджестів',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.spaceSm),
+                  Wrap(
+                    spacing: AppTheme.spaceSm,
+                    children: [
+                      _ScheduleChip(
+                        label: 'Щоденно',
+                        value: 'daily',
+                        selected: _digestSchedule == 'daily',
+                        onTap: () => setState(() => _digestSchedule = 'daily'),
+                      ),
+                      _ScheduleChip(
+                        label: 'Щотижнево',
+                        value: 'weekly',
+                        selected: _digestSchedule == 'weekly',
+                        onTap: () =>
+                            setState(() => _digestSchedule = 'weekly'),
+                      ),
+                      _ScheduleChip(
+                        label: 'Вручну',
+                        value: 'manual',
+                        selected: _digestSchedule == 'manual',
+                        onTap: () =>
+                            setState(() => _digestSchedule = 'manual'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildNotifications() {
     return _SectionCard(
       title: 'Notifications',
@@ -582,11 +818,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _StatCounter(label: 'Posts', value: posts),
-            _StatCounter(label: 'Followers', value: followers),
+            _NeonStatCounter(
+              label: 'Епізодів',
+              value: posts,
+              color: AppTheme.neonBlue,
+            ),
+            _NeonStatCounter(
+              label: 'Кімнат',
+              value: followers,
+              color: AppTheme.neonPurple,
+            ),
             GestureDetector(
               onTap: onFollowingTap,
-              child: _StatCounter(label: 'Following', value: following),
+              child: _NeonStatCounter(
+                label: 'Прослухано',
+                value: following,
+                color: AppTheme.neonPink,
+              ),
             ),
           ],
         ),
@@ -711,22 +959,35 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-class _StatCounter extends StatelessWidget {
+class _NeonStatCounter extends StatelessWidget {
   final String label;
   final int value;
+  final Color color;
 
-  const _StatCounter({required this.label, required this.value});
+  const _NeonStatCounter({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value.toString(),
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+        ShaderMask(
+          shaderCallback: (bounds) => LinearGradient(
+            colors: [
+              color,
+              color.withValues(alpha: 0.8),
+            ],
+          ).createShader(bounds),
+          child: Text(
+            value.toString(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         const SizedBox(height: 4),
@@ -738,6 +999,51 @@ class _StatCounter extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ScheduleChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ScheduleChip({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spaceMd,
+          vertical: AppTheme.spaceSm,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.neonBlue.withValues(alpha: 0.2)
+              : AppTheme.glassSurfaceDense,
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          border: Border.all(
+            color: selected ? AppTheme.neonBlue : AppTheme.glassStroke,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppTheme.neonBlue : AppTheme.textSecondary,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
     );
   }
 }

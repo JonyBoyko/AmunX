@@ -34,12 +34,14 @@ final feedProvider = FutureProvider<List<Episode>>((ref) async {
     return filtered;
   } catch (e, stackTrace) {
     AppLogger.error(
-      'Failed to fetch episodes',
+      'Failed to fetch episodes, returning empty list',
       tag: 'FeedProvider',
       error: e,
       stackTrace: stackTrace,
     );
-    rethrow;
+    // Повертаємо порожній список замість помилки, щоб додаток не зависав
+    AppLogger.info('FeedProvider: Returning empty list to show empty state', tag: 'FeedProvider');
+    return [];
   }
 });
 

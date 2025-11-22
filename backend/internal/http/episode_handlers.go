@@ -318,28 +318,28 @@ type createEpisodeParams struct {
 }
 
 func createEpisode(ctx context.Context, db *sql.DB, params createEpisodeParams) error {
-	const stmt = `
-INSERT INTO episodes (id, author_id, topic_id, visibility, mask, quality, duration_sec, storage_key)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
-`
-	var (
-		topic    interface{}
-		duration interface{}
-	)
-	if params.TopicID != nil {
-		topic = *params.TopicID
+	// Determine kind based on duration
+	kind := "podcast_episode"
+	if params.DurationSec != nil && *params.DurationSec <= 120 {
+		kind = "micro"
 	}
+	
+	const stmt = `
+INSERT INTO audio_items (id, owner_id, visibility, kind, duration_sec, s3_key, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW());
+`
+	var duration interface{}
 	if params.DurationSec != nil {
 		duration = *params.DurationSec
+	} else {
+		duration = 0
 	}
 
 	_, err := db.ExecContext(ctx, stmt,
 		params.ID,
 		params.AuthorID,
-		topic,
 		params.Visibility,
-		params.Mask,
-		params.Quality,
+		kind,
 		duration,
 		params.StorageKey,
 	)
@@ -347,30 +347,34 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 }
 
 func setEpisodeStatus(ctx context.Context, db *sql.DB, id uuid.UUID, author uuid.UUID, status string) error {
+	// In audio_items, visibility replaces status
+	visibility := "private"
+	if status == "public" {
+		visibility = "public"
+	}
+	
 	const stmt = `
-UPDATE episodes
-SET status = $2,
-    status_changed_at = now(),
-    updated_at = now(),
-    published_at = CASE WHEN $2 = 'public' THEN now() ELSE published_at END
+UPDATE audio_items
+SET visibility = $2,
+    updated_at = now()
 WHERE id = $1
-  AND author_id = $3
+  AND owner_id = $3
 RETURNING id;
 `
 	var scanned uuid.UUID
-	return db.QueryRowContext(ctx, stmt, id, status, author).Scan(&scanned)
+	return db.QueryRowContext(ctx, stmt, id, visibility, author).Scan(&scanned)
 }
 
 func undoEpisode(ctx context.Context, db *sql.DB, id uuid.UUID, author uuid.UUID, undoSeconds int) (bool, error) {
+	// In audio_items, we check if visibility is public and created recently
 	const stmt = `
-UPDATE episodes
-SET status = 'deleted',
-    status_changed_at = now(),
+UPDATE audio_items
+SET visibility = 'private',
     updated_at = now()
 WHERE id = $1
-  AND author_id = $3
-  AND status = 'pending_public'
-  AND now() - status_changed_at <= ($2::int || ' seconds')::interval
+  AND owner_id = $3
+  AND visibility = 'public'
+  AND now() - created_at <= ($2::int || ' seconds')::interval
 RETURNING id;
 `
 	var scanned uuid.UUID
@@ -531,23 +535,27 @@ type devEpisodeParams struct {
 }
 
 func insertDevEpisode(ctx context.Context, db *sql.DB, params devEpisodeParams) error {
-	const stmt = `
-INSERT INTO episodes (id, author_id, topic_id, visibility, status, title, duration_sec, storage_key, audio_url, mask, quality, published_at, created_at, updated_at)
-VALUES ($1, $2, $3, 'public', 'public', $4, $5, $6, $7, 'none', 'clean', NOW(), NOW(), NOW());
-`
-	var topic interface{}
-	if params.TopicID != nil {
-		topic = *params.TopicID
+	// Determine kind based on duration
+	kind := "podcast_episode"
+	if params.DurationSec != nil && *params.DurationSec <= 120 {
+		kind = "micro"
 	}
+	
+	const stmt = `
+INSERT INTO audio_items (id, owner_id, visibility, kind, title, duration_sec, s3_key, audio_url, created_at, updated_at)
+VALUES ($1, $2, 'public', $3, $4, $5, $6, $7, NOW(), NOW());
+`
 	var duration interface{}
 	if params.DurationSec != nil {
 		duration = *params.DurationSec
+	} else {
+		duration = 0
 	}
 
 	_, err := db.ExecContext(ctx, stmt,
 		params.ID,
 		params.AuthorID,
-		topic,
+		kind,
 		params.Title,
 		duration,
 		params.StorageKey,
@@ -668,9 +676,9 @@ func handleServeDevAudio(deps *app.App) http.HandlerFunc {
 			return
 		}
 
-		const query = `SELECT storage_key FROM episodes WHERE id = $1`
-		var storageKey sql.NullString
-		if err := deps.DB.QueryRowContext(req.Context(), query, episodeID).Scan(&storageKey); err != nil {
+		const query = `SELECT s3_key FROM audio_items WHERE id = $1`
+		var s3Key sql.NullString
+		if err := deps.DB.QueryRowContext(req.Context(), query, episodeID).Scan(&s3Key); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				WriteError(w, http.StatusNotFound, "not_found", "episode not found")
 				return
@@ -678,12 +686,12 @@ func handleServeDevAudio(deps *app.App) http.HandlerFunc {
 			WriteError(w, http.StatusInternalServerError, "storage_error", err.Error())
 			return
 		}
-		if !storageKey.Valid || !strings.HasPrefix(storageKey.String, "dev/") {
+		if !s3Key.Valid || !strings.HasPrefix(s3Key.String, "dev/") {
 			WriteError(w, http.StatusNotFound, "not_found", "dev audio not found")
 			return
 		}
 
-		path := filepath.Join(deps.Config.LocalMediaPath, storageKey.String)
+		path := filepath.Join(deps.Config.LocalMediaPath, s3Key.String)
 		if _, err := os.Stat(path); err != nil {
 			WriteError(w, http.StatusNotFound, "not_found", "audio file missing")
 			return
@@ -931,28 +939,23 @@ func parseLimit(raw string, def, max int) int {
 }
 
 func listPublicEpisodes(ctx context.Context, db *sql.DB, params listEpisodesParams) ([]episodeSummary, error) {
-	query := fmt.Sprintf(`SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood, u.plan
-FROM episodes e
-JOIN users u ON u.id = e.author_id
-LEFT JOIN summaries s ON s.episode_id = e.id
-WHERE e.status = 'public'
+	query := fmt.Sprintf(`SELECT e.id, e.owner_id, e.title, e.visibility, e.kind, e.duration_sec, e.audio_url, e.created_at, s.tldr, s.keywords, s.mood, u.plan
+FROM audio_items e
+JOIN users u ON u.id = e.owner_id
+LEFT JOIN summaries s ON s.audio_id = e.id
+WHERE e.visibility = 'public'
   AND NOT (u.plan = 'free' AND COALESCE(e.duration_sec, 0) <= %d AND e.created_at < NOW() - INTERVAL '24 hours')`, shortStoryDurationThreshold)
 	var (
 		args   []any
 		cursor = 1
 	)
-	if params.TopicID != nil {
-		query += fmt.Sprintf(" AND e.topic_id = $%d", cursor)
-		args = append(args, *params.TopicID)
-		cursor++
-	}
 	if params.AuthorID != nil {
-		query += fmt.Sprintf(" AND e.author_id = $%d", cursor)
+		query += fmt.Sprintf(" AND e.owner_id = $%d", cursor)
 		args = append(args, *params.AuthorID)
 		cursor++
 	}
 	if params.After != nil {
-		query += fmt.Sprintf(" AND e.published_at < $%d", cursor)
+		query += fmt.Sprintf(" AND e.created_at < $%d", cursor)
 		args = append(args, *params.After)
 		cursor++
 	}
@@ -965,7 +968,7 @@ WHERE e.status = 'public'
 		query += " AND " + tagClause
 	}
 	if strings.ToLower(params.Filters.Tab) == "subscriptions" {
-		query += " AND MOD(ABS(hashtext(e.author_id::text)), 3) = 0"
+		query += " AND MOD(ABS(hashtext(e.owner_id::text)), 3) = 0"
 	}
 
 	query += buildFeedOrderClause(params.Filters)
@@ -982,12 +985,11 @@ WHERE e.status = 'public'
 	for rows.Next() {
 		var (
 			rec         episodeSummary
-			topicID     sql.NullString
 			title       sql.NullString
 			duration    sql.NullInt64
 			audioURL    sql.NullString
-			publishedAt sql.NullTime
-			authorUUID  uuid.UUID
+			kind        string
+			ownerUUID   uuid.UUID
 			tldr        sql.NullString
 			keywordsArr pq.StringArray
 			moodJSON    sql.NullString
@@ -995,17 +997,12 @@ WHERE e.status = 'public'
 		)
 		if err := rows.Scan(
 			&rec.ID,
-			&authorUUID,
-			&topicID,
+			&ownerUUID,
 			&title,
 			&rec.Visibility,
-			&rec.Status,
+			&kind,
 			&duration,
 			&audioURL,
-			&rec.Mask,
-			&rec.Quality,
-			&rec.IsLive,
-			&publishedAt,
 			&rec.CreatedAt,
 			&tldr,
 			&keywordsArr,
@@ -1014,11 +1011,13 @@ WHERE e.status = 'public'
 		); err != nil {
 			return nil, err
 		}
-		rec.AuthorID = authorUUID.String()
+		rec.AuthorID = ownerUUID.String()
 		rec.AuthorPlan = authorPlan
-		if topicID.Valid {
-			rec.TopicID = &topicID.String
-		}
+		rec.Status = "public" // audio_items with visibility='public' are always public
+		rec.Mask = "none"     // Default value
+		rec.Quality = "clean" // Default value
+		rec.IsLive = false    // audio_items don't have is_live, default to false
+		rec.PublishedAt = &rec.CreatedAt // Use created_at as published_at
 		if title.Valid {
 			rec.Title = &title.String
 		}
@@ -1029,9 +1028,6 @@ WHERE e.status = 'public'
 		if audioURL.Valid {
 			url := audioURL.String
 			rec.AudioURL = &url
-		}
-		if publishedAt.Valid {
-			rec.PublishedAt = &publishedAt.Time
 		}
 		if tldr.Valid {
 			rec.Summary = &tldr.String
@@ -1053,11 +1049,12 @@ WHERE e.status = 'public'
 func buildFormatClause(filters feedFilterParams, cursor *int, args *[]any) string {
 	switch strings.ToLower(filters.Format) {
 	case "live":
-		return " AND e.is_live = true"
+		// audio_items don't have is_live, skip live filter for now
+		return ""
 	case "shorts":
-		return " AND e.is_live = false AND COALESCE(e.duration_sec, 0) <= 120"
+		return " AND e.kind = 'micro' AND COALESCE(e.duration_sec, 0) <= 120"
 	case "podcasts":
-		return " AND e.is_live = false AND COALESCE(e.duration_sec, 0) > 120"
+		return " AND e.kind = 'podcast_episode' AND COALESCE(e.duration_sec, 0) > 120"
 	default:
 		return ""
 	}
@@ -1121,31 +1118,29 @@ func buildFeedOrderClause(filters feedFilterParams) string {
 	case "recommended":
 		const scoreExpr = `
 (COALESCE(NULLIF(e.duration_sec, 0), 90)) +
-(CASE WHEN e.is_live THEN 120 ELSE 0 END) +
 (COALESCE(cardinality(s.keywords), 0) * 20) +
 (COALESCE(length(s.tldr), 0) % 40)`
-		return " ORDER BY " + scoreExpr + " DESC, e.published_at DESC NULLS LAST, e.created_at DESC"
+		return " ORDER BY " + scoreExpr + " DESC, e.created_at DESC"
 	case "trending_nearby":
-		return " ORDER BY e.is_live DESC, e.published_at DESC NULLS LAST, e.created_at DESC"
+		return " ORDER BY e.created_at DESC"
 	default:
-		return " ORDER BY e.published_at DESC NULLS LAST, e.created_at DESC"
+		return " ORDER BY e.created_at DESC"
 	}
 }
 
 func getEpisodeByID(ctx context.Context, db *sql.DB, id uuid.UUID) (episodeSummary, error) {
-	const query = `SELECT e.id, e.author_id, e.topic_id, e.title, e.visibility, e.status, e.duration_sec, e.audio_url, e.mask, e.quality, e.is_live, e.published_at, e.created_at, s.tldr, s.keywords, s.mood, u.plan
-FROM episodes e
-JOIN users u ON u.id = e.author_id
-LEFT JOIN summaries s ON s.episode_id = e.id
+	const query = `SELECT e.id, e.owner_id, e.title, e.visibility, e.kind, e.duration_sec, e.audio_url, e.created_at, s.tldr, s.keywords, s.mood, u.plan
+FROM audio_items e
+JOIN users u ON u.id = e.owner_id
+LEFT JOIN summaries s ON s.audio_id = e.id
 WHERE e.id = $1`
 	var (
 		rec         episodeSummary
-		topicID     sql.NullString
 		title       sql.NullString
 		duration    sql.NullInt64
 		audioURL    sql.NullString
-		publishedAt sql.NullTime
-		authorUUID  uuid.UUID
+		kind        string
+		ownerUUID   uuid.UUID
 		tldr        sql.NullString
 		keywordsArr pq.StringArray
 		moodJSON    sql.NullString
@@ -1153,17 +1148,12 @@ WHERE e.id = $1`
 	)
 	err := db.QueryRowContext(ctx, query, id).Scan(
 		&rec.ID,
-		&authorUUID,
-		&topicID,
+		&ownerUUID,
 		&title,
 		&rec.Visibility,
-		&rec.Status,
+		&kind,
 		&duration,
 		&audioURL,
-		&rec.Mask,
-		&rec.Quality,
-		&rec.IsLive,
-		&publishedAt,
 		&rec.CreatedAt,
 		&tldr,
 		&keywordsArr,
@@ -1173,11 +1163,13 @@ WHERE e.id = $1`
 	if err != nil {
 		return episodeSummary{}, err
 	}
-	rec.AuthorID = authorUUID.String()
+	rec.AuthorID = ownerUUID.String()
 	rec.AuthorPlan = authorPlan
-	if topicID.Valid {
-		rec.TopicID = &topicID.String
-	}
+	rec.Status = "public" // audio_items with visibility='public' are always public
+	rec.Mask = "none"     // Default value
+	rec.Quality = "clean" // Default value
+	rec.IsLive = false    // audio_items don't have is_live
+	rec.PublishedAt = &rec.CreatedAt // Use created_at as published_at
 	if title.Valid {
 		rec.Title = &title.String
 	}
@@ -1188,9 +1180,6 @@ WHERE e.id = $1`
 	if audioURL.Valid {
 		url := audioURL.String
 		rec.AudioURL = &url
-	}
-	if publishedAt.Valid {
-		rec.PublishedAt = &publishedAt.Time
 	}
 	if tldr.Valid {
 		rec.Summary = &tldr.String
@@ -1252,11 +1241,12 @@ func podcastLimitMessage(plan string) string {
 
 func countUserPodcasts(ctx context.Context, db *sql.DB, userID uuid.UUID) (int, error) {
 	const stmt = `
-SELECT COUNT(*) FROM episodes
-WHERE author_id = $1
+SELECT COUNT(*) FROM audio_items
+WHERE owner_id = $1
+  AND kind = 'podcast_episode'
   AND COALESCE(duration_sec, 0) >= $2
   AND created_at >= NOW() - INTERVAL '7 days'
-  AND status != 'deleted'`
+  AND visibility != 'private'`
 	var count int
 	if err := db.QueryRowContext(ctx, stmt, userID, podcastDurationThreshold).Scan(&count); err != nil {
 		return 0, err

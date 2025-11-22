@@ -145,15 +145,15 @@ func registerPublicCommentRoutes(r chi.Router, deps *app.App) {
 }
 
 func ensureEpisodeCommentable(ctx context.Context, db *sql.DB, episodeID uuid.UUID, userID uuid.UUID) error {
-	const query = `SELECT author_id, status FROM episodes WHERE id = $1`
+	const query = `SELECT owner_id, visibility FROM audio_items WHERE id = $1`
 	var (
-		author uuid.UUID
-		status string
+		owner     uuid.UUID
+		visibility string
 	)
-	if err := db.QueryRowContext(ctx, query, episodeID).Scan(&author, &status); err != nil {
+	if err := db.QueryRowContext(ctx, query, episodeID).Scan(&owner, &visibility); err != nil {
 		return err
 	}
-	if status != "public" && author != userID {
+	if visibility != "public" && owner != userID {
 		return errors.New("episode not public")
 	}
 	return nil
@@ -184,12 +184,12 @@ func createComment(ctx context.Context, db *sql.DB, episodeID, userID uuid.UUID,
 	)
 	err := db.QueryRowContext(ctx, `
 WITH inserted AS (
-	INSERT INTO comments (episode_id, author_id, text)
+	INSERT INTO comments (audio_id, author_id, text)
 	VALUES ($1, $2, $3)
-	RETURNING id, episode_id, author_id, text, created_at
+	RETURNING id, audio_id, author_id, text, created_at
 )
 SELECT i.id,
-	   i.episode_id,
+	   i.audio_id,
 	   i.author_id,
 	   i.text,
 	   i.created_at,
@@ -225,7 +225,7 @@ JOIN users u ON u.id = i.author_id;
 func listEpisodeComments(ctx context.Context, db *sql.DB, episodeID uuid.UUID, limit int, after *time.Time) ([]commentResponse, error) {
 	query := `
 SELECT c.id,
-       c.episode_id,
+       c.audio_id,
 	   c.author_id,
 	   c.text,
 	   c.created_at,
@@ -234,7 +234,7 @@ SELECT c.id,
 	   NULLIF(u.avatar, '') AS author_avatar
   FROM comments c
   JOIN users u ON u.id = c.author_id
- WHERE c.episode_id = $1`
+ WHERE c.audio_id = $1`
 	args := []any{episodeID}
 	if after != nil {
 		query += " AND c.created_at < $2"

@@ -129,9 +129,9 @@ func appendSelfReactions(ctx context.Context, db *sql.DB, userID uuid.UUID, epis
 	}
 
 	rows, err := db.QueryContext(ctx, `
-SELECT episode_id, type
+SELECT audio_id, type
 FROM reactions
-WHERE episode_id = ANY($1) AND user_id = $2
+WHERE audio_id = ANY($1) AND user_id = $2
 `, pq.Array(ids), userID)
 	if err != nil {
 		return err
@@ -167,10 +167,10 @@ WHERE episode_id = ANY($1) AND user_id = $2
 
 func fetchReactionCounts(ctx context.Context, db *sql.DB, ids []uuid.UUID) (map[string][]reactionCount, error) {
 	rows, err := db.QueryContext(ctx, `
-SELECT episode_id, type, COUNT(*)
+SELECT audio_id, type, COUNT(*)
 FROM reactions
-WHERE episode_id = ANY($1)
-GROUP BY episode_id, type
+WHERE audio_id = ANY($1)
+GROUP BY audio_id, type
 `, pq.Array(ids))
 	if err != nil {
 		return nil, err

@@ -1,100 +1,212 @@
-# Moweton
+# AmunX - Asynchronous Voice Messenger
 
-Voice-first journal & livecast platform.  
-Mobile is a Flutter client that talks to a Go backend (API + worker) running on a Docker Compose stack (Postgres, Redis, LiveKit, Loki/Grafana).
+Повнофункціональний додаток для асинхронного голосового спілкування з підтримкою подкастів, коротких аудіо повідомлень та live трансляцій.
 
-## Status (November 2025)
+## 🚀 Швидкий старт
 
-- ✅ Flutter UI implemented for onboarding, auth, feed, episode detail, comments, recorder/publish, profile, topics, live host/listener.
-- ✅ Custom logging (`AppLogger`) wired through navigation, providers and API client.
-- ✅ Backend integration tests run against Docker stack (`docker-compose.test.yml`).
-- ✅ Recording uses the native microphone via `record`, uploads to `/v1/episodes/dev`, and the Go API serves audio from `LOCAL_MEDIA_PATH`.
-- ✅ Flutter integration smoke test (`integration_test/app_test.dart`) exercises onboarding → auth → feed and is wired into `scripts/test.*`.
+### Передумови
 
-## Repository layout
+- Docker та Docker Compose
+- Flutter SDK (>=3.0.0)
+- Go 1.21+
+- Android Studio / Xcode (для мобільної розробки)
 
-```
-backend/         Go API + worker, migrations, scripts
-configs/         Observability configs (Grafana/Loki etc.)
-docker-compose*  Local stack definitions
-mobile/          Flutter client (lib/, android/, scripts/)
-design/UX_UI...  Figma export & reference components
-scripts/         Cross-platform helpers (tests, builds, flutter install)
-```
-
-## Prerequisites
-
-- Flutter 3.24+ / Dart 3.4+ (`scripts/install-flutter.ps1` sets up on Windows).
-- Go 1.22+
-- Docker & Docker Compose
-- Make / Bash (or PowerShell equivalents) for helper scripts.
-
-## Backend
+### 1. Клонування репозиторію
 
 ```bash
-# 1. Environment
-cp backend/.env.example backend/.env
-
-# 2. Dependencies
-cd backend
-go mod download
-
-# 3. Local infra
-cd ..
-docker compose up -d        # Postgres, Redis, LiveKit, Loki/Grafana, API, worker
-
-# 4. Migrations
-./scripts/migrate.sh up     # or scripts/migrate.ps1 on Windows
-
-# 5. Tests
-./scripts/test.sh           # (Linux/macOS)
-./scripts/test.ps1          # (Windows)
+git clone <repository-url>
+cd AmunX
 ```
 
-Locally the API is exposed at `http://localhost:8080/v1` (production: `https://api.moweton.com/v1`).  
-Seed data example: `docker compose exec postgres psql -U postgres -d postgres`.
+### 2. Запуск бекенду
 
-### Smart Inbox worker
+```bash
+# Запуск всіх сервісів (PostgreSQL, Redis, API)
+docker-compose up -d
 
-Smart Inbox responses are now served from cached snapshots to keep the `/smart-inbox` handler fast.
+# Перевірка статусу
+docker-compose ps
+```
 
-- The worker (`cd backend && go run ./cmd/worker` or `docker compose up worker`) warms the cache immediately on start and then refreshes snapshots every five minutes (default interval) with a 15-minute TTL (`smart_inbox_snapshots.valid_until`).
-- While the cache is cold, the API returns `503 smart_inbox_warming_up`; once a snapshot exists, the mobile client fetches the cached payload (limit 60) and only hits the DB directly for custom limits.
-- Logs to watch: `smart inbox warmup failed` (generation error) and `smart inbox snapshot saved` (success). A stuck cache usually means the worker cannot reach Postgres.
-- To manually re-prime the cache, restart the worker; it executes one `Generate` cycle immediately and then resumes the schedule. Old snapshots are pruned after 24 hours.
+### 3. Застосування міграцій
 
-## Mobile (Flutter)
+```bash
+cd backend
+
+# Linux/Mac
+./scripts/migrate.sh up
+
+# Windows PowerShell
+Get-Content db\migrations\*.up.sql | docker exec -i amunx-postgres-1 psql -U postgres -d amunx
+```
+
+### 4. Заповнення тестовими даними
+
+```bash
+cd backend
+
+# Linux/Mac
+./scripts/seed.sh
+
+# Windows PowerShell
+.\scripts\seed.ps1
+
+# Або з очищенням існуючих даних
+.\scripts\seed.ps1 -Reset
+```
+
+### 5. Запуск Flutter додатку
 
 ```bash
 cd mobile
-flutter pub get
 
-# Run on emulator / device
+# Перевірка доступних пристроїв
+flutter devices
+
+# Запуск на Android емуляторі
 flutter run -d emulator-5554
 
-# Build debug APK
-flutter build apk --debug
+# Або на iOS симуляторі
+flutter run -d iPhone
 ```
 
-Notes:
-- `scripts/install-flutter.ps1` adds Flutter to `C:\src\flutter` and updates PATH.
-- Android builds expect SDK 34+ with hardware acceleration enabled; the repo already sets `android.useAndroidX=true`.
-- Logging is visible via `flutter run` (look for `App:` / `Feed:` etc.).
+## 📚 Документація
 
-## Stack verification
+- [Локальна розробка](LOCAL_DEVELOPMENT.md) - детальна інструкція для локальної розробки
+- [Архітектура](docs/ARCHITECTURE.md) - опис архітектури системи
+- [API документація](docs/API.md) - опис API endpoints
 
-1. Start Docker services (`docker compose up -d`).
-2. Insert sample episodes (see `backend/internal/http/episode_handlers.go` for schema).
-3. Run `flutter run` → log in with any email (dev mode auto-logs you in) → verify feed, episode detail, comments, recorder/publish flows.
-4. Backend tests: `./scripts/test.sh` spins up the test stack (`docker-compose.test.yml`) and executes Go integration suite.
+## 🧪 Тестування
 
-## Roadmap snapshot
+### Backend тести
 
-### Stage 3 (AI/behavioral)
-- [x] Smart Inbox prototype (client-side digest/highlights + tests).
-- [x] Smart Inbox worker + backend feed API (snapshots + TL;DR).
-- [ ] LiveKit reconnection/backoff (partially done) + Live transcripts, Smart Inbox + TL;DR, Smart Inbox in feed preview.
+```bash
+cd backend
+go test ./internal/http/... -v
+```
 
-Everything else from previous docs lives here now; browse Git history for legacy notes.
+### Flutter тести
 
+```bash
+cd mobile
 
+# Unit тести
+flutter test
+
+# Інтеграційні тести
+flutter test integration_test/
+```
+
+## 📁 Структура проекту
+
+```
+AmunX/
+├── backend/          # Go backend API
+│   ├── cmd/         # Entry points
+│   ├── internal/    # Internal packages
+│   ├── db/          # Database migrations & seeds
+│   └── scripts/     # Utility scripts
+├── mobile/          # Flutter mobile app
+│   ├── lib/         # Dart source code
+│   ├── test/        # Unit tests
+│   └── integration_test/  # Integration tests
+└── docs/            # Documentation
+```
+
+## 🔧 Розробка
+
+### Додавання нових тестових даних
+
+Редагуйте `backend/db/seed.sql` та запустіть seed скрипт:
+
+```bash
+cd backend
+.\scripts\seed.ps1 -Reset  # Windows
+# або
+./scripts/seed.sh reset    # Linux/Mac
+```
+
+### Логування
+
+#### Backend
+
+Логи доступні через Docker:
+
+```bash
+# API логи
+docker logs amunx-api-1 --tail 100 -f
+
+# PostgreSQL логи
+docker logs amunx-postgres-1 --tail 100 -f
+```
+
+#### Flutter
+
+Логи виводяться в консоль під час розробки. Всі логи зберігаються в пам'яті:
+
+```dart
+// Отримати всі логи
+final logs = AppLogger.getAllLogs();
+
+// Отримати як рядок
+final logsString = AppLogger.getLogsAsString();
+```
+
+## 🐛 Відлагодження
+
+### Перевірка підключення до бази даних
+
+```bash
+docker exec -it amunx-postgres-1 psql -U postgres -d amunx
+```
+
+### Перевірка API
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# Тестовий запит
+curl http://localhost:8080/v1/me
+```
+
+### Перевірка Flutter підключення
+
+Переконайтеся, що Flutter додаток використовує правильний API URL:
+- Android Emulator: `http://10.0.2.2:8080`
+- iOS Simulator: `http://localhost:8080`
+- Фізичний пристрій: `http://<your-ip>:8080`
+
+## 📝 Тестові користувачі
+
+Після виконання seed скрипту доступні наступні тестові користувачі:
+
+- `test1@example.com` (testuser1) - Tech enthusiast
+- `test2@example.com` (testuser2) - Music producer
+- `test3@example.com` (testuser3) - Content creator
+- `test4@example.com` (testuser4) - Developer
+- `test5@example.com` (testuser5) - Artist
+
+## 🛠️ Корисні команди
+
+```bash
+# Перегляд всіх логів
+docker-compose logs -f
+
+# Перезапуск всіх сервісів
+docker-compose restart
+
+# Зупинка всіх сервісів
+docker-compose down
+
+# Видалення всіх даних (ОБЕРЕЖНО!)
+docker-compose down -v
+```
+
+## 📄 Ліцензія
+
+[Додайте інформацію про ліцензію]
+
+## 👥 Автори
+
+[Додайте інформацію про авторів]

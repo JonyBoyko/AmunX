@@ -44,17 +44,32 @@ class AppLogger {
     final levelStr = level.name.toUpperCase().padRight(7);
     final tagStr = tag ?? _tag;
     
-    final logMessage = '$timestamp [$levelStr] $tagStr: $message';
+    final buffer = StringBuffer();
+    buffer.writeln('$timestamp [$levelStr] $tagStr: $message');
+    
+    if (error != null) {
+      buffer.writeln('  Error: $error');
+      if (error is Exception) {
+        buffer.writeln('  Exception type: ${error.runtimeType}');
+      }
+    }
+    
+    if (stackTrace != null) {
+      buffer.writeln('  StackTrace:');
+      final lines = stackTrace.toString().split('\n');
+      for (final line in lines.take(10)) {
+        buffer.writeln('    $line');
+      }
+      if (lines.length > 10) {
+        buffer.writeln('    ... (${lines.length - 10} more lines)');
+      }
+    }
+    
+    final logMessage = buffer.toString();
     
     // Print to console
     if (kDebugMode) {
-      print(logMessage);
-      if (error != null) {
-        print('  Error: $error');
-      }
-      if (stackTrace != null) {
-        print('  StackTrace: $stackTrace');
-      }
+      debugPrint(logMessage);
     }
 
     // Store in memory (for later export if needed)

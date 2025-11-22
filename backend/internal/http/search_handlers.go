@@ -224,7 +224,7 @@ const searchDocumentsCTE = `
 WITH search_query AS (SELECT plainto_tsquery('english', $1) AS query),
 docs AS (
     SELECT e.id,
-           e.author_id,
+           e.owner_id AS author_id,
            COALESCE(e.title, '') AS title,
            COALESCE(e.duration_sec, 0) AS duration_sec,
            e.created_at,
@@ -233,10 +233,9 @@ docs AS (
            setweight(to_tsvector('english', COALESCE(e.title, '')), 'A') ||
            setweight(to_tsvector('english', COALESCE(s.tldr, '')), 'B') ||
            setweight(to_tsvector('english', array_to_string(COALESCE(s.keywords, ARRAY[]::text[]), ' ')), 'C') AS document
-      FROM episodes e
-      LEFT JOIN summaries s ON s.episode_id = e.id
-     WHERE e.status = 'public'
-       AND e.visibility = 'public'
+      FROM audio_items e
+      LEFT JOIN summaries s ON s.audio_id = e.id
+     WHERE e.visibility = 'public'
 )
 `
 
@@ -272,7 +271,7 @@ SELECT COUNT(*)
 
 const fallbackSearchSelectSQL = `
 SELECT e.id,
-       e.author_id,
+       e.owner_id AS author_id,
        COALESCE(e.title, '') AS title,
        COALESCE(e.duration_sec, 0) AS duration_sec,
        e.created_at,
@@ -280,11 +279,10 @@ SELECT e.id,
        COALESCE(s.tldr, '') AS summary,
        COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1)) AS display_name,
        COALESCE(u.avatar, '') AS avatar
-  FROM episodes e
-  JOIN users u ON u.id = e.author_id
-  LEFT JOIN summaries s ON s.episode_id = e.id
- WHERE e.status = 'public'
-   AND e.visibility = 'public'
+  FROM audio_items e
+  JOIN users u ON u.id = e.owner_id
+  LEFT JOIN summaries s ON s.audio_id = e.id
+ WHERE e.visibility = 'public'
    AND (
         COALESCE(e.title, '') ILIKE $1 ESCAPE '\'
         OR COALESCE(s.tldr, '') ILIKE $1 ESCAPE '\'
@@ -295,10 +293,9 @@ SELECT e.id,
 
 const fallbackSearchCountSQL = `
 SELECT COUNT(*)
-  FROM episodes e
-  LEFT JOIN summaries s ON s.episode_id = e.id
- WHERE e.status = 'public'
-   AND e.visibility = 'public'
+  FROM audio_items e
+  LEFT JOIN summaries s ON s.audio_id = e.id
+ WHERE e.visibility = 'public'
    AND (
         COALESCE(e.title, '') ILIKE $1 ESCAPE '\'
         OR COALESCE(s.tldr, '') ILIKE $1 ESCAPE '\'

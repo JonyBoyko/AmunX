@@ -277,7 +277,9 @@ class LivekitController extends StateNotifier<LivekitSessionState> {
     if (room == null) {
       return 0;
     }
-    return room.participants.length;
+    // В новій версії livekit_client використовується remoteParticipants
+    // +1 для local participant (host)
+    return room.remoteParticipants.length + (room.localParticipant != null ? 1 : 0);
   }
 
   void _emitStats() {

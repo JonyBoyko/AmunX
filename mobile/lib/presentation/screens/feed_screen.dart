@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
-import '../../core/i18n/l10n_extensions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../data/models/episode.dart';
 import '../filters/feed_filters.dart';
@@ -97,16 +96,25 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               ]),
               color: AppTheme.brandPrimary,
               child: feedAsync.when(
-                data: (episodes) => _buildFeed(
-                  context,
-                  episodes,
-                  filterState,
-                  tags,
-                  liveRooms,
-                  smartInboxAsync,
-                ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, stack) => _buildError(context),
+                data: (episodes) {
+                  AppLogger.debug('FeedScreen: episodes count = ${episodes.length}', tag: 'Feed');
+                  return _buildFeed(
+                    context,
+                    episodes,
+                    filterState,
+                    tags,
+                    liveRooms,
+                    smartInboxAsync,
+                  );
+                },
+                loading: () {
+                  AppLogger.debug('FeedScreen: loading', tag: 'Feed');
+                  return const Center(child: CircularProgressIndicator());
+                },
+                error: (error, stack) {
+                  AppLogger.error('FeedScreen: error', tag: 'Feed', error: error, stackTrace: stack);
+                  return _buildError(context);
+                },
               ),
             ),
             Positioned(
@@ -140,7 +148,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   ) {
     final coverageNotifier = ref.read(feedFilterProvider.notifier);
     final tagsNotifier = ref.read(trendingTagsProvider.notifier);
-    ref.read(authorDirectoryProvider.notifier).syncWithEpisodes(episodes);
+    // Delay provider modification until after build
+    Future(() {
+      ref.read(authorDirectoryProvider.notifier).syncWithEpisodes(episodes);
+    });
     final authors = ref.watch(authorDirectoryProvider);
 
     return CustomScrollView(
@@ -246,21 +257,27 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               final liveListeners = liveAudienceEstimate(episode);
               final reactionSnapshot =
                   ref.watch(reactionSnapshotProvider(episode.id));
-              return EpisodeCard(
-                episode: episode,
-                regionLabel: region.label,
-                formatLabel: format.label,
-                author: author,
-                liveListeners: liveListeners > 0 ? liveListeners : null,
-                onFollowToggle: author == null
-                    ? null
-                    : () => ref
-                        .read(authorDirectoryProvider.notifier)
-                        .toggleFollow(author.id),
-                onTap: () => _openEpisode(episode),
-                onTopicTap: () => _openTopic(episode),
-                reactionSnapshot: reactionSnapshot,
-                onReactionTap: (type) => _handleReactionTap(episode, type),
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spaceLg,
+                  vertical: 4,
+                ),
+                child: EpisodeCard(
+                  episode: episode,
+                  regionLabel: region.label,
+                  formatLabel: format.label,
+                  author: author,
+                  liveListeners: liveListeners > 0 ? liveListeners : null,
+                  onFollowToggle: author == null
+                      ? null
+                      : () => ref
+                          .read(authorDirectoryProvider.notifier)
+                          .toggleFollow(author.id),
+                  onTap: () => _openEpisode(episode),
+                  onTopicTap: () => _openTopic(episode),
+                  reactionSnapshot: reactionSnapshot,
+                  onReactionTap: (type) => _handleReactionTap(episode, type),
+                ),
               );
             },
           ),
@@ -1048,10 +1065,29 @@ class _LiveRoomCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onFollowToggle;
 
+  // Визначаємо колір кімнати на основі ID (для різноманітності)
+  Color _getRoomColor() {
+    final hash = room.id.hashCode;
+    final index = hash.abs() % 3;
+    switch (index) {
+      case 0:
+        return AppTheme.neonBlue;
+      case 1:
+        return AppTheme.neonPurple;
+      case 2:
+        return AppTheme.neonPink;
+      default:
+        return AppTheme.neonBlue;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final elapsed = DateTime.now().difference(room.startedAt).inMinutes;
     final elapsedLabel = elapsed < 1 ? 'live now' : '${elapsed}m live';
+    final roomColor = _getRoomColor();
+    final hasUnread = room.listeners > 0; // Можна додати логіку для unread
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1060,153 +1096,209 @@ class _LiveRoomCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.glassSurface,
           borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-          border: Border.all(color: AppTheme.glassStroke),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x22000000),
-              blurRadius: 24,
-              offset: Offset(0, 16),
-              spreadRadius: -6,
-            ),
-          ],
+          border: Border.all(
+            color: hasUnread
+                ? roomColor.withValues(alpha: 0.3)
+                : AppTheme.glassStroke,
+          ),
+          boxShadow: hasUnread
+              ? [
+                  BoxShadow(
+                    color: roomColor.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 8),
+                  ),
+                  const BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 16),
+                    spreadRadius: -6,
+                  ),
+                ]
+              : const [
+                  BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 16),
+                    spreadRadius: -6,
+                  ),
+                ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTheme.spaceSm,
-                    vertical: AppTheme.spaceXs,
-                  ),
+            // Unread indicator (ліва лінія) - згідно з макетом
+            if (hasUnread)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 2,
                   decoration: BoxDecoration(
-                    gradient: AppTheme.neonGradient,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                    boxShadow: AppTheme.glowPink,
-                  ),
-                  child: const Text(
-                    'LIVE',
-                    style: TextStyle(
-                      color: AppTheme.textInverse,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    color: roomColor,
+                    borderRadius: BorderRadius.circular(1),
                   ),
                 ),
-                const SizedBox(width: AppTheme.spaceSm),
-                Text(
-                  elapsedLabel,
-                  style: const TextStyle(color: AppTheme.textSecondary),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: onFollowToggle,
-                  icon: Icon(
-                    room.isFollowedHost
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    color: room.isFollowedHost
-                        ? AppTheme.neonPink
-                        : AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTheme.spaceSm),
-            Row(
+              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.glassSurfaceDense,
-                    border: Border.all(color: AppTheme.glassStroke),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    room.emoji,
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                ),
-                const SizedBox(width: AppTheme.spaceSm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        room.topic,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontWeight: FontWeight.w700,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spaceSm,
+                        vertical: AppTheme.spaceXs,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.neonGradient,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        boxShadow: AppTheme.glowPink,
+                      ),
+                      child: const Text(
+                        'LIVE',
+                        style: TextStyle(
+                          color: AppTheme.textInverse,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '@${room.handle.isNotEmpty ? room.handle : room.hostName}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
+                    ),
+                    const SizedBox(width: AppTheme.spaceSm),
+                    Text(
+                      elapsedLabel,
+                      style: TextStyle(
+                        color: hasUnread
+                            ? AppTheme.textPrimary
+                            : AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: onFollowToggle,
+                      icon: Icon(
+                        room.isFollowedHost
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: room.isFollowedHost
+                            ? AppTheme.neonPink
+                            : AppTheme.textSecondary,
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppTheme.spaceSm),
+                Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: roomColor.withValues(alpha: 0.2),
+                        border: Border.all(
+                          color: roomColor,
+                          width: 2,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        room.emoji,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spaceMd),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            room.topic,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: hasUnread
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.textPrimary.withValues(alpha: 0.7),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '@${room.handle.isNotEmpty ? room.handle : room.hostName}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppTheme.spaceSm),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.group,
+                      size: 14,
+                      color: roomColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${room.listeners}',
+                      style: TextStyle(
+                        color: roomColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (hasUnread) ...[
+                      const SizedBox(width: AppTheme.spaceMd),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: roomColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                          border: Border.all(
+                            color: roomColor,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 12,
+                              color: roomColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'нових',
+                              style: TextStyle(
+                                color: roomColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: AppTheme.spaceSm),
-            Row(
-              children: [
-                const Icon(
-                  Icons.group,
-                  size: 16,
-                  color: AppTheme.neonBlue,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${room.listeners} listening',
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                const Spacer(),
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 16,
-                  color: AppTheme.neonPurple,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  room.city,
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            if (room.tags.isNotEmpty) ...[
-              const SizedBox(height: AppTheme.spaceSm),
-              Wrap(
-                spacing: AppTheme.spaceSm,
-                runSpacing: AppTheme.spaceSm,
-                children: room.tags
-                    .take(3)
-                    .map(
-                      (tag) => _TagPill(
-                        label: '#$tag',
-                        dense: true,
-                        onTap: onTap,
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
           ],
         ),
       ),

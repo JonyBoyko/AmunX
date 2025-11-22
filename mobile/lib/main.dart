@@ -9,8 +9,18 @@ import 'presentation/services/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  
+  // Ініціалізація Firebase (опціонально, якщо є google-services.json)
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    AppLogger.warning(
+      'Firebase initialization failed (google-services.json may be missing): $e',
+      tag: 'Firebase',
+    );
+    // Продовжуємо без Firebase для тестування
+  }
 
   FlutterError.onError = (FlutterErrorDetails details) {
     AppLogger.error(

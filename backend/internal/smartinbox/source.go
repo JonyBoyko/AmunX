@@ -18,14 +18,13 @@ func FetchEpisodeRows(ctx context.Context, db *sql.DB, limit int) ([]EpisodeRow,
 	const stmt = `
 SELECT e.id,
        COALESCE(e.title, '') AS title,
-       e.author_id,
+       e.owner_id AS author_id,
        COALESCE(s.tldr, '') AS summary,
        COALESCE(s.keywords, ARRAY[]::text[]) AS keywords,
        e.created_at
-  FROM episodes e
-  LEFT JOIN summaries s ON s.episode_id = e.id
- WHERE e.status = 'public'
-   AND e.visibility = 'public'
+  FROM audio_items e
+  LEFT JOIN summaries s ON s.audio_id = e.id
+ WHERE e.visibility = 'public'
  ORDER BY e.created_at DESC
  LIMIT $1`
 

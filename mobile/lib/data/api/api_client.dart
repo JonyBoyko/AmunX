@@ -345,6 +345,9 @@ ApiClient createApiClient({String? token}) {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
+      sendTimeout: const Duration(seconds: 5),
     ),
   );
 

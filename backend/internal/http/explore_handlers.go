@@ -191,19 +191,19 @@ func parseExploreFilters(r *http.Request) exploreFilters {
 func queryExploreFeed(ctx context.Context, db *sql.DB, filters exploreFilters, limit int) ([]ExploreCardResponse, error) {
 	query := `
 WITH reaction_totals AS (
-    SELECT episode_id,
+    SELECT audio_id,
            COUNT(*) FILTER (WHERE type = 'like') AS likes,
            COUNT(*) FILTER (WHERE type IN ('save','bookmark')) AS bookmarks
       FROM reactions
-     GROUP BY episode_id
+     GROUP BY audio_id
 ),
 comment_totals AS (
-    SELECT episode_id, COUNT(*) AS comments
+    SELECT audio_id, COUNT(*) AS comments
       FROM comments
-     GROUP BY episode_id
+     GROUP BY audio_id
 )
 SELECT e.id,
-       e.author_id,
+       e.owner_id,
        COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1)) AS display_name,
        COALESCE(NULLIF(u.avatar, ''), '') AS avatar,
        COALESCE(e.duration_sec, 0) AS duration,
@@ -215,13 +215,12 @@ SELECT e.id,
        COALESCE(rt.likes, 0) AS likes,
        COALESCE(rt.bookmarks, 0) AS saves,
        COALESCE(ct.comments, 0) AS comments
-  FROM episodes e
-  JOIN users u ON u.id = e.author_id
-  LEFT JOIN summaries s ON s.episode_id = e.id
-  LEFT JOIN reaction_totals rt ON rt.episode_id = e.id
-  LEFT JOIN comment_totals ct ON ct.episode_id = e.id
- WHERE e.status = 'public'
-   AND e.visibility = 'public'
+  FROM audio_items e
+  JOIN users u ON u.id = e.owner_id
+  LEFT JOIN summaries s ON s.audio_id = e.id
+  LEFT JOIN reaction_totals rt ON rt.audio_id = e.id
+  LEFT JOIN comment_totals ct ON ct.audio_id = e.id
+ WHERE e.visibility = 'public'
    AND NOT (u.plan = 'free' AND COALESCE(e.duration_sec, 0) <= $1 AND e.created_at < NOW() - INTERVAL '24 hours')
 `
 	args := []any{shortStoryDurationThreshold}

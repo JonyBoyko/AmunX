@@ -113,15 +113,15 @@ func registerReactionRoutes(r chi.Router, deps *app.App) {
 }
 
 func ensureEpisodeReactable(ctx context.Context, db *sql.DB, episodeID uuid.UUID, userID uuid.UUID) error {
-	const query = `SELECT author_id, status FROM episodes WHERE id = $1`
+	const query = `SELECT owner_id, visibility FROM audio_items WHERE id = $1`
 	var (
-		author uuid.UUID
-		status string
+		owner      uuid.UUID
+		visibility string
 	)
-	if err := db.QueryRowContext(ctx, query, episodeID).Scan(&author, &status); err != nil {
+	if err := db.QueryRowContext(ctx, query, episodeID).Scan(&owner, &visibility); err != nil {
 		return err
 	}
-	if status != "public" && author != userID {
+	if visibility != "public" && owner != userID {
 		return errors.New("episode not public")
 	}
 	return nil
@@ -129,20 +129,20 @@ func ensureEpisodeReactable(ctx context.Context, db *sql.DB, episodeID uuid.UUID
 
 func addReaction(ctx context.Context, db *sql.DB, episodeID, userID uuid.UUID, reactType string) error {
 	_, err := db.ExecContext(ctx, `
-INSERT INTO reactions (episode_id, user_id, type)
+INSERT INTO reactions (audio_id, user_id, type)
 VALUES ($1, $2, $3)
-ON CONFLICT (episode_id, user_id, type) DO NOTHING;
+ON CONFLICT (audio_id, user_id, type) DO NOTHING;
 `, episodeID, userID, reactType)
 	return err
 }
 
 func removeReaction(ctx context.Context, db *sql.DB, episodeID, userID uuid.UUID, reactType string) error {
-	_, err := db.ExecContext(ctx, `DELETE FROM reactions WHERE episode_id = $1 AND user_id = $2 AND type = $3`, episodeID, userID, reactType)
+	_, err := db.ExecContext(ctx, `DELETE FROM reactions WHERE audio_id = $1 AND user_id = $2 AND type = $3`, episodeID, userID, reactType)
 	return err
 }
 
 func listSelfReactions(ctx context.Context, db *sql.DB, episodeID, userID uuid.UUID) ([]string, error) {
-	rows, err := db.QueryContext(ctx, `SELECT type FROM reactions WHERE episode_id = $1 AND user_id = $2`, episodeID, userID)
+	rows, err := db.QueryContext(ctx, `SELECT type FROM reactions WHERE audio_id = $1 AND user_id = $2`, episodeID, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -11,11 +11,26 @@ import 'session_provider.dart';
 final smartInboxProvider = FutureProvider<SmartInboxState>((ref) async {
   final repo = ref.read(smartInboxRepositoryProvider);
   final session = ref.watch(sessionProvider);
-  return loadSmartInbox(
-    repository: repo,
-    token: session.token,
-    enableFallback: AppConfig.smartInboxFallbackEnabled,
-  );
+  try {
+    return await loadSmartInbox(
+      repository: repo,
+      token: session.token,
+      enableFallback: AppConfig.smartInboxFallbackEnabled,
+    );
+  } catch (e, stack) {
+    AppLogger.error(
+      'Smart inbox failed, returning empty state',
+      tag: 'SmartInbox',
+      error: e,
+      stackTrace: stack,
+    );
+    // Повертаємо порожній стан замість помилки
+    return SmartInboxState(
+      digests: [],
+      highlights: [],
+      generatedAt: DateTime.now(),
+    );
+  }
 });
 
 @visibleForTesting
@@ -149,14 +164,23 @@ class SmartInboxDigest {
     required this.entries,
     required this.tags,
     required this.summary,
+    this.taskCount = 0,
+    this.aiSummary = '',
   });
 
   final DateTime date;
   final List<SmartInboxEntry> entries;
   final List<String> tags;
   final String summary;
+  final int taskCount;
+  final String aiSummary;
 
   String get dayLabel => DateFormat.MMMMd().format(date);
+  
+  int get totalTaskCount {
+    if (taskCount > 0) return taskCount;
+    return entries.fold(0, (sum, entry) => sum + entry.taskCount);
+  }
 
   factory SmartInboxDigest.fromJson(Map<String, dynamic> json) {
     final entries = (json['entries'] as List<dynamic>? ?? const [])
@@ -177,6 +201,8 @@ class SmartInboxDigest {
       entries: entries,
       tags: tags,
       summary: summary,
+      taskCount: json['task_count'] as int? ?? 0,
+      aiSummary: (json['ai_summary'] as String?)?.trim() ?? '',
     );
   }
 }
@@ -189,6 +215,10 @@ class SmartInboxEntry {
     required this.tags,
     required this.isNew,
     required this.createdAt,
+    this.tasks = const [],
+    this.quotedBlocks = const [],
+    this.taskCount = 0,
+    this.aiGenerated = false,
   });
 
   final String episodeId;
@@ -197,8 +227,23 @@ class SmartInboxEntry {
   final List<String> tags;
   final bool isNew;
   final DateTime createdAt;
+  final List<SmartInboxTask> tasks;
+  final List<String> quotedBlocks;
+  final int taskCount;
+  final bool aiGenerated;
 
   factory SmartInboxEntry.fromJson(Map<String, dynamic> json) {
+    final tasksJson = json['tasks'] as List<dynamic>? ?? const [];
+    final tasks = tasksJson
+        .map((t) => SmartInboxTask.fromJson(
+              Map<String, dynamic>.from(t as Map),
+            ))
+        .toList();
+    
+    final quotedBlocks = (json['quoted_blocks'] as List<dynamic>? ?? const [])
+        .map((q) => q.toString())
+        .toList();
+
     return SmartInboxEntry(
       episodeId: json['episode_id'] as String,
       title: (json['title'] as String?) ?? 'Без назви',
@@ -210,6 +255,30 @@ class SmartInboxEntry {
       createdAt:
           DateTime.tryParse(json['created_at'] as String? ?? '') ??
               DateTime.now(),
+      tasks: tasks,
+      quotedBlocks: quotedBlocks,
+      taskCount: json['task_count'] as int? ?? tasks.length,
+      aiGenerated: json['ai_generated'] as bool? ?? false,
+    );
+  }
+}
+
+class SmartInboxTask {
+  const SmartInboxTask({
+    required this.id,
+    required this.text,
+    this.completed = false,
+  });
+
+  final String id;
+  final String text;
+  final bool completed;
+
+  factory SmartInboxTask.fromJson(Map<String, dynamic> json) {
+    return SmartInboxTask(
+      id: json['id'] as String? ?? '',
+      text: json['text'] as String? ?? '',
+      completed: json['completed'] as bool? ?? false,
     );
   }
 }

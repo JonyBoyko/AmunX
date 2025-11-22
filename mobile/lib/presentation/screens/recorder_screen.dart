@@ -377,30 +377,56 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
   }
 
   Widget _buildAudioLevel() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(14, (index) {
-        final normalizedIndex = (index + 1) / 14;
-        final isActive = normalizedIndex <= _audioLevel + 0.08;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: 8,
-          height: 24 + (index * 4),
-          decoration: BoxDecoration(
-            gradient: isActive
-                ? const LinearGradient(
-                    colors: [AppTheme.neonBlue, AppTheme.neonPink],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  )
-                : null,
-            color: isActive ? null : AppTheme.surfaceChip,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: isActive ? AppTheme.glowPrimary : null,
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(14, (index) {
+            final normalizedIndex = (index + 1) / 14;
+            final isActive = normalizedIndex <= _audioLevel + 0.08;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: 8,
+              height: 24 + (index * 4),
+              decoration: BoxDecoration(
+                gradient: isActive
+                    ? const LinearGradient(
+                        colors: [AppTheme.neonBlue, AppTheme.neonPink],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                      )
+                    : null,
+                color: isActive ? null : AppTheme.surfaceChip,
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: isActive
+                    ? [
+                        ...AppTheme.glowPrimary,
+                        BoxShadow(
+                          color: AppTheme.neonPink.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                        ),
+                      ]
+                    : null,
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: AppTheme.spaceSm),
+        Text(
+          _isRecording
+              ? 'Recording in progress...'
+              : 'Ready to record',
+          style: TextStyle(
+            color: _isRecording
+                ? AppTheme.neonPink
+                : AppTheme.textSecondary,
+            fontSize: 12,
+            fontWeight: _isRecording ? FontWeight.w600 : FontWeight.normal,
           ),
-        );
-      }),
+        ),
+      ],
     );
   }
 
@@ -411,16 +437,32 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
       children: [
         Text(
           '$minutes:$seconds',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
+          style: TextStyle(
+            color: _isRecording
+                ? AppTheme.neonPink
+                : AppTheme.textPrimary,
             fontSize: 48,
-            fontFeatures: [FontFeature.tabularFigures()],
+            fontFeatures: const [FontFeature.tabularFigures()],
+            shadows: _isRecording
+                ? [
+                    BoxShadow(
+                      color: AppTheme.neonPink.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      spreadRadius: 0,
+                    ),
+                  ]
+                : null,
           ),
         ),
         const SizedBox(height: AppTheme.spaceSm),
         Text(
           _isRecording ? 'Recording in progress' : 'Ready to record',
-          style: const TextStyle(color: AppTheme.textSecondary),
+          style: TextStyle(
+            color: _isRecording
+                ? AppTheme.neonPink
+                : AppTheme.textSecondary,
+            fontWeight: _isRecording ? FontWeight.w600 : FontWeight.normal,
+          ),
         ),
       ],
     );
@@ -469,10 +511,20 @@ class _RecorderScreenState extends ConsumerState<RecorderScreen> {
                     )
                   : AppTheme.neonGradient,
               shape: BoxShape.circle,
-              boxShadow: [
-                ...AppTheme.glowPrimary,
-                ...AppTheme.glowAccent,
-              ],
+              boxShadow: _isRecording
+                  ? [
+                      ...AppTheme.glowPink,
+                      BoxShadow(
+                        color: AppTheme.neonPink.withValues(alpha: 0.4),
+                        blurRadius: 30,
+                        spreadRadius: -4,
+                        offset: const Offset(0, 16),
+                      ),
+                    ]
+                  : [
+                      ...AppTheme.glowPrimary,
+                      ...AppTheme.glowAccent,
+                    ],
             ),
             child: IconButton(
               iconSize: 48,

@@ -49,6 +49,26 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       rethrow;
     }
   }
+
+  Future<void> devLogin(String email) async {
+    state = const AsyncValue.loading();
+    try {
+      AppLogger.info('devLogin start for $email', tag: 'AuthProvider');
+      final response = await _authRepository.devLogin(email);
+      final accessToken = response['access_token'] as String;
+      await _sessionNotifier.setToken(accessToken);
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'devLogin failed for $email',
+        tag: 'AuthProvider',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      state = AsyncValue.error(e, stackTrace);
+      rethrow;
+    }
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<void>>(

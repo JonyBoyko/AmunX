@@ -218,7 +218,7 @@ SELECT u.id,
 	   COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar, '')) AS avatar,
 	   (SELECT COUNT(*) FROM user_follows WHERE followee_id = u.id) AS followers,
 	   (SELECT COUNT(*) FROM user_follows WHERE follower_id = u.id) AS following,
-	   (SELECT COUNT(*) FROM episodes WHERE author_id = u.id AND status = 'public' AND visibility = 'public') AS posts,
+	   (SELECT COUNT(*) FROM audio_items WHERE owner_id = u.id AND visibility = 'public') AS posts,
 	   COALESCE(p.settings, '{}'::jsonb) AS settings
 FROM users u
 LEFT JOIN profiles p ON p.user_id = u.id

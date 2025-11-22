@@ -35,6 +35,7 @@ class ReactionStrip extends StatelessWidget {
       child: Wrap(
         spacing: AppTheme.spaceSm,
         runSpacing: AppTheme.spaceSm,
+        alignment: WrapAlignment.end,
         children: children,
       ),
     );
