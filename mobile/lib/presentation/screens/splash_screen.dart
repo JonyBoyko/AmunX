@@ -149,7 +149,6 @@ class _SplashBadgeState extends State<_SplashBadge>
     with SingleTickerProviderStateMixin {
   late AnimationController _glowController;
   late AnimationController _sparkleController;
-  late Animation<double> _glowAnimation;
   late Animation<double> _sparkleRotation;
 
   @override
@@ -164,13 +163,6 @@ class _SplashBadgeState extends State<_SplashBadge>
       duration: const Duration(seconds: 20),
       vsync: this,
     )..repeat();
-
-    _glowAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _glowController,
-        curve: Curves.easeInOut,
-      ),
-    );
 
     _sparkleRotation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(

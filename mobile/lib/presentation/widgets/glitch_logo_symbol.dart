@@ -81,7 +81,6 @@ class _GlitchWavePainter extends CustomPainter {
     
     // M форма: дві вершини вгору (піки на 1/3 і 2/3)
     // W форма: дві вершини вниз (впадини на 1/3 і 2/3)
-    final targetShape = isM ? 1.0 : -1.0;
     final currentShape = isM ? animationValue : (1 - animationValue);
     
     path.moveTo(0, centerY);

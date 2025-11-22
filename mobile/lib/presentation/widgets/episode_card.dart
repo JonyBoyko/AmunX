@@ -91,9 +91,9 @@ class _EpisodeCardState extends State<EpisodeCard> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
-            color: AppTheme.glassSurface,
+            color: AppTheme.glassSurfaceLight,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.glassStroke),
+            border: Border.all(color: AppTheme.glassStroke.withValues(alpha: 0.5)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Column(
