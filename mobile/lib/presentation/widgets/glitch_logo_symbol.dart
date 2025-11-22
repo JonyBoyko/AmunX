@@ -14,14 +14,26 @@ class GlitchLogoSymbol extends StatefulWidget {
 
 class _GlitchLogoSymbolState extends State<GlitchLogoSymbol> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  bool _isM = true;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat();
+    );
+    
+    _startCycle();
+  }
+
+  void _startCycle() {
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() => _isM = !_isM);
+      _controller.forward(from: 0);
+      _startCycle();
+    });
   }
 
   @override
@@ -39,7 +51,7 @@ class _GlitchLogoSymbolState extends State<GlitchLogoSymbol> with SingleTickerPr
           width: widget.size,
           height: widget.size,
           child: CustomPaint(
-            painter: _GlitchWavePainter(_controller.value),
+            painter: _GlitchWavePainter(_controller.value, _isM),
           ),
         );
       },
@@ -49,14 +61,15 @@ class _GlitchLogoSymbolState extends State<GlitchLogoSymbol> with SingleTickerPr
 
 class _GlitchWavePainter extends CustomPainter {
   final double animationValue;
+  final bool isM;
 
-  _GlitchWavePainter(this.animationValue);
+  _GlitchWavePainter(this.animationValue, this.isM);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
+      ..strokeWidth = 4
       ..strokeCap = StrokeCap.round
       ..shader = const LinearGradient(
         colors: [AppTheme.neonPurple, AppTheme.neonBlue, AppTheme.neonPurple],
@@ -64,12 +77,39 @@ class _GlitchWavePainter extends CustomPainter {
 
     final path = Path();
     final centerY = size.height / 2;
+    final amplitude = size.height * 0.35;
+    
+    // M форма: дві вершини вгору (піки на 1/3 і 2/3)
+    // W форма: дві вершини вниз (впадини на 1/3 і 2/3)
+    final targetShape = isM ? 1.0 : -1.0;
+    final currentShape = isM ? animationValue : (1 - animationValue);
+    
     path.moveTo(0, centerY);
-
+    
     for (double x = 0; x <= size.width; x += 1) {
       final normalizedX = x / size.width;
-      final wave = sin((normalizedX * pi * 2) + (animationValue * pi * 2));
-      final y = centerY + wave * (size.height * 0.35);
+      double y;
+      
+      if (isM) {
+        // M: два піки вгору
+        if (normalizedX < 0.33) {
+          y = centerY - sin(normalizedX * 3 * pi) * amplitude * currentShape;
+        } else if (normalizedX < 0.67) {
+          y = centerY - sin((normalizedX - 0.33) * 3 * pi) * amplitude * currentShape;
+        } else {
+          y = centerY;
+        }
+      } else {
+        // W: два піки вниз
+        if (normalizedX < 0.33) {
+          y = centerY + sin(normalizedX * 3 * pi) * amplitude * currentShape;
+        } else if (normalizedX < 0.67) {
+          y = centerY + sin((normalizedX - 0.33) * 3 * pi) * amplitude * currentShape;
+        } else {
+          y = centerY;
+        }
+      }
+      
       path.lineTo(x, y);
     }
 
@@ -77,6 +117,7 @@ class _GlitchWavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GlitchWavePainter oldDelegate) => true;
+  bool shouldRepaint(_GlitchWavePainter oldDelegate) => 
+    oldDelegate.animationValue != animationValue || oldDelegate.isM != isM;
 }
 
