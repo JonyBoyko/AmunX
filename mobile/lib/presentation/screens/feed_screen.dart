@@ -31,21 +31,8 @@ class FeedScreen extends ConsumerStatefulWidget {
   ConsumerState<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends ConsumerState<FeedScreen> with SingleTickerProviderStateMixin {
+class _FeedScreenState extends ConsumerState<FeedScreen> {
   Episode? _playingEpisode;
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
 
   Future<void> _openEpisode(Episode episode) async {
     setState(() => _playingEpisode = episode);
